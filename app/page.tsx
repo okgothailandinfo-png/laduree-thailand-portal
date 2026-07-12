@@ -23,17 +23,14 @@ const steps = [
 
 export default function Home() {
   return (
-    <div className="relative min-h-full flex-1 bg-background text-text">
-      <header className="bg-primary">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-4 sm:px-8">
-          <p className="text-base tracking-[0.08em] text-white sm:text-lg">
+    <div className="relative min-h-full flex-1 bg-page text-text">
+      <header className="site-header">
+        <div className="container-sg flex items-center justify-between py-4">
+          <p className="brand-name text-base sm:text-lg">
             Ladurée Thailand (BKK 01)
           </p>
-          <a
-            href="#member"
-            className="inline-flex items-center justify-center rounded-full border border-primary bg-white px-4 py-1.5 text-xs uppercase tracking-[0.16em] text-primary transition-colors hover:bg-background"
-          >
-            Member
+          <a href="#member" className="btn-login">
+            Member?
           </a>
         </div>
       </header>
@@ -64,8 +61,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="border-b border-border bg-background">
-          <div className="mx-auto w-full max-w-5xl px-5 py-14 sm:px-8 sm:py-20">
+        <section className="border-b border-border bg-page">
+          <div className="container-sg py-14 sm:py-20">
             <h1 className="text-3xl leading-tight tracking-tight text-text sm:text-4xl">
               BKK 01
             </h1>
@@ -95,8 +92,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how-it-works" className="bg-background">
-          <div className="mx-auto w-full max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
+        <section id="how-it-works" className="bg-page">
+          <div className="container-sg py-12 sm:py-16">
             <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">
               How it works
             </p>
@@ -138,12 +135,14 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="mt-auto border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 px-5 py-6 text-text-secondary sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <p className="text-sm tracking-[0.06em] text-text">
-            © 2026 Ladurée Paris.
+      <footer className="site-footer mt-auto">
+        <div className="container-sg flex flex-col gap-2 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-base font-bold text-announcement">
+            © 2026 Laduree Paris. Powered by Getz
           </p>
-          <p className="text-xs tracking-wide"></p>
+          <a href="#allergen" className="text-base font-bold">
+            Allergen Information
+          </a>
         </div>
       </footer>
     </div>

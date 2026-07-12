@@ -1,20 +1,104 @@
 @import "tailwindcss";
 
+/*
+  Singapore design tokens — https://www.laduree.sg
+  Source: docs/design-tokens.md
+*/
+
 :root {
-  --primary: #8B815B;
-  --primary-dark: #655E43;
-  --background: #F8F7F3;
-  --surface: #FFFFFF;
-  --charcoal: #303030;
-  --text: #252525;
-  --text-secondary: #77736B;
-  --border: #D8D4CA;
-  --disabled: #B6B3AC;
-  --success: #61705A;
+  /* Merchant theme (verified) */
+  --main-color: #84754e;
+  --main-activated-color: #84754e;
+  --main-light-color: #84754e14;
+  --main-color-40: #84754e40;
+  --main-scrollbar-color: #84754e80;
+  --main-background-page-color: #fdf8ec;
+  --main-background-item-color: #fdf8ec;
+  --main-background-item-color-60: #fdf8ec60;
+  --main-background-item-color-80: #fdf8ec80;
+  --main-button-hover-color: #d5e4c0;
+  --main-announcement-text-color: #ffffff;
+  --main-font-family: var(--font-lora), "Lora", sans-serif;
+
+  --promo-code-color: #1565c0;
+  --voucher-color: #00b900;
+  --expired-color: #636a79;
+
+  /* Supporting (verified) */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-gray-7f: #7f7f7f;
+  --color-gray-85: #85807b;
+  --color-gray-555: #555555;
+  --color-card-vertical: #f0f0f0;
+  --color-card-horizontal: #f8f8f8;
+  --color-border-card: #ececec;
+  --color-border-cart-bar: #e6e6e6;
+  --color-border-ddd: #dddddd;
+  --color-border-ccc: #cccccc;
+  --color-star: #ffc700;
+  --color-badge: #da534f;
+  --color-checkout-legacy: #333333;
+  --color-olive-dark: #615236;
+  --color-olive-mid: #8a764f;
+  --color-tab-inactive: #a7a7a7;
+  --color-title-5: #6c6c84;
+  --color-placeholder: #80858a;
+  --color-input-text: #181818;
+  --color-input-fill: #ebebeb;
+
+  /* Radius (verified) */
+  --radius-input: 4px;
+  --radius-card: 8px;
+  --radius-card-horizontal: 10px;
+  --radius-control: 12px;
+  --radius-sheet: 24px;
+
+  /* Shadows (verified) */
+  --shadow-none: none;
+  --shadow-dropdown: 0 6px 12px rgba(0, 0, 0, 0.175);
+  --shadow-tabs: 0 3px 5px 0 rgba(0, 0, 0, 0.25);
+  --shadow-cart-tab: 0px -4px 4px rgba(0, 0, 0, 0.25);
+  --shadow-view-cart-bar: 0 -3px 15px rgba(0, 0, 0, 0.06);
+  --shadow-input-inset: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+
+  /* Layout (verified Bootstrap 3 + Singapore) */
+  --gutter: 15px;
+  --container-sm: 750px;
+  --container-md: 970px;
+  --container-lg: 1170px;
+  --header-logo-width: 170px;
+  --checkout-height: 46px;
+  --view-cart-bar-clearance: 64px;
+
+  /* App aliases (map to Singapore) */
+  --primary: var(--main-color);
+  --primary-dark: var(--color-olive-dark);
+  --background: var(--main-background-page-color);
+  --surface: var(--color-white);
+  --charcoal: var(--color-checkout-legacy);
+  --text: var(--color-black);
+  --text-secondary: var(--color-gray-7f);
+  --border: var(--color-border-card);
+  --disabled: var(--color-tab-inactive);
+  --success: var(--voucher-color);
   --foreground: var(--text);
 }
 
 @theme inline {
+  /* Singapore theme colors → Tailwind utilities */
+  --color-main: var(--main-color);
+  --color-main-activated: var(--main-activated-color);
+  --color-main-hover: var(--main-button-hover-color);
+  --color-page: var(--main-background-page-color);
+  --color-item: var(--main-background-item-color);
+  --color-announcement: var(--main-announcement-text-color);
+  --color-star: var(--color-star);
+  --color-badge: var(--color-badge);
+  --color-card: var(--color-card-vertical);
+  --color-card-horizontal: var(--color-card-horizontal);
+
+  /* Legacy aliases used by current pages */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
@@ -26,96 +110,189 @@
   --color-border: var(--border);
   --color-disabled: var(--disabled);
   --color-success: var(--success);
-  --font-sans: Georgia, "Times New Roman", serif;
-  --font-serif: Georgia, "Times New Roman", serif;
+
+  --font-sans: var(--main-font-family);
+  --font-serif: var(--main-font-family);
+
+  --radius-input: var(--radius-input);
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
 }
 
 body {
-  background: var(--background);
-  color: var(--text);
-  font-family: Georgia, "Times New Roman", serif;
+  background: var(--main-background-page-color);
+  color: var(--color-black);
+  font-family: var(--main-font-family);
+  font-size: 14px;
   font-weight: 400;
+  line-height: 1.2;
 }
 
+/* Singapore .btn-grey (ADD / primary filled) */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 2.75rem;
-  padding: 0.65rem 1.5rem;
-  background: var(--charcoal);
-  color: #ffffff;
-  border: 1px solid var(--charcoal);
-  border-radius: 4px;
+  padding: 6px 45px;
+  background: var(--main-color);
+  color: var(--main-announcement-text-color);
+  border: 1px solid var(--main-color);
+  border-radius: var(--radius-card);
   font-family: inherit;
-  font-size: 0.9375rem;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: 0.02em;
   text-decoration: none;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background: var(--main-button-hover-color);
+  border-color: var(--main-button-hover-color);
+  color: var(--main-color);
 }
 
+/* Singapore themed outline (Unavailable / secondary) */
 .btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 2.75rem;
-  padding: 0.65rem 1.5rem;
-  background: var(--surface);
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  border-radius: 4px;
+  padding: 6px 12px;
+  background: var(--color-white);
+  color: var(--main-color);
+  border: 1px solid var(--main-color);
+  border-radius: var(--radius-card);
   font-family: inherit;
-  font-size: 0.9375rem;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: 0.02em;
   text-decoration: none;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-secondary:hover {
-  background: var(--background);
-  color: var(--primary-dark);
-  border-color: var(--primary-dark);
+  background: var(--main-button-hover-color);
+  color: var(--main-color);
+  border-color: var(--main-color);
 }
 
+/* Singapore .btn-checkout */
 .btn-checkout {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  padding: 0.65rem 1.5rem;
-  background: var(--charcoal);
-  color: #ffffff;
-  border: 1px solid var(--charcoal);
-  border-radius: 4px;
+  width: 100%;
+  max-width: 100%;
+  height: var(--checkout-height);
+  min-height: var(--checkout-height);
+  padding: 0 18px;
+  background: var(--main-color);
+  color: var(--color-white);
+  border: 1px solid var(--main-color);
+  border-radius: var(--radius-control);
   font-family: inherit;
-  font-size: 0.9375rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
   text-decoration: none;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-checkout:hover {
-  opacity: 0.9;
+  background: var(--main-button-hover-color);
+  border-color: var(--main-button-hover-color);
+  color: var(--main-color);
 }
 
+/* Singapore .btn-login (Member?) */
+.btn-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  background: var(--main-color);
+  color: var(--color-white);
+  border: 1px solid var(--main-color);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-login:hover,
+.btn-login:focus {
+  background: var(--color-white);
+  color: var(--main-color);
+  text-decoration: none;
+}
+
+/* Singapore vertical product card surface */
 .card-surface {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: none;
+  background: var(--color-card-vertical);
+  border: 1px solid var(--color-border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-none);
 }
 
+/* Site chrome helpers */
+.site-header {
+  background: var(--main-background-page-color);
+  border-bottom: 1px solid var(--color-border-card);
+}
+
+.site-footer {
+  background: var(--main-color);
+  color: var(--color-white);
+}
+
+.site-footer a {
+  color: var(--color-white);
+}
+
+.brand-name {
+  color: var(--color-black);
+  font-family: var(--main-font-family);
+  font-weight: 400;
+}
+
+.container-sg {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+@media (min-width: 768px) {
+  .container-sg {
+    max-width: var(--container-sm);
+  }
+}
+
+@media (min-width: 992px) {
+  .container-sg {
+    max-width: var(--container-md);
+  }
+}
+
+@media (min-width: 1200px) {
+  .container-sg {
+    max-width: var(--container-lg);
+  }
+}
+
+/* Existing hero structure — Singapore colors/type only */
 .hero {
   width: 100%;
-  background: var(--background);
-  border-bottom: 1px solid var(--border);
+  background: var(--main-background-page-color);
+  border-bottom: 1px solid var(--color-border-card);
 }
 
 .hero-inner {
@@ -125,8 +302,7 @@ body {
   align-items: center;
   width: 100%;
   min-height: 55vh;
-  padding: 2.5rem 1.25rem;
-  transition: padding 0.3s ease;
+  padding: 2.5rem var(--gutter);
 }
 
 .hero-copy {
@@ -138,28 +314,27 @@ body {
 
 .hero-title {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--main-font-family);
   font-size: clamp(2.25rem, 7vw, 3.75rem);
   font-weight: 400;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  color: var(--text);
+  line-height: 1.2;
+  color: var(--color-black);
 }
 
 .hero-kicker {
   margin: 1.25rem 0 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.05rem;
+  font-family: var(--main-font-family);
+  font-size: 16px;
   font-weight: 400;
   letter-spacing: 0.04em;
-  color: var(--primary-dark);
+  color: var(--color-olive-dark);
 }
 
 .hero-subtitle {
   margin: 0.75rem 0 0;
   max-width: 28rem;
-  font-size: 1rem;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
@@ -174,16 +349,27 @@ body {
   width: 100%;
   min-height: 14rem;
   aspect-ratio: 4 / 5;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: #efebe3;
-  box-shadow: 0 8px 24px rgba(48, 48, 48, 0.08);
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  border: 1px solid var(--color-border-card);
+  border-radius: var(--radius-card);
+  background: var(--color-card-vertical);
+  box-shadow: var(--shadow-tabs);
 }
 
-@media (min-width: 640px) {
+@media (max-width: 991px) {
+  .btn-checkout {
+    font-size: 13px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .site-footer {
+    margin-bottom: var(--view-cart-bar-clearance);
+  }
+}
+
+@media (min-width: 768px) {
   .hero-inner {
-    padding: 3rem 2rem;
+    padding: 3rem var(--gutter);
   }
 
   .hero-actions {
@@ -196,17 +382,21 @@ body {
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 992px) {
   .hero-inner {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     gap: 3.5rem;
-    max-width: 72rem;
+    max-width: var(--container-lg);
     margin: 0 auto;
-    padding: 3.5rem 2rem;
+    padding: 3.5rem var(--gutter);
   }
 
   .hero-media {
     min-height: 22rem;
     aspect-ratio: 5 / 6;
+  }
+
+  .site-footer {
+    margin-bottom: 0;
   }
 }
