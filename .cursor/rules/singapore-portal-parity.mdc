@@ -1,0 +1,68 @@
+---
+description: Ladurée Singapore portal is the single source of truth; inspect before implementing
+alwaysApply: true
+---
+
+# Singapore Portal = Single Source of Truth
+
+Reference: https://www.laduree.sg
+
+When implementing any page, always inspect the corresponding page on laduree.sg first.
+
+- Do not approximate
+- Do not simplify
+- Do not redesign
+
+If information cannot be verified from the Singapore portal, stop and ask for approval. Do not invent content.
+
+## What may differ from Singapore
+
+Only these items may differ:
+
+- Outlet name
+- Outlet code
+- Address
+- Opening hours
+- Last order time
+- Product availability
+- Thailand pricing
+- Currency (THB)
+- Payment methods
+- Legal information
+
+Everything else should match Singapore.
+
+## Parity scope
+
+Reproduce Singapore as closely as technically possible: IA, nav, menu hierarchy, page sequence, system wording, button/category labels, pickup workflow, cart/checkout, typography, colors, spacing, borders, component behavior, and mobile behavior.
+
+## Never write customer-facing marketing copy
+
+Never create any of the following unless they already exist in the Singapore portal or are explicitly provided by the project owner:
+
+- headlines
+- taglines
+- descriptions
+- promotional copy
+- button wording
+- section titles
+
+Also do not invent: menu labels, category names, process names, or extra homepage sections.
+
+Forbidden examples (unless exact Singapore wording or owner-approved):
+- Luxury French Pâtisserie
+- Luxury Pickup Experience
+- Browse Collection
+- Select Boutique
+
+Reproduce Singapore terms exactly (e.g. Home, Menu, Recommended, About Us, Pick-up, Delivery, Select service, date and time, Pickup Time, Item(s) Added, Clear items, Checkout, All Items, Macaron Gift Boxes, ADD, View Cart, Allergen Information).
+
+## Thailand data
+
+See `.cursor/rules/thailand-localization.mdc` for the allowed differ list, THB formatting, and locale defaults.
+
+## Content source rule
+
+Customer-facing text must come from: (1) approved Singapore portal wording, (2) approved France/global brand material, or (3) Thailand ops info from the project owner (only for the allowed differ list above).
+
+If none exists: stop and ask for approval — or use `[CONTENT PENDING APPROVAL]` only when the owner has directed that placeholder. Never invent replacement copy.

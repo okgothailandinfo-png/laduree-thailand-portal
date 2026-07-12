@@ -1,0 +1,47 @@
+---
+description: Thailand-only localization rules for Ladurée Thailand portal
+alwaysApply: true
+---
+
+# Thailand Localization
+
+Singapore portal structure and wording stay unchanged. Localize only operational and commercial data.
+
+## Allowed differences from Singapore
+
+Only these may differ:
+
+- Outlet name
+- Outlet code
+- Address
+- Opening hours
+- Last order time
+- Product availability
+- Thailand pricing
+- Currency (THB)
+- Payment methods
+- Legal information
+
+Everything else must match Singapore.
+
+## Locale defaults
+
+- Country: Thailand
+- Brand: Ladurée Thailand
+- Timezone: Asia/Bangkok
+- Date format: DD/MM/YYYY
+- Time format: 24-hour
+
+## Currency and pricing
+
+- Currency: THB only
+- Display format: ฿1,290 (or THB 1,290 when that form is required)
+- Never display SGD
+- Never convert Singapore prices with an exchange rate
+- Use only owner-supplied or approved Thailand retail prices
+
+## Content ownership
+
+Outlet details, hours, last-order times, availability, prices, payment methods, and legal/policy text must be supplied or approved by the project owner.
+
+If Thailand-specific data is missing: stop and ask for approval. Do not invent values.
