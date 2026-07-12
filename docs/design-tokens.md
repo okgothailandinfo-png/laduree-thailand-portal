@@ -1,489 +1,430 @@
 # Ladurée Singapore — Design Tokens
 
-**Source of truth:** https://www.laduree.sg  
-**Audited:** 12 July 2026  
-**Method:** Extracted from live HTML CSS variables and linked stylesheets (`colour-scheme.css`, `style.css`, `custom_new_ui.css`, `font-style.css`, `style_v2.min.css`, `homepage.min.css`, `bootstrap.css`, `GetzThemMenuLeftRightAuto.css`, `remove-logo-box-shadow.css`).  
-**Rule:** Do not invent values. Unverified items are marked `TODO`.
+| Field | Value |
+| --- | --- |
+| **Source of truth** | https://www.laduree.sg |
+| **Audit date** | 2026-07-12 |
+| **Method** | Downloaded homepage HTML; downloaded linked CSS assets with version query strings from HTML `href`s; extracted tokens only from those files and inline `:root` / `@font-face` in the homepage. No invented values. Uncertain items marked **TODO**. |
+| **Asset version query** | `?v=27.20260706-124` (where present on hrefs) |
 
-Theme tokens below are the merchant-configured Ladurée Singapore values. Where Bootstrap defaults remain visible underneath theme overrides, both are noted.
+## CSS assets reviewed
+
+| File | Path | Status |
+| --- | --- | --- |
+| Homepage HTML | `/` | 200 |
+| `colour-scheme.css` | `/Content/css_newUI/colour-scheme.css` | 200 |
+| `style.css` | `/Content/css_newUI/style.css` | 200 |
+| `custom_new_ui.css` | `/Content/css_newUI/custom_new_ui.css` | 200 |
+| `font-style.css` | `/Content/css_newUI/font-style.css` | 200 |
+| `style_v2.min.css` | `/Content/themes/css-v2/style_v2.min.css` | 200 |
+| `homepage.min.css` | `/Content/v2/css/homepage/homepage.min.css` | 200 |
+| `bootstrap.css` | `/Content/css_newUI/bootstrap.css` | 200 — Bootstrap **v3.4.1** |
+| `GetzThemMenuLeftRightAuto.css` | `/Content/themes/GetzThemMenuLeftRightAuto.css` | 200 |
+| `remove-logo-box-shadow.css` | `/Content/custom-theme/remove-logo-box-shadow.css` | 200 |
+| `select-payment-method.css` | `/Content/css_newUI/select-payment-method.css` | 200 |
+| `slow-notice.css` | `/Content/slow-notice.css` | 200 |
+| `form_new_ui.css` | `/Content/css_newUI/form_new_ui.css` | **404** — linked from homepage; not available for extraction |
+
+Also linked on homepage but not fully audited in this pass: Owl carousel CSS, print CSS, modal-loading CSS, Font Awesome, jQuery UI, datetimepicker, product-details.min.css, getz-dropdownhover.css, S3 `styleCustom.css`.
 
 ---
 
-## 1. Color palette
+## Color palette
 
-### Theme CSS variables (live homepage `:root` / inline theme)
+### CSS custom properties (`:root`)
 
-| Token | Value | Role |
+**Observed in:** inline `<style>` on homepage HTML. `colour-scheme.css` consumes these via `var(--main-*)`.
+
+| Token | Value | Role (from name / usage) |
 | --- | --- | --- |
-| `--main-color` | `#84754e` | Primary olive / brand |
-| `--main-activated-color` | `#84754e` | Activated / accent (same as primary on this merchant) |
-| `--main-light-color` | `#84754e14` | Primary at ~8% alpha |
-| `--main-color-40` | `#84754e40` | Primary at ~25% alpha |
-| `--main-scrollbar-color` | `#84754e80` | Scrollbar (~50% alpha) |
-| `--main-background-page-color` | `#fdf8ec` | Page / header shell background |
+| `--main-color` | `#84754e` | Primary brand / chrome |
+| `--main-light-color` | `#84754e14` | Light tint of main (8-digit hex) |
+| `--main-activated-color` | `#84754e` | Active / selected (same as main on this tenant) |
+| `--main-background-page-color` | `#fdf8ec` | Page background |
 | `--main-background-item-color` | `#fdf8ec` | Item / panel background |
-| `--main-background-item-color-60` | `#fdf8ec60` | Item bg ~38% alpha |
-| `--main-background-item-color-80` | `#fdf8ec80` | Item bg ~50% alpha |
-| `--main-button-hover-color` | `#d5e4c0` | Button / nav hover wash |
-| `--main-announcement-text-color` | `#ffffff` | Text on primary buttons / announcements |
-| `--main-font-family` | `"Lora", sans-serif` | (typography; listed for completeness) |
+| `--main-button-hover-color` | `#d5e4c0` | Button / control hover |
+| `--main-announcement-text-color` | `#ffffff` | Text on brand fills (e.g. `.btn-grey`) |
+| `--main-scrollbar-color` | `#84754e80` | Scrollbar (alpha) |
+| `--main-color-40` | `#84754e40` | Borders (e.g. product detail footer top) |
+| `--main-background-item-color-60` | `#fdf8ec60` | Background with alpha |
+| `--main-background-item-color-80` | `#fdf8ec80` | Background with alpha |
+| `--main-font-family` | `"Lora", sans-serif` | Primary UI font stack |
 
-### Applied / supporting colors (verified in theme/component CSS)
+**Homepage / voucher vars** (`homepage.min.css` `:root`):
 
-| Value | Where observed |
-| --- | --- |
-| `#FFFFFF` / `#fff` | Surfaces, footer link/copy on primary, buttons text |
-| `#000000` / `#000` | Body text (`style.css` body), titles |
-| `#7F7F7F` | `.title-4` hover (desktop) |
-| `#85807B` | `.text-gray-color` |
-| `#F0F0F0` | Vertical product card background |
-| `#F8F8F8` | Horizontal product card background (mobile rule) |
-| `#ececec` | Horizontal product card border |
-| `#e6e6e6` | Mobile sticky cart bar top border |
-| `#ddd` / `#ccc` | Borders (menus, Bootstrap inputs) |
-| `#d9d9d9`, `#ebebeb`, `#e1e1e1`, `#d7d7d7` | Misc borders / input chrome |
-| `#555555` / `#555` | Bootstrap `.form-control` text; some menu titles |
-| `#a7a7a7` | Inactive service tab label color (`style.css`) |
-| `#6c6c84` | `.title-5` default color |
-| `#515151` | Struck price (`.price-line-through`) |
-| `#80858a` | Homepage input placeholder |
-| `#181818` | Homepage `.input-group-name` text |
-| `#FFC700` | Star recommendation color (`.color-by-star`) |
-| `#DA534F` | Cart badge / promo-ish red override |
-| `#fd576b` | Legacy pink accents still present in base `style.css` (often overridden by `--main-color`) |
-| `#333` | `#btnCheckOut` background in `style.css` (see Buttons) |
-| `#66afe9` | Bootstrap `.form-control:focus` border (default framework) |
-
-### Homepage.min extra CSS variables
-
-| Token | Value |
-| --- | --- |
-| `--promo-code-color` | `#1565c0` |
-| `--voucher-color` | `#00b900` |
-| `--expired-color` | `#636a79` |
-
-### CMS inline colors (About Us content, not theme tokens)
-
-| Value | Where |
-| --- | --- |
-| `#84754e` | About Us body text |
-| `rgb(95, 80, 53)` | About Us store headings |
-| `#615236`, `#8a764f` | Delivery charges announcement table text |
-
----
-
-## 2. Typography
-
-| Role | Family | Source |
+| Token | Value | Observed with |
 | --- | --- | --- |
-| Primary UI (`--main-font-family`) | `"Lora", sans-serif` | Live theme + `font-style.css` |
-| Lora files | `/Content/fonts/custom-fonts/Lora/Lora.woff`, `.ttf` | `@font-face` in homepage HTML (`font-weight: normal`) |
-| Also loaded | Google Fonts `Lato` (100,300,400,700,900) | `<link>` on homepage |
-| Also imported | `Bebas Neue` | `@import` in `homepage.min.css` |
-| Base `style.css` body fallback | `"Helvetica Neue", Helvetica, Arial, sans-serif` | Overridden for branded UI by `font-style.css` → Lora |
-| About Us CMS paragraphs | `georgia, serif` | Inline CMS styles on `/Home/Hours` |
-| Cart arrow label (colour-scheme) | `Roboto` (named in rule) | `#header .cart .fa-arrow-left span` |
-| Icons | Font Awesome 4.3.0 | Linked stylesheet |
+| `--promo-code-color` | `#1565c0` | Promo code UI |
+| `--voucher-color` | `#00b900` | Voucher UI |
+| `--expired-color` | `#636a79` | Expired state |
 
-`font-style.css` forces Lora on: `body`, branch name, service tabs, brand name, titles (`.title-2`, `.title-4`), cart product titles, modals, promotion title, tracker titles, datetime picker, etc.
+### Supporting colors (hardcoded; where observed)
+
+| Color | Where observed | Notes |
+| --- | --- | --- |
+| `#ffffff` / `#fff` | Buttons, footer links, tab labels, cart chrome | Ubiquitous white |
+| `#000000` / `#000` | `.brand-name` (`colour-scheme.css`); `body` text (`style.css`) | |
+| `#333` / `#333333` | Payment modal secondary buttons | |
+| `#555` / `#555555` | Inactive tab chrome (`.tab .nav-tabs`), service tabs | |
+| `#7F7F7F` | Slider dots (`colour-scheme.css`) | |
+| `#d7d7d7` | Cart category borders; dotted item dividers | |
+| `#DA534F` | `#header a#my-cart-count .fa-shopping-cart span` badge | Cart count badge |
+| `#FD576B` | Delivery modal hover accents; older pink accents in `style.css` | Coexists with brand olive; not CSS-var driven |
+| `#FF7A00` | `.btn-action-required-*` | Action-required CTAs |
+| `#ff9800` | `#slow-notice` background (`slow-notice.css`) | |
+| `#b94a48` | `input.input-validation-error` border | Validation |
+| `#fcf8e3` / `#faebcc` / `#8a6d3b` | `.content-minimum-delivery` (warning panel) | |
+| `#F0F0F0` / `#f0f0f0` | Payment modal header / voucher sections | |
+| `#777777` | Payment radio `small` helper text | |
+| `#d90000` | `.text-red-color` (`select-payment-method.css`) | |
+| `#CCCCCC` | Secondary button borders in payment modals | |
+| `#8a764f` | Inline announcement HTML on homepage | Content color close to but **not** identical to `--main-color` `#84754e` |
+| `#615236` | Inline announcement HTML on homepage | Content-only |
+| `#C2AE83` / `#c2ae83` | Commented scrollbar / animation rules | Mostly commented; treat cautiously |
+| `#cbb991` | `.mobile-progress-bar-dilivery .content` border | |
+| `#301b20` | `homepage.min.css` | **TODO:** map exact selectors/roles |
+| `#edeee0` | `style_v2.min.css` | **TODO:** map exact selectors/roles |
+| Bootstrap `#337ab7` `.btn-primary` | `bootstrap.css` | Overridden by `colour-scheme.css` for themed buttons |
+
+**TODO:** Full inventory of every hex in `style.css` / `style_v2.min.css` with semantic naming. Above list is verified but not exhaustive.
 
 ---
 
-## 3. Font sizes
+## Typography / font family
 
-Verified recurring / component sizes:
+### Primary (tenant)
 
-| Size | Where |
+| Token / rule | Value | Source |
+| --- | --- | --- |
+| `@font-face` `Lora` | `font-weight: normal`; `src`: `/Content/fonts/custom-fonts/Lora/Lora.woff`, `.ttf`; `font-display: swap` | Inline homepage HTML |
+| `--main-font-family` | `"Lora", sans-serif` | Inline homepage `:root` |
+| Application | `body`, headings, cart titles, tabs, modals, tracker, etc. use `font-family: var(--main-font-family) !important` | `font-style.css` |
+
+### Also declared (not the live body default under `font-style.css`)
+
+| Family | Where | Notes |
+| --- | --- | --- |
+| `"Helvetica Neue", Helvetica, Arial, sans-serif` | `body` in `style.css` (`font-size: 14px`, `font-weight: 400`, `line-height: 1.2`) | Base stack; **overridden** by `font-style.css` |
+| `'Open Sans', sans-serif` | `.brand-name` in `style.css` | Also overridden toward Lora via `font-style.css` |
+| `'SweetlyBroken', cursive, sans-serif` | `@font-face` + decorative title rules in `style.css` | Specialty display font |
+| `FontAwesome` | `style.css` `@font-face` | Icons |
+| `"Glyphicons Halflings"` | `bootstrap.css` | Bootstrap icons |
+| `sans-serif` | `#slow-notice` | Explicit exception |
+
+Homepage also links Google Fonts **Lato** stylesheet and `homepage.min.css` imports **Bebas Neue** — usage map beyond presence: **TODO**.
+
+**TODO:** Confirm whether additional Lora weights (bold/italic) are loaded elsewhere; only `font-weight: normal` `@font-face` was verified on the homepage.
+
+---
+
+## Font size scale
+
+**No named type scale** (no `--font-size-*` tokens). Verified recurring `font-size` values from brand CSS:
+
+| Size | Approx. frequency | Verified usage examples |
+| --- | --- | --- |
+| `14px` | Very high | `body` (`style.css`); homepage cart CTA; many UI labels |
+| `12px` | High | `.panel-title > a`; meter text; compact labels |
+| `16px` | High | Footer menu/copy; checkout button; cart “items added” |
+| `13px` | Medium | `#slow-notice`; various compact UI |
+| `18px` | Medium | Action-required buttons; mobile tab router; voucher titles |
+| `20px` | Medium | `.title-2` (`style.css`); mobile cart tab item |
+| `15px` | Lower | Footer copy variants; `.to-order-now` |
+| `10px`–`11px` | Low | Compact icons / reward info |
+| `22px` | Low | `.promotion-title` |
+| `23px` | Low | `.modal-body h4` (`font-style.css` `!important`) |
+| `24px` | Low | `.welcome-page-h4`; `.back-to-menu` |
+| `26px`–`27px` | Low | Tracker / voucher; `.tracker-services-available` → `27px !important` |
+| `12pt` | Low | `.btn-view-changes` |
+| `em` / `%` | Various | e.g. `#footer .footer` `0.92857em` / `0.6875em` in media blocks |
+
+Base body size verified: **14px** (`style.css`).
+
+---
+
+## Font weights
+
+No CSS-var weight tokens. Verified values in brand CSS:
+
+| Weight | Frequency (approx.) | Examples |
+| --- | --- | --- |
+| `bold` / `700` | High | Titles, mobile tab router, homepage cart CTA, checkout |
+| `500` | Medium | Tab labels; `.clear-items`; payment radio labels; quantity value |
+| `400` / `normal` | Medium | Body / default |
+| `600` | Lower | Tracker copy; `.brand-name` in `style.css` |
+| `300` | Rare | `.alcoholic-policy__message` |
+| `200` | Rare | `.title-order-status-header` |
+
+**TODO:** Whether Lora `@font-face` actually serves 500/600/700 or browser synthesizes — only normal face verified in HTML.
+
+---
+
+## Line heights
+
+No named scale. Verified recurring values:
+
+| Value | Notes / examples |
 | --- | --- |
-| `14px` | Body (`style.css`), `.title-4`, `.text-clamp-overflow-item`, Bootstrap `.form-control`, branch text, homepage name input |
-| `12px` | `.btn-login` (`style_v2`) |
-| `13px` | `.btn-checkout` override (smaller variant in `style_v2`); tab labels via `em(13px)` in `style.css` |
-| `15px` | `.item-products .text-clamp-overflow-item` |
-| `16px` | `.btn-checkout` primary rule; footer menu / copyrights |
-| `18px` | Modal cart arrow span; various headings |
-| `20px` | Popup titles; some welcome modal inputs |
-| `22px` | `.promotion-title`, `.order-total-title` (colour-scheme) |
-| `23px` | `.modal-body h4` (`font-style.css`) |
-| `27px` | `.tracker-services-available` |
-| `0.92857em` | `#footer .footer` (~13px if 14px root) |
-| `1em` | Vertical card `h3`; `#menu-mb .title-5` |
-| `75%` | Struck-through price |
-| About Us CMS | `18px` paragraphs; `16px` store block |
-
-Bootstrap also ships many sizes; merchant UI above is authoritative for branded surfaces.
+| `1.2` | `body` (`style.css`) |
+| `1.42857143` | Bootstrap `.btn` / `.form-control` |
+| `1.3` | `.title-2 > a`; product modal subtitle; payment helpers |
+| `1.5` | Payment radio labels |
+| `17px` | Many v2 / homepage buttons (checkout tracker, homepage cart) |
+| `20px` / `22px` / `16px` / `18px` / `14px` | Component-specific |
+| `160%` / `140%` / `100%` | Occasional percentage line-heights |
 
 ---
 
-## 4. Font weights
+## Letter spacing
 
-| Weight | Where observed |
-| --- | --- |
-| `normal` / `400` | Lora `@font-face`; body `font-weight: 400`; `.title-4` |
-| `500` | Service tab labels; cart arrow span |
-| `600` | `.branch__text` |
-| `700` / `bold` | `.btn-login`; popup titles; `#btnCheckOut`; footer menu; various CTAs |
-| `bolder` | `#menu-mb .title-5` |
-| `300` | Present in CSS corpus (Lato load) — component mapping **TODO** beyond font link |
-
----
-
-## 5. Line heights
+No named scale. Verified values:
 
 | Value | Where |
 | --- | --- |
-| `1.2` | `body` in `style.css` |
-| `1.3` | `.title-2 > a` |
-| `1.42857143` | Bootstrap body / `.form-control` |
-| `17px` | Vertical card title links |
-| `18px` | Floating category titles (colour-scheme) |
-| `20px` | Bootstrap navbar links |
-| `22px` | Recurring in theme CSS |
-| `24px` | Popup title (`style_v2`) |
-| `32px` / `33px` | Header cart icon/label line-heights |
-| `160%` / `140%` | Present in CSS corpus — specific component mapping **TODO** |
+| `.2px` | Frequent in `homepage.min.css` |
+| `.4px` | `style_v2` outlet/datetime titles |
+| `.5px` | Voucher status names (`homepage.min.css`) |
+| `.6px` | Homepage cart / mark-as-ready buttons |
+| `.3px` | `.cart-block .btn-checkout` |
+| `1px` | Payment options popup titles (`style_v2`) |
+| `.04em` / `.01em` | Occasional popup text |
+| `1.08px` | Announcement OK button |
+| `35px` / `12px` | `.text-2` decorative (`style.css`) — specialty |
 
 ---
 
-## 6. Spacing scale
+## Spacing scale
 
-No named spacing-token system was found. Verified recurring spacing values:
+**No named spacing scale** (no `--space-*` tokens).
 
-| Value | Common uses |
+### Observed recurring padding/margin values (brand CSS)
+
+| Value | Approx. uses |
 | --- | --- |
-| `2px` | Micro paddings |
-| `3px` | Branch text padding-top; `#bodyMainHome` margin-top |
-| `5px` | Card/title offsets; input-group margins |
-| `6px` | `.title-4` vertical margin; Bootstrap input padding |
-| `8px` | Tab span padding; homepage input padding; popup gaps |
-| `10px` | Popup title padding; mobile sticky cart padding; checkout area padding |
-| `12px` | `.title-4` horizontal margin; footer padding-bottom; Bootstrap input horizontal padding |
-| `15px` | Bootstrap grid gutter half; card text margins; navbar link horizontal padding; popup content padding |
-| `16px` | Nav bar padding-top; cart tabs margin-bottom |
-| `18px` | Checkout button horizontal padding; footer menu item padding |
-| `19px` | Footer menu left padding |
-| `20px` | Product card margin-bottom |
-| `27px` | Footer socials margin-top |
-| Bootstrap `.row` | `margin-left/right: -15px` |
-| Bootstrap columns | `padding-left/right: 15px` (standard Bootstrap 3) |
+| `0` | Very high |
+| `5px` | High |
+| `10px` | High |
+| `15px` | High |
+| `20px` | Medium |
+| `8px` | Medium |
+| `30px` | Lower |
+| `3px` / `4px` / `6px` / `12px` / `16px` / `25px` / `35px` | Present |
 
-Formal 4/8 spacing scale document: **TODO** (not defined as tokens on site).
+Bootstrap grid gutter pattern: `.container` uses **15px** horizontal padding; `.row` uses `margin-left/right: -15px`. This build also contains `[class*="col-"] { padding-right: 0; padding-left: 0; }` — verified customization of Bootstrap 3.
+
+**TODO:** Formal reduced spacing token set would require design intent not published in CSS.
 
 ---
 
-## 7. Border radius
+## Border radius
 
-| Value | Where |
+No named radius tokens. Verified recurring values:
+
+| Value | Examples |
 | --- | --- |
-| `0` / `0px` | Some legacy buttons (`.btn-border-red` in `style.css`) |
-| `3px` | Quantity badge radius (homepage cart) |
-| `4px` | Bootstrap inputs; MENU dropdown (`GetzThemMenu…`) |
-| `5px` | `#btnCheckOut` in `style.css`; some input-group buttons |
-| `8px` | Vertical product cards + image top corners + ADD bottom corners |
-| `10px` | Horizontal product cards (mobile colour-scheme rule) |
-| `12px` | `.btn-checkout`, `.btn-login`, service `.nav-tabs` container |
-| `16px` | Homepage `.input-group-name` |
-| `20px` | Header side cart tab (`20px 0 0 20px`) |
-| `24px 24px 0 0` | Bottom sheet `.popup-dialog` |
-| `50%` | Circular controls (scroll-top etc.) |
+| `4px` | Bootstrap `.btn` / `.form-control`; `#header .navbar-toggle`; quantity buttons (mobile) |
+| `5px` | `#content-tab-main` bottom corners; floating category; cart tracker button |
+| `6px` | Payment modal header corners |
+| `8px` | Product thumbnails / vertical products; bottom of `btn-border-red` on cards |
+| `12px` | `.btn-checkout`; homepage cart CTA |
+| `20px` / `20px 20px 0 0` | Service tabs; cart side panel `20px 0 0 20px` |
+| `50%` | Circles (scroll-top, radio custom) |
+| `0` / `0px` | Many tabs / squared controls |
 
 ---
 
-## 8. Border widths
+## Border width
 
-| Width / style | Where |
+| Value | Notes |
 | --- | --- |
-| `1px solid var(--main-color)` | Primary themed borders (ADD outline / login / etc.) |
-| `1px solid #ececec` | Horizontal product cards |
-| `1px solid #e6e6e6` | Mobile sticky cart bar |
-| `1px solid #ccc` | Bootstrap `.form-control` |
-| `1px solid #ddd` | Menus / Bootstrap tabs |
-| `1px solid rgba(0,0,0,0.15)` | MENU dropdown |
-| `2px solid var(--main-color)` | Occurs in theme CSS |
-| `2px solid transparent` | Legacy `.btn-grey` in `style.css` |
-| `10px solid var(--main-color)` | `#checkoutArea4Click` frame |
+| `1px` | Dominant (buttons, inputs, dividers, footer borders) |
+| `2px` | Less common (e.g. chevron borders in mobile login) |
+| `3px` | Tab top indicator height uses `height: 3px` (not always border-width) |
+
+Default themed outline button: `1px solid var(--main-color)`.
 
 ---
 
-## 9. Shadows
+## Button styles
 
-| Value | Where |
+Bootstrap base (`.btn` in `bootstrap.css`): `padding: 6px 12px`; `font-size: 14px`; `line-height: 1.42857143`; `border-radius: 4px`; `font-weight: normal`; transparent border.
+
+### Themed primary fills (`colour-scheme.css`)
+
+| Selector | Properties (verified) |
 | --- | --- |
-| `none` | Logo box-shadow forced off: `#header .navbar-brand { box-shadow: none !important; }` (`remove-logo-box-shadow.css`) |
-| `0 6px 12px rgba(0,0,0,0.175)` | MENU dropdown |
-| `0 3px 5px 0 rgba(0,0,0,.25)` | Service tabs container |
-| `0px -4px 4px rgba(0,0,0,0.25)` | Header side cart tab |
-| `0 -3px 15px rgba(0,0,0,.06)` | Mobile sticky cart bar |
-| `0 -4px 4px rgba(255,255,255,.16), inset 0 2px 2px rgba(0,0,0,.15)` | Bottom sheet popup (also related variants) |
-| `inset 0 1px 1px rgba(0,0,0,0.075)` | Bootstrap inputs |
-| `0 0 6px rgba(0,0,0,0.5)` | Logo rule in `style.css` (overridden to `none` for this merchant) |
+| `.btn-primary` | `color: #fff`; `background-color: var(--main-color) !important`; `border-color: var(--main-color) !important` |
+| `.btn-danger` | `color: #fff !important`; `background-color: var(--main-color) !important`; `border-color: var(--main-color) !important` |
+| `.btn-danger:hover` | `background-color: var(--main-button-hover-color) !important`; `color: #fff !important`; `border-color: #dcd8d8 !important` |
+| `.btn-grey` | `color: var(--main-announcement-text-color) !important`; `background-color: var(--main-color) !important` |
+| `.btn-grey:hover` | `background-color: var(--main-button-hover-color) !important` |
+| `.btn-proceed-to-payment` | Brand fill; hover → `--main-button-hover-color` |
+| `.btn-number` | Brand fill; desktop hover → `--main-button-hover-color` |
+| `.post-code-block .btn-next` | Brand fill |
+| `.btn-view-changes` | Brand fill + `font-size: 12pt`; hover inverts |
 
-Stronger Bootstrap modal shadows exist in framework CSS; merchant-facing emphasis is the list above.
+### Outline / secondary
 
----
-
-## 10. Button styles
-
-### Primary ADD (cart add) — `.btn-grey` via colour-scheme (wins over base)
-
-- Text: `var(--main-announcement-text-color)` → `#ffffff`
-- Background: `var(--main-color)` → `#84754e`
-- Hover background: `var(--main-button-hover-color)` → `#d5e4c0`
-- Used with `.btn-add-to-cart` / `.btn-3` / `.btn-sm` classes on product cards
-- Label: `ADD`
-
-### Unavailable — `.btn-border-red` (themed)
-
-- Background: `#fff`
-- Border: `1px solid var(--main-color)`
-- Color: `var(--main-color)`
-- Bottom corners on vertical cards: `8px`
-- Label: `Unavailable`
-
-### Member login — `.btn-login` (`style_v2`)
-
-- Border: `1px solid var(--main-color)`
-- Radius: `12px`
-- Background: `var(--main-color)`
-- Padding: `5px 8px`
-- Color: `#fff`
-- Weight: `700`
-- Size: `12px`
-- Letter-spacing: `.04em`
-- Hover: text `var(--main-color)`, background `#fff`
-
-### Checkout — `#btnCheckOut` / `.btn-checkout`
-
-From `style.css`:
-
-- `#btnCheckOut`: background `#333`; radius `5px`; `font-weight: bold`
-
-From `style_v2.min.css`:
-
-- `.btn-checkout`: width `100%`; `text-transform: uppercase`; color `#fff`; height `46px`; font-size `16px` (also `13px` override present); letter-spacing `.3px`; padding-left/right `18px` (also `10px` override); radius `12px`
-
-From `colour-scheme.css`:
-
-- `#btnCheckOut:hover`: background `var(--main-button-hover-color)`
-- Checkout frame `#checkoutArea4Click`: `border: 10px solid var(--main-color)`
-
-Effective resting background when themed: **TODO** to confirm computed paint order in browser (base `#333` vs theme/`bg-pink` parent). Parent cart panels use `.bg-pink` → `background-color: var(--main-color)`.
-
-### Mobile sticky View Cart — `.btn-homepage-cart-display`
-
-- Background: `var(--main-color)`
-- Color: `#fff`
-- Height: `44px`
-- Letter-spacing: `.6px`
-- Bar padding: `10px 15px 12px`
-- Bar shadow: `0 -3px 15px rgba(0,0,0,.06)`
-
-### Bootstrap `.btn-primary`
-
-Framework default blues remain in `bootstrap.css` but colour-scheme overrides `.btn-primary` to `--main-color` + white text.
-
----
-
-## 11. Input styles
-
-### Bootstrap `.form-control` (base)
-
-- Height: `34px`
-- Padding: `6px 12px`
-- Font-size: `14px`
-- Line-height: `1.42857143`
-- Color: `#555555`
-- Background: `#fff`
-- Border: `1px solid #ccc`
-- Radius: `4px`
-- Shadow: `inset 0 1px 1px rgba(0,0,0,0.075)`
-- Focus border: `#66afe9` + blue glow shadow
-
-### Homepage name-style field — `.input-group-name`
-
-- Background: `#ebebeb`
-- Radius: `16px`
-- Border: `0`
-- Padding: `8px 20px 8px 30px`
-- Height: `48px`
-- Font-size: `14px`
-- Weight: `normal`
-- Color: `#181818`
-- Placeholder: `#80858a`
-
-### Welcome / join modal inputs
-
-- Font-size: `20px`
-- Background: `#FFF`
-- Padding-left: `50px`
-- Height: `40px`
-
-### Linked file `form_new_ui.css`
-
-Referenced by homepage HTML but returned **HTTP 404** at audit time → additional form token details: **TODO** (re-fetch when available).
-
-### Placeholders observed in DOM
-
-`Search items`, `Delivery location postal code`, `Enter your name `, `Tap to add note`, `Type the request in here`, `Voucher Code / Phone Number`, etc.
-
----
-
-## 12. Header
-
-| Property | Verified value |
+| Selector | Properties |
 | --- | --- |
-| Shell background | `#header > .inner`, brand-name, `#container` → `var(--main-background-page-color)` (`#fdf8ec`) |
-| Mobile fixed bar | `.header__navbar`: `position: fixed`; `background-color: #fff`; `width: 100%`; `z-index: 4` |
-| Logo (`.navbar-brand`) | Width `170px`; `background #fff`; `margin-top: 10px`; padding `0`; box-shadow removed for this merchant |
-| Nav active/open | Color `var(--main-color)` |
-| Nav hover | `var(--main-button-hover-color)` / also rules setting `var(--main-color)` |
-| Hamburger bars | `var(--main-color)` |
-| Side cart tab | Width `47px`; height `258px`; bg `var(--main-color)`; radius `20px 0 0 20px`; shadow `0px -4px 4px rgba(0,0,0,0.25)`; top `33px` |
+| `.btn-border-red` | `background-color: #fff !important`; `border: 1px solid var(--main-color) !important`; `color: var(--main-color) !important` |
+| `.btn-border-red:hover` | fill `--main-button-hover-color`; `border: 1px solid #fff`; `color: #fff` |
+| `.btn-border-promotion` | Same outline pattern as `.btn-border-red` |
+
+### Action-required (non-brand orange)
+
+| Selector | Properties |
+| --- | --- |
+| `.btn-action-required-background` | `border: 1px solid #FF7A00`; `min-width: 270px`; `font-size: 18px`; `background-color: #FF7A00`; `color: #ffffff` |
+| `.btn-action-required-border` | White fill, `#FF7A00` text/border; same sizing |
+
+### Homepage cart CTA (`homepage.min.css`)
+
+`.btn-homepage-mark-as-ready`, `.btn-homepage-cart-display`:
+
+- `background-color: var(--main-color)`; `color: #fff`
+- `letter-spacing: .6px`; `line-height: 17px`; `text-transform: uppercase`; `font-weight: 700`; `font-size: 14px`
+- `border: 1px solid rgba(255,255,255,.5)`; `border-radius: 12px`; `height: 44px`; `padding: 8px 15px`
+
+### Checkout (`style_v2.min.css`)
+
+`.btn-checkout`: `width: 100%`; `text-transform: uppercase`; `color: #fff`; `height: 46px`; `font-size: 16px`; `letter-spacing: .3px`; `padding-left/right: 18px`; `border-radius: 12px !important`  
+
+Background fill via theme / parent — **TODO:** confirm computed background if not in the same rule block.
+
+`.cart-block .btn-view-order-tracker`: brand fill, white text, `border-radius: 5px`, `height: 44px`, `font-weight: 700`, `font-size: 16px`, uppercase.
+
+### Payment modal secondary (`select-payment-method.css`)
+
+`.btn-return-previous-screen` / `.btn-back-to-cart`: `background: #FFFFFF`; `color: #333333`; `border: 1px solid #CCCCCC`; typically `min-width: 200px`; `height: 40px`.
+
+### Disabled
+
+`.btn-disabled` (`custom_new_ui.css`): `cursor: not-allowed`; `opacity: 0.65`; `box-shadow: none`.
+
+---
+
+## Form styles
+
+### Bootstrap baseline (`bootstrap.css`)
+
+`.form-control`: `height: 34px`; `padding: 6px 12px`; `font-size: 14px`; `line-height: 1.42857143`; `color: #555555`; `background: #fff`; `border: 1px solid #ccc`; `border-radius: 4px`; inset shadow.
+
+### Theme overrides (`colour-scheme.css`)
+
+| Selector | Properties |
+| --- | --- |
+| Quantity / modifier text inputs | `border-color: var(--main-color) !important` |
+| `.theme-radio-color input[type='radio']` | Custom 20×20 circle; `border: 1px solid var(--main-color)`; checked fill `var(--main-color)` |
+| `input.input-validation-error` | `border: 1px solid #b94a48` |
+| `.modal .time-selector-dropdown`, `.modal .input-group-addon` | `border-color: var(--main-color) !important` |
+| `.search-form .input-1 input.stxtProductSearch:focus` | `background-color: var(--main-background-item-color) !important` |
+
+### Payment / voucher forms (`select-payment-method.css`)
+
+- Radio rows: `border: 1px solid #f0f0f0`; `padding: 15px 5px`; active `box-shadow: 2px 4px 10px 6px rgba(0,0,0,0.1)`
+- Labels: `font-size: 16px`; `font-weight: 500`; `line-height: 1.5`
+- Helpers: `color: #777777`; `line-height: 1.3`
+
+### `form_new_ui.css`
+
+**404 — no form tokens from this file.** Homepage still links it. **TODO:** confirm if S3 `styleCustom.css` or other sheets replace it.
+
+---
+
+## Navigation styles
+
+| Area | Verified rules |
+| --- | --- |
+| Header nav links | `#header .navbar-nav li.active > a` / `.open > a` → `color: var(--main-color) !important` |
+| Desktop hover | Competing rules: `--main-button-hover-color`, `--main-color`, and legacy `#fd576b` in `style.css` — **TODO:** resolve cascade on live homepage |
+| Tabs | `.tab .nav-tabs li > a`: uppercase, `font-weight: 500`, muted `#a7a7a7`; active span `background-color: var(--main-color)` |
+| Service tabs | `.tab-service-main .tab-service-item.active`: `background: var(--main-color)`; white text; `border-radius: 20px 20px 0 0` |
+| Mobile tab router | `.mobile-tab__header--nav .nav-tabs-router`: white bg, black text, uppercase, `font-weight: 700`, `font-size: 18px` |
+| Category dropdown | `GetzThemMenuLeftRightAuto.css`: menu `width: 250px`; `background: #fff`; `border-radius: 4px`; `border: 1px solid rgba(0,0,0,0.15)`; shadow `0 6px 12px rgba(0,0,0,0.175)`; hover `#f5f5f5` |
+| Left menu | `#idMenuLeft .nav > li` `border-right: 1px solid #ffffff` |
+
+---
+
+## Header
+
+| Selector / trait | Verified |
+| --- | --- |
+| `#header.header` | `min-height: 90px` (`style.css`) |
+| `#header` | `box-shadow: 0 0 1px #ebebeb` |
+| `#header .navbar-brand` | `width: 170px`; `background-color: #fff`; shadow in `style.css` **removed** by `remove-logo-box-shadow.css` (`box-shadow: none !important`) |
+| `#header .navbar-toggle .icon-bar` | `background-color: var(--main-color) !important` |
+| `#header > .inner`, `.brand-name`, `#container` | `background-color: var(--main-background-page-color) !important` |
+| Cart rail (`#header .cart`) | Size/position in `colour-scheme.css`; homepage forces white cart bg; icon uses `--main-color` |
 | Cart badge | `#DA534F` |
-| Branch label | Uppercase; `14px`; weight `600`; Lora |
 
-Desktop vs mobile header composition differs (logo + MENU + RECOMMENDED + About Us + Member? vs compact service/search/cart). Exact desktop header total height: **TODO** (computed; JS adjusts `#header` height from `.header__navbar`).
+Sticky brand-name variants exist (`height: 57px` / `60px`, white background) in `style.css`.
 
 ---
 
-## 13. Footer
+## Footer
 
-| Property | Verified value |
+| Selector | Verified |
 | --- | --- |
-| Background | `#footer .footer { background-color: var(--main-color); }` |
-| Link color | `#FFFFFF` |
-| Copyright (`.copyrights-copy`) | `#FFFFFF`; `16px` |
-| Menu items | `16px`; `font-weight: bold`; horizontal padding `19px` / `18px` |
-| Footer font-size | `0.92857em` |
-| Padding-bottom | `12px` |
-| Socials margin-top | `27px` |
-| Mobile clearance | `@media (max-width: 991px) { footer#footer { margin-bottom: 64px !important; } }` (inline/related rule observed in audit HTML) |
+| `footer` | `background-color: var(--main-color) !important` (`colour-scheme.css`) |
+| `#footer .footer` | `background-color: var(--main-color)` |
+| `#footer .footer a` | `color: #FFFFFF` |
+| `#footer` | `text-align: center` |
+| `#footer .footer-menu > li` / `.copy > a` | Bold; sizes **16px** or **15px** depending on media block |
+| Social icons | `40×40` hit area; `.fa` at `2em` (mobile block) |
+| Product-detail footers | Use `--main-color` / `--main-background-item-color` / `--main-color-40` borders |
 
 ---
 
-## 14. Navigation
+## Grid
 
-### Desktop primary nav
-
-- Labels: `Home`, `MENU` (dropdown), `RECOMMENDED`, `About Us`, `Member?`
-- MENU dropdown panel: width `250px`; bg `#fff`; radius `4px`; border `1px solid rgba(0,0,0,0.15)`; shadow `0 6px 12px rgba(0,0,0,0.175)`
-- Dropdown item padding: `5px 15px 5px 10px`; hover bg `#f5f5f5`
-- Active color: `var(--main-color)`
-
-### Mobile menu `#menu-mb`
-
-- Width: `80%`
-- Off-canvas transform; transition `.4s`
-- Background base `#eee` in `style.css`; list accent `var(--main-color)`
-- Section title `.title-5`: padding `12px`; border-bottom `1px solid #ddd`
-
-### Service tabs (cart)
-
-- Container height `50px`; bg `#fff`; radius `12px`; shadow `0 3px 5px 0 rgba(0,0,0,.25)`
-- Active tab span bg: `var(--main-color)`
-
----
-
-## 15. Cards
-
-### Vertical product card (`.thumbnail-1`)
-
-- Background: `#F0F0F0`
-- Radius: `8px`
-- Margin-bottom: `20px`
-- Image top radius: `8px`
-- Title: `14px`, 2-line clamp
-- Price color: `var(--main-color)`
-- Title/price left margin often `15px`
-
-### Horizontal product card (mobile colour-scheme)
-
-- Background: `#F8F8F8`
-- Radius: `10px`
-- Border: `1px solid #ececec`
-- Margin-bottom: `20px`
-
-### Cart panels
-
-- `.bg-pink` → `background-color: var(--main-color)` (name is legacy; color is olive)
-
----
-
-## 16. Forms
-
-Documented from Bootstrap + homepage/modal rules (see §11).
-
-Additional form stylesheet `form_new_ui.css`: **TODO** (404 at audit).
-
-Payment option popup / checkout field chrome: partially in `select-payment-method.css` + `style_v2` popups — full field-by-field matrix: **TODO** (interactive checkout pass).
-
-Popup sheet pattern (`style_v2`):
-
-- Radius `24px 24px 0 0`
-- Padding `15px`
-- Gap `8px`
-- Title: `700`, `20px` / `24px` line-height, uppercase, `#000`
-
----
-
-## 17. Breakpoints
-
-Most used in merchant + Bootstrap CSS:
-
-| Breakpoint | Role |
+| System | Verified |
 | --- | --- |
-| `767px` / `768px` | Bootstrap / phone ↔ tablet |
-| `991px` / `992px` | Primary mobile ↔ desktop chrome split (sticky View Cart, fonts, layout) |
-| `1199px` / `1200px` | Bootstrap large |
-| Also present | `320`, `375`, `480`, `540`, `1024`, `1152` in various rules |
+| Framework | Bootstrap **3.4.1** |
+| Columns | 12-column: `.col-xs-*`, `.col-sm-*`, `.col-md-*`, `.col-lg-*` |
+| `.container` widths | `750px` (≥768px), `970px` (≥992px), `1170px` (≥1200px); base `padding-left/right: 15px` |
+| `.row` | `margin-left/right: -15px` |
+| Column padding | Customized: `[class*="col-"] { padding-left: 0; padding-right: 0; }` present in this build |
 
-Homepage sticky cart explicitly: `@media (max-width: 991px)`.
-
----
-
-## 18. Grid
-
-Bootstrap 3 grid (linked `bootstrap.css`):
-
-| Token | Value |
-| --- | --- |
-| Gutter | `15px` padding per column side; `.row` margins `-15px` |
-| `.container` widths | `750px` @≥768, `970px` @≥992, `1170px` @≥1200 |
-| Ordering layout | Content `col-md-8` + cart `col-md-4` (observed in homepage structure) |
-| Fluid shells | `.container-fluid` used in header/footer/home |
+Homepage / cart also use **flex** and occasional **CSS grid** — not a separate named grid token system.
 
 ---
 
-## 19. Mobile behavior
+## Responsive breakpoints
 
-Verified behaviors:
+### Bootstrap 3 (primary grid)
 
-1. **≤991px:** show fixed bottom homepage cart bar (`.homepage-cart-button-display`) with `View Cart`; footer gains bottom margin (~`64px`) to clear bar.
-2. **Off-canvas menu** `#menu-mb` (~`80%` width) for Home / Recommended / Promotions / About Us / Menu Categories.
-3. **Fixed white** `.header__navbar` for compact header controls (service, search, member, cart).
-4. **Product cards** switch toward horizontal treatment with `#F8F8F8` + `10px` radius + `#ececec` border.
-5. **Service selection** uses full-width tab headers / bottom sheets (`border-radius: 24px 24px 0 0`).
-6. **Touch:** `-webkit-overflow-scrolling: touch` on body/menu.
-7. **Animation:** sticky cart `show-homepage-cart-btn` `.4s ease-in-out`.
+| Name | Query | Container width |
+| --- | --- | --- |
+| Extra small | `<768px` (default) | auto / 100% |
+| Small | `min-width: 768px` | `750px` |
+| Medium | `min-width: 992px` | `970px` |
+| Large | `min-width: 1200px` | `1170px` |
 
-Exact safe-area / iOS notch handling: **TODO**.
+Also common: `max-width: 767px`, `768px–991px`, `992px–1199px`.
 
----
+### Additional breakpoints observed in brand CSS
 
-## Implementation notes for Thailand
+Frequently used: `320px`, `375px`, `400px`, `420px`, `460px`, `480px`, `568px`, `736px`, `767px` / `768px`, `991px` / `992px`, `1023px` / `1024px`, `1151px` / `1152px`, `1200px`.
 
-- Prefer merchant CSS variables (`--main-*`) over hard-coding, matching Singapore values unless owner approves a token change.
-- Lora is the mandated UI face for branded chrome; do not replace with invented fonts.
-- Logo shadow must remain `none` for this brand configuration.
-- Do not invent a spacing scale beyond observed values without measuring corresponding Singapore components again.
+These are **ad hoc**, not a documented custom scale beyond Bootstrap’s.
 
 ---
 
 ## Outstanding TODOs
 
-1. Contents of `form_new_ui.css` (404 during audit)  
-2. Computed checkout button resting background (cascade confirmation in DevTools)  
-3. Exact desktop header total height  
-4. Full payment-form field styling matrix  
-5. Named spacing scale (none published by site)  
-6. iOS safe-area / PWA mobile specifics  
-7. Bebas Neue usage map (imported; component coverage not fully traced)
+1. **`form_new_ui.css` — HTTP 404** (linked but missing).
+2. No formal spacing / type / radius **named token system** beyond `--main-*` color/font vars.
+3. Hover color cascade for header nav (brand olive vs `#fd576b`) — needs computed-style check in browser.
+4. Lora weight files beyond `normal` not verified.
+5. Exhaustive hex inventory in legacy `style.css` / pink accent system not fully catalogued.
+6. Out-of-scope sheets (S3 `styleCustom.css`, Font Awesome, Owl, etc.) may add tokens.
+7. `.btn-checkout` background fill rule pairing if not inherited from a shared themed class.
+8. Map roles for `#301b20` and `#edeee0`.
+9. Lato / Bebas Neue usage map.
+
+---
+
+## Files used for extraction
+
+Homepage HTML, `colour-scheme.css`, `style.css`, `custom_new_ui.css`, `font-style.css`, `style_v2.min.css`, `homepage.min.css`, `bootstrap.css`, `GetzThemMenuLeftRightAuto.css`, `remove-logo-box-shadow.css`, `select-payment-method.css`, `slow-notice.css`.
