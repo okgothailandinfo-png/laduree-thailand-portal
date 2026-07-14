@@ -158,6 +158,25 @@ function CartIcon() {
   );
 }
 
+/**
+ * Home banner slider shell — Singapore structure (laduree.sg #main-slide).
+ * Thailand banner assets pending approval; grey placeholders until then.
+ */
+const HOME_SLIDES = [
+  { id: "banner-1" },
+  { id: "banner-2" },
+  { id: "banner-3" },
+  { id: "banner-4" },
+  { id: "banner-5" },
+  { id: "banner-6" },
+] as const;
+
+const HOME_SLIDER_AUTOPLAY_MS = 5000;
+const HOME_SLIDER_SPEED_MS = 500;
+
+/** Singapore footer slider shell — Thailand assets pending. */
+const FOOTER_SLIDES = [{ id: "footer-1" }, { id: "footer-2" }] as const;
+
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,8 +184,15 @@ export default function Home() {
   const [service, setService] = useState<"Pick-up" | "Delivery">("Pick-up");
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [announcementExpanded, setAnnouncementExpanded] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
+    null,
+  );
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [sliderPaused, setSliderPaused] = useState(false);
+  const [footerSlide, setFooterSlide] = useState(0);
   const menuRef = useRef<HTMLLIElement>(null);
   const serviceRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -189,6 +215,22 @@ export default function Home() {
       document.body.style.overflow = "";
     };
   }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (sliderPaused || HOME_SLIDES.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setActiveSlide((current) => (current + 1) % HOME_SLIDES.length);
+    }, HOME_SLIDER_AUTOPLAY_MS);
+    return () => window.clearInterval(timer);
+  }, [sliderPaused]);
+
+  useEffect(() => {
+    if (FOOTER_SLIDES.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setFooterSlide((current) => (current + 1) % FOOTER_SLIDES.length);
+    }, HOME_SLIDER_AUTOPLAY_MS);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <div className="relative min-h-full flex-1 bg-page text-text">
@@ -213,6 +255,14 @@ export default function Home() {
 
               <div className="header-content-col">
                 <div className="header-desktop-top">
+                  <h1
+                    className="brand-name"
+                    onClick={() => {
+                      window.location.href = "/";
+                    }}
+                  >
+                    [CONTENT PENDING APPROVAL]
+                  </h1>
                   <div className="header-member">
                     <a
                       href="#"
@@ -511,95 +561,292 @@ export default function Home() {
       </header>
 
       <main className="home-main">
-        <section
-          id="main-slide"
-          className="block slider-block"
-          aria-label="Home slider"
-        >
-          <div
-            className="slider slider-1 home-page-slider"
-            data-slider="home-slider"
-          />
+        <section id="main-slide" className="block slider-block">
+          <div className="container-fluid">
+            <div
+              className="slider slider-1 home-page-slider slick-initialized slick-slider"
+              data-slider="home-slider"
+              onMouseEnter={() => setSliderPaused(true)}
+              onMouseLeave={() => setSliderPaused(false)}
+              onTouchStart={(event) => {
+                touchStartX.current = event.changedTouches[0]?.clientX ?? null;
+                setSliderPaused(true);
+              }}
+              onTouchEnd={(event) => {
+                const startX = touchStartX.current;
+                const endX = event.changedTouches[0]?.clientX;
+                touchStartX.current = null;
+                setSliderPaused(false);
+                if (startX == null || endX == null) return;
+                const delta = endX - startX;
+                if (Math.abs(delta) < 40) return;
+                setActiveSlide((current) =>
+                  delta < 0
+                    ? (current + 1) % HOME_SLIDES.length
+                    : (current - 1 + HOME_SLIDES.length) % HOME_SLIDES.length,
+                );
+              }}
+            >
+              <div className="slick-list draggable" aria-live="polite">
+                <div
+                  className="slick-track"
+                  style={{
+                    transform: `translate3d(-${activeSlide * 100}%, 0, 0)`,
+                    transition: `transform ${HOME_SLIDER_SPEED_MS}ms ease`,
+                  }}
+                >
+                  {HOME_SLIDES.map((slide, index) => (
+                    <div
+                      key={slide.id}
+                      className={`slide slick-slide${index === activeSlide ? " slick-current slick-active" : ""}`}
+                      data-slick-index={index}
+                      aria-hidden={index !== activeSlide}
+                    >
+                      <a href="" onClick={(e) => e.preventDefault()}>
+                        <picture>
+                          <source
+                            media="(max-width: 767px)"
+                            srcSet="/hero-placeholder-mobile.svg"
+                          />
+                          <img
+                            className="asyncImage img-responsive-1"
+                            src="/hero-placeholder-desktop.svg"
+                            alt=""
+                          />
+                        </picture>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <ul className="slick-dots" role="tablist">
+                {HOME_SLIDES.map((slide, index) => (
+                  <li
+                    key={slide.id}
+                    className={index === activeSlide ? "slick-active" : undefined}
+                    role="presentation"
+                  >
+                    <button
+                      type="button"
+                      data-role="none"
+                      role="tab"
+                      aria-label={`${index + 1}`}
+                      aria-selected={index === activeSlide}
+                      tabIndex={0}
+                      onClick={() => setActiveSlide(index)}
+                    >
+                      {index + 1}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </section>
 
-        <div className="home-body">
+        <div id="bodyMainHome" className="home-body container-fluid">
           <div className="home-layout">
             <div className="home-content">
-              <section
-                id="announcement-homepage-section"
-                className="announcement-section"
+              {/* Mobile iconic category navigation (Singapore homepage body pattern) */}
+              <nav
+                className="category-nav-mobile"
+                aria-label="Menu Categories"
               >
-                <div
-                  className={`announcement-content${announcementExpanded ? " is-expanded" : ""}`}
-                >
-                  <p>
-                    <em>Dear Valued Ladurée Customers</em>,
-                  </p>
-                  <p>
-                    - We offer Islandwide Delivery (or Advance orders) to a
-                    single location in Singapore at <strong>$18</strong>, no
-                    minimum purchase required.
-                  </p>
-                  <p>
-                    - Enjoy <strong>FREE WEEKDAY</strong> delivery if you
-                    purchase <strong>$90</strong> and above.
-                  </p>
-                  <p>
-                    - A surcharge of +$8.80 will be incurred for all deliveries
-                    fulfilled during Weekends and Special Occasions (Eve of PH,
-                    PH & Celebratory Days). This surcharge also applies to
-                    delivery orders above $90.
-                  </p>
-                  <p>
-                    <strong>Summary of Delivery Charges:</strong>
-                  </p>
-                  <p>
-                    - Potential delays might occur due to bad weather/shortage
-                    of delivery personnel.
-                  </p>
-                  <p>
-                    - Payment options: Visa/Mastercard only.
-                  </p>
-                  <p>Thank you for your support and understanding!</p>
-                </div>
-                <button
-                  type="button"
-                  className="announcement-toggle"
-                  onClick={() => setAnnouncementExpanded((open) => !open)}
-                >
-                  {announcementExpanded ? "View less" : "View more"}
-                </button>
-              </section>
+                <ul className="category-menu-mobile category-menu-iconic">
+                  {catalogSections.map((section) => (
+                    <li
+                      key={`mobile-nav-${section.id}`}
+                      className="menu-mobile-item"
+                    >
+                      <a href={`#scroll-${section.id}`} title={section.title}>
+                        <span
+                          className="img-category-iconic b-radius"
+                          style={{
+                            backgroundImage:
+                              "url(/category-icon-placeholder.svg)",
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span className="slide__title item-menu-title">
+                          {section.title}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
 
-              <div className="row floating-category menu-floating">
-                <aside
-                  id="floating-category__menu"
-                  className="floating-category-rail"
+              <div
+                id="floating-category__menu"
+                className="row floating-category menu-floating"
+              >
+                {/* Promotion / Collection editorial — Singapore #announcement-homepage-section */}
+                <section
+                  id="announcement-homepage-section"
+                  className={`announcement-section${announcementExpanded ? " readmore" : ""}`}
+                >
+                  <div className="col-xs-12">
+                    <div className="announcement-content">
+                      <p>
+                        <span className="announcement-body-text">
+                          <em>Dear Valued Ladurée Customers</em>,
+                        </span>
+                      </p>
+                      <p>
+                        <span className="announcement-body-text">
+                          [CONTENT PENDING APPROVAL]
+                        </span>
+                      </p>
+                      <p>
+                        <span className="announcement-body-text">
+                          [CONTENT PENDING APPROVAL]
+                        </span>
+                      </p>
+                      <p>
+                        <span className="announcement-body-text">
+                          [CONTENT PENDING APPROVAL]
+                        </span>
+                      </p>
+                      <div>
+                        <hr className="announcement-divider" />
+                        <p className="announcement-summary-title">
+                          <strong>Summary of Delivery Charges:</strong>
+                        </p>
+                        <div className="announcement-table-wrap">
+                          <table className="announcement-delivery-table">
+                            <tbody>
+                              <tr>
+                                <td>
+                                  <strong>
+                                    Purchase Value
+                                    <br />
+                                    (with VAT)
+                                  </strong>
+                                </td>
+                                <td>
+                                  <strong>Weekdays</strong>
+                                </td>
+                                <td>
+                                  <strong>
+                                    Weekends /
+                                    <br />
+                                    Special Occasions
+                                  </strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>[CONTENT PENDING APPROVAL]</td>
+                                <td>[CONTENT PENDING APPROVAL]</td>
+                                <td>[CONTENT PENDING APPROVAL]</td>
+                              </tr>
+                              <tr>
+                                <td>[CONTENT PENDING APPROVAL]</td>
+                                <td>[CONTENT PENDING APPROVAL]</td>
+                                <td>[CONTENT PENDING APPROVAL]</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      <p>
+                        <span className="announcement-body-text">
+                          [CONTENT PENDING APPROVAL]
+                        </span>
+                      </p>
+                      <p>
+                        <span className="announcement-body-text">
+                          [CONTENT PENDING APPROVAL]
+                        </span>
+                      </p>
+                      <p>
+                        <span className="announcement-body-text">
+                          Thank you for your support and understanding!
+                        </span>
+                      </p>
+                    </div>
+                    <div
+                      className="view-actions"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() =>
+                        setAnnouncementExpanded((open) => !open)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setAnnouncementExpanded((open) => !open);
+                        }
+                      }}
+                    >
+                      <span className="view-more">View more</span>
+                      <span className="view-less">View less</span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Category navigation — Singapore #idMenuLeft (below announcement) */}
+                <div
+                  id="idMenuLeft"
+                  className="floating-category-rail col-xs-5 col-sm-4 col-md-3 pull-left remove-padding-left-right-mobile remove-padding-right"
                   aria-label="Menu Categories"
                 >
-                  <ul className="category-menu-mobile item-menu-floating">
-                    {catalogSections.map((section) => (
-                      <li key={section.id} className="menu-mobile-item">
-                        <a href={`#category-${section.id}`}>
-                          <span className="slide__title">{section.title}</span>
-                        </a>
-                      </li>
-                    ))}
+                  <ul className="nav category-menu-mobile item-menu-floating position-fixed">
+                    {catalogSections.map((section) => {
+                      const isActive = activeCategoryId === section.id;
+                      return (
+                        <li
+                          key={`rail-${section.id}`}
+                          id={`li-${section.id}`}
+                          className={`menu-mobile-item floating-category-item${isActive ? " active" : ""}`}
+                          data-href={`#scroll-${section.id}`}
+                          onClick={() => setActiveCategoryId(section.id)}
+                        >
+                          <span className="slide__title item-menu-title">
+                            {section.title}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
-                </aside>
+                </div>
 
-                <div className="products-column">
+                {/* Featured Product Grid — Singapore #product-grid */}
+                <div id="product-grid" className="products-column">
+                  <section
+                    id="description-by-recommended"
+                    className="full-menu-block style-1 description-by-recommended"
+                  >
+                    <div className="group-title">
+                      Items with star{" "}
+                      <i className="fa fa-star color-by-star" aria-hidden="true">
+                        ★
+                      </i>{" "}
+                      are recommended by our chef and patrons
+                    </div>
+                  </section>
+
                   {catalogSections.map((section) => (
                     <section
                       key={section.id}
                       id={`category-${section.id}`}
-                      className="category-section block-1 full-menu-block style-1"
+                      data-category-id={section.id}
+                      className="full-menu-block style-1 item-products-floating"
                     >
-                      <div className="title-group">
+                      <div className="title-group" id={`scroll-${section.id}`}>
                         <h2 className="title-2">
-                          <span className="color-by-theme">{section.title}</span>
+                          <a href={`/Category/${section.id}.html`}>
+                            <span className="color-by-theme">
+                              {section.title}
+                            </span>
+                          </a>
+                          <i
+                            className="fa fa-chevron-circle-right visible-xs"
+                            aria-hidden="true"
+                          />
                         </h2>
-                        <p className="desc text-clamp-overflow">{section.intro}</p>
+                        <div className="desc text-clamp-overflow">
+                          <p>{section.intro}</p>
+                        </div>
                       </div>
 
                       <div
@@ -607,54 +854,50 @@ export default function Home() {
                         data-item-per-row="3"
                       >
                         {section.products.map((title) => (
-                          <article
+                          <div
                             key={title}
-                            className="item-products"
+                            className="lazy item-products"
+                            data-full-height-item=""
                           >
                             <div className="thumbnail thumbnail-1 style-1">
                               <div className="thumbnail-group__top">
-                                <div
-                                  className="product__img product__img--empty"
-                                  role="img"
-                                  aria-label={title}
-                                />
-                                <h3 className="title-4">
-                                  <button
-                                    type="button"
-                                    className="text-clamp-overflow-item"
-                                  >
+                                <div className="product__img">
+                                  <span className="img-1">
+                                    <img
+                                      className="img-responsive-2"
+                                      src="/product-placeholder.svg"
+                                      alt=""
+                                    />
+                                  </span>
+                                </div>
+                                <div className="title-4">
+                                  <div className="text-clamp-overflow-item">
                                     {title}
-                                  </button>
-                                </h3>
+                                  </div>
+                                </div>
                               </div>
                               <div className="thumbnail-group__bottom">
-                                <div className="price-bottom">฿ —</div>
+                                <div className="price-bottom">
+                                  <span>฿ —</span>
+                                </div>
                                 <div className="btn-add">
-                                  <button
-                                    type="button"
-                                    className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
-                                  >
-                                    ADD
-                                  </button>
+                                  <div className="product-item__footer">
+                                    <a
+                                      href="#"
+                                      className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
+                                      onClick={(e) => e.preventDefault()}
+                                    >
+                                      ADD
+                                    </a>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </article>
+                          </div>
                         ))}
                       </div>
                     </section>
                   ))}
-
-                  <p
-                    id="description-by-recommended"
-                    className="description-by-recommended"
-                  >
-                    Items with star{" "}
-                    <span className="star-icon" aria-hidden="true">
-                      ★
-                    </span>{" "}
-                    are recommended by our chef and patrons
-                  </p>
                 </div>
               </div>
             </div>
@@ -722,9 +965,74 @@ export default function Home() {
         </div>
       </main>
 
-      <footer id="footer" className="site-footer">
+      <footer id="footer">
+        {/* Singapore footer slider (data-slider="footer-slider") */}
+        <section
+          id="footer-slide"
+          className="block slider-block footer-slider-block"
+        >
+          <div className="container-fluid">
+            <div
+              data-slider="footer-slider"
+              className="slider slider-1 home-page-slider slick-initialized slick-slider"
+            >
+              <div className="slick-list draggable" aria-live="polite">
+                <div
+                  className="slick-track"
+                  style={{
+                    transform: `translate3d(-${footerSlide * 100}%, 0, 0)`,
+                    transition: `transform ${HOME_SLIDER_SPEED_MS}ms ease`,
+                  }}
+                >
+                  {FOOTER_SLIDES.map((slide, index) => (
+                    <div
+                      key={slide.id}
+                      className={`slide slick-slide${index === footerSlide ? " slick-current slick-active" : ""}`}
+                      data-slick-index={index}
+                      aria-hidden={index !== footerSlide}
+                    >
+                      <a href="" onClick={(e) => e.preventDefault()}>
+                        <picture>
+                          <source
+                            media="(max-width: 767px)"
+                            srcSet="/hero-placeholder-mobile.svg"
+                          />
+                          <img
+                            className="asyncImage img-responsive-1"
+                            src="/hero-placeholder-desktop.svg"
+                            alt=""
+                          />
+                        </picture>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <ul className="slick-dots" role="tablist">
+                {FOOTER_SLIDES.map((slide, index) => (
+                  <li
+                    key={`footer-dot-${slide.id}`}
+                    className={index === footerSlide ? "slick-active" : ""}
+                    role="presentation"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={index === footerSlide}
+                      aria-label={`Footer slide ${index + 1}`}
+                      onClick={() => setFooterSlide(index)}
+                    >
+                      {index + 1}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <div className="footer">
-          <div className="container-fluid footer-inner">
+          <div className="container-fluid">
             <ul className="list-inline footer-menu">
               <li>
                 <a href="/Home/TermsConditions" title="Allergen Information">
@@ -732,24 +1040,31 @@ export default function Home() {
                 </a>
               </li>
             </ul>
+            <ul className="list-inline socials" />
             <p className="copy">
               <span className="copyrights-copy">
                 ©2026 Laduree Paris. Powered by{" "}
               </span>
-              <a href="http://getz.co" rel="noreferrer">
+              <a href="http://getz.co" title="http://getz.co" rel="noreferrer">
                 Getz
               </a>
             </p>
           </div>
+
+          <div id="scroll-top" className="hidden" aria-hidden="true">
+            <i className="fa fa-chevron-up" />
+          </div>
+
+          <div className="homepage-cart-button-display">
+            <button type="button" className="btn btn-homepage-cart-display">
+              <span className="homepage-cart-display__view-cart">View Cart</span>
+              <span className="homepage-cart-display__quatity-box custom-text-style">
+                <span className="homepage-cart-display__quatity">0</span>
+              </span>
+            </button>
+          </div>
         </div>
       </footer>
-
-      <div className="homepage-cart-button-display">
-        <button type="button" className="btn-homepage-cart-display">
-          View Cart
-          <span className="view-cart-qty">0</span>
-        </button>
-      </div>
     </div>
   );
 }
