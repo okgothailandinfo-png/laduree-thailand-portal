@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import CartFulfillmentStrip from "../pickup/CartFulfillmentStrip";
 import { useCart } from "./CartContext";
 import CartPanel from "./CartPanel";
 import "./cart.css";
@@ -44,6 +45,9 @@ export default function CartDrawer() {
           >
             ×
           </button>
+        </div>
+        <div className="cart-drawer-fulfillment">
+          <CartFulfillmentStrip />
         </div>
         <CartPanel variant="drawer" />
       </div>
