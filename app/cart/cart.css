@@ -251,6 +251,37 @@
   cursor: not-allowed;
 }
 
+.cart-panel .cart-pickup-gate {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #a94442;
+  background: #f2dede;
+  border: 1px solid #ebccd1;
+}
+
+.cart-panel .cart-pickup-gate-link {
+  padding: 0;
+  color: var(--main-color, #84754e);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.cart-drawer-fulfillment {
+  flex: 0 0 auto;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.cart-drawer-fulfillment .tab-service-main {
+  margin: 0;
+}
+
 .cart-panel .checkout-all-content {
   display: flex;
   align-items: center;

@@ -1,5 +1,6 @@
 "use client";
 
+import { usePickup } from "../pickup/PickupContext";
 import { useCart } from "./CartContext";
 import "./cart.css";
 
@@ -16,8 +17,10 @@ export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
     clearItems,
     closeDrawer,
   } = useCart();
+  const { isPickupComplete, openPickupSelection } = usePickup();
 
   const isEmpty = items.length === 0;
+  const canCheckout = !isEmpty && isPickupComplete;
 
   return (
     <div
@@ -172,12 +175,29 @@ export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
 
         <div className="block-4 total-price-block" id="content-cart-checkout">
           <div className="inner bg-pink" id="checkoutArea4Click">
+            {!isEmpty && !isPickupComplete ? (
+              <div
+                className="note danger_message danger_red_message cart-pickup-gate"
+                role="status"
+              >
+                Select service, date and time before checkout.{" "}
+                <button
+                  type="button"
+                  className="cart-pickup-gate-link"
+                  onClick={() => openPickupSelection({ step: "service" })}
+                >
+                  Select service, date and time
+                </button>
+              </div>
+            ) : null}
             <button
               id="btnCheckOut"
               className="btn btn-checkout"
               type="button"
-              disabled={isEmpty}
+              disabled={!canCheckout}
+              aria-disabled={!canCheckout}
               onClick={() => {
+                if (!canCheckout) return;
                 if (variant === "drawer") closeDrawer();
               }}
             >

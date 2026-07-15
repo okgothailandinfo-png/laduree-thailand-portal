@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import DesktopCartAside from "./cart/DesktopCartAside";
 import MobileViewCartButton from "./cart/MobileViewCartButton";
+import ServiceDateTimeBar from "./pickup/ServiceDateTimeBar";
 
 const menuCategories = [
   { label: "All Items", href: "/Category" },
@@ -480,28 +481,7 @@ export default function Home() {
               </div>
             ) : null}
 
-            <div className="services-info-block">
-              <button
-                type="button"
-                className="select-datetime-service"
-                title="Select service, date and time"
-              >
-                <span>Select service, date and time</span>
-                <svg
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="10"
-                  height="17"
-                  viewBox="0 0 10 17"
-                  fill="none"
-                >
-                  <path
-                    d="M0 2.38L6.10667 8.5L0 14.62L1.88 16.5L9.88 8.5L1.88 0.5L0 2.38Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
-            </div>
+            <ServiceDateTimeBar />
           </div>
         </div>
 
