@@ -174,8 +174,10 @@ const HOME_SLIDES = [
 const HOME_SLIDER_AUTOPLAY_MS = 5000;
 const HOME_SLIDER_SPEED_MS = 500;
 
-/** Singapore footer slider shell — Thailand assets pending. */
+/** Singapore footer slider shell — Thailand assets pending approval. */
 const FOOTER_SLIDES = [{ id: "footer-1" }, { id: "footer-2" }] as const;
+const FOOTER_SLIDER_AUTOPLAY_MS = 5000;
+const FOOTER_SLIDER_SPEED_MS = 500;
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -228,7 +230,7 @@ export default function Home() {
     if (FOOTER_SLIDES.length <= 1) return;
     const timer = window.setInterval(() => {
       setFooterSlide((current) => (current + 1) % FOOTER_SLIDES.length);
-    }, HOME_SLIDER_AUTOPLAY_MS);
+    }, FOOTER_SLIDER_AUTOPLAY_MS);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -981,7 +983,7 @@ export default function Home() {
                   className="slick-track"
                   style={{
                     transform: `translate3d(-${footerSlide * 100}%, 0, 0)`,
-                    transition: `transform ${HOME_SLIDER_SPEED_MS}ms ease`,
+                    transition: `transform ${FOOTER_SLIDER_SPEED_MS}ms ease`,
                   }}
                 >
                   {FOOTER_SLIDES.map((slide, index) => (
@@ -995,11 +997,11 @@ export default function Home() {
                         <picture>
                           <source
                             media="(max-width: 767px)"
-                            srcSet="/hero-placeholder-mobile.svg"
+                            srcSet="/footer-placeholder-mobile.svg"
                           />
                           <img
                             className="asyncImage img-responsive-1"
-                            src="/hero-placeholder-desktop.svg"
+                            src="/footer-placeholder-desktop.svg"
                             alt=""
                           />
                         </picture>
