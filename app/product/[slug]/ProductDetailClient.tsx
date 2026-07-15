@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useCart } from "../../cart/CartContext";
 import { SAMPLE_PRODUCT } from "../sample-product";
 import "../product-detail.css";
 
@@ -13,6 +14,7 @@ function clampQty(value: number) {
 
 export default function ProductDetailClient({ slug }: { slug: string }) {
   const product = SAMPLE_PRODUCT;
+  const { addItem } = useCart();
   const [activeImage, setActiveImage] = useState(0);
   const [productQty, setProductQty] = useState(1);
   const [modifierQty, setModifierQty] = useState<Record<string, number>>({});
@@ -27,6 +29,32 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     setModifierQty((current) => {
       const next = clampQty((current[key] ?? 0) + delta);
       return { ...current, [key]: next };
+    });
+  }
+
+  function handleAddToCart() {
+    const modifiers: { label: string; quantity?: number }[] = [];
+
+    for (const group of product.modifierGroups) {
+      if (group.type === "radio") {
+        const selected = radioSelection[group.id];
+        if (selected) modifiers.push({ label: selected });
+        continue;
+      }
+
+      for (const option of group.options) {
+        const quantity = modifierQty[`${group.id}:${option}`] ?? 0;
+        if (quantity > 0) modifiers.push({ label: option, quantity });
+      }
+    }
+
+    addItem({
+      productId: slug || product.slug,
+      name: product.title,
+      imageSrc: "/product-placeholder.svg",
+      quantity: productQty,
+      modifiers,
+      note: remark.trim() || undefined,
     });
   }
 
@@ -336,7 +364,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           <div className="product-total-price">
             <div className="input-group">
               <div className="input-group-btn text-right">
-                <button id="btn-AddToCart" className="btn" type="button">
+                <button
+                  id="btn-AddToCart"
+                  className="btn"
+                  type="button"
+                  onClick={handleAddToCart}
+                >
                   ADD
                   <span>
                     -<span id="totalPriceOfProduct"> ฿ —</span>

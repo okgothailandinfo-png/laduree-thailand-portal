@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
+import CartProviderShell from "./cart/CartProviderShell";
 import "./globals.css";
 
 const lora = Lora({
@@ -21,7 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`h-full antialiased ${lora.variable}`}>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <CartProviderShell>{children}</CartProviderShell>
+      </body>
     </html>
   );
 }

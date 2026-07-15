@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import DesktopCartAside from "./cart/DesktopCartAside";
+import MobileViewCartButton from "./cart/MobileViewCartButton";
 
 const menuCategories = [
   { label: "All Items", href: "/Category" },
@@ -905,63 +907,7 @@ export default function Home() {
             </div>
 
             <aside className="sidebar" aria-label="Cart">
-              <div className="cart-block">
-                <div className="tab-service-main">
-                  <div className="tab-service-item active">Pick-up</div>
-                  <button type="button" className="tab-service-item tab-service-other">
-                    Select Other Services
-                  </button>
-                </div>
-
-                <div id="divPickupMyCart" className="bg-pink cart-fulfillment">
-                  <div className="cart-outlet">
-                    <span className="cart-outlet-name">Ladurée Thailand</span>
-                  </div>
-                  <div className="cart-pickup-time">
-                    <span className="cart-pickup-label">Pickup Time</span>
-                    <button type="button" className="cart-pickup-change">
-                      Select a different date/time
-                    </button>
-                  </div>
-                </div>
-
-                <div className="cart-items-header">
-                  <span>Item(s) Added</span>
-                  <button type="button" id="clear-items" className="clear-items">
-                    Clear items
-                  </button>
-                </div>
-
-                <div
-                  id="ErrNothingToCheckout"
-                  className="danger_message cart-empty"
-                >
-                  Your cart is empty.Add at least 1 item to checkout!
-                </div>
-
-                <div id="info-total-cart" className="cart-totals">
-                  <div className="cart-total-row">
-                    <span>Item(s) Total</span>
-                    <span>฿ —</span>
-                  </div>
-                  <div className="cart-total-row">
-                    <span>Tax</span>
-                    <span>฿ —</span>
-                  </div>
-                </div>
-
-                <div id="content-cart-checkout" className="cart-checkout">
-                  <button
-                    type="button"
-                    id="btnCheckOut"
-                    className="btn-checkout"
-                  >
-                    <span className="checkout-total-amount">฿ —</span>
-                    <span id="textCheckOut">Checkout</span>
-                    <span className="checkout-total-quantity">0</span>
-                  </button>
-                </div>
-              </div>
+              <DesktopCartAside />
             </aside>
           </div>
         </div>
@@ -1058,12 +1004,7 @@ export default function Home() {
           </div>
 
           <div className="homepage-cart-button-display">
-            <button type="button" className="btn btn-homepage-cart-display">
-              <span className="homepage-cart-display__view-cart">View Cart</span>
-              <span className="homepage-cart-display__quatity-box custom-text-style">
-                <span className="homepage-cart-display__quatity">0</span>
-              </span>
-            </button>
+            <MobileViewCartButton />
           </div>
         </div>
       </footer>
