@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useCart } from "../cart/CartContext";
 import { usePickup } from "../pickup/PickupContext";
@@ -12,16 +13,11 @@ import { useCheckout } from "./CheckoutContext";
 import "./checkout.css";
 
 export default function CheckoutPageClient() {
+  const router = useRouter();
   const { items, itemCount } = useCart();
   const { confirmed: pickup, isPickupComplete, openPickupSelection } =
     usePickup();
-  const {
-    info,
-    setField,
-    errors,
-    confirmCheckoutInfo,
-    paymentPendingNotice,
-  } = useCheckout();
+  const { info, setField, errors, confirmCheckoutInfo } = useCheckout();
 
   const isEmpty = items.length === 0;
   const canProceedToForm = !isEmpty && isPickupComplete;
@@ -29,7 +25,9 @@ export default function CheckoutPageClient() {
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!canProceedToForm) return;
-    confirmCheckoutInfo();
+    if (confirmCheckoutInfo()) {
+      router.push("/payment");
+    }
   }
 
   return (
@@ -297,17 +295,6 @@ export default function CheckoutPageClient() {
                 <button type="submit" className="checkout-submit">
                   Continue to Payment
                 </button>
-
-                {paymentPendingNotice ? (
-                  <div
-                    className="checkout-payment-pending"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    Checkout information saved. Payment: [CONTENT PENDING
-                    APPROVAL]
-                  </div>
-                ) : null}
               </form>
             </section>
           </>
