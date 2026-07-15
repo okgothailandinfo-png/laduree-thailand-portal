@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { usePickup } from "../pickup/PickupContext";
 import { useCart } from "./CartContext";
 import "./cart.css";
@@ -9,6 +10,7 @@ type CartPanelProps = {
 };
 
 export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
+  const router = useRouter();
   const {
     items,
     itemCount,
@@ -199,6 +201,7 @@ export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
               onClick={() => {
                 if (!canCheckout) return;
                 if (variant === "drawer") closeDrawer();
+                router.push("/checkout");
               }}
             >
               <div className="checkout-all-content">
