@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
+import {
+  MOCK_PAYMENT_METHOD_LABELS,
+  useOrderFlow,
+  type MockPaymentMethod,
+} from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
 import {
   formatPickupDateLong,
   parseDateKey,
 } from "../pickup/mock-pickup";
 import "./payment.css";
-
-type PaymentMethod =
-  | "credit-card"
-  | "promptpay-qr"
-  | "apple-pay"
-  | "google-pay";
 
 type CardDraft = {
   cardholderName: string;
@@ -35,23 +35,23 @@ const emptyCard: CardDraft = {
   cvv: "",
 };
 
-const METHOD_LABELS: Record<PaymentMethod, string> = {
-  "credit-card": "Credit Card",
-  "promptpay-qr": "PromptPay QR",
-  "apple-pay": "Apple Pay",
-  "google-pay": "Google Pay",
-};
-
 export default function PaymentPageClient() {
+  const router = useRouter();
   const { items, itemCount } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
   const { confirmed: pickup, isPickupComplete, openPickupSelection } =
     usePickup();
+  const {
+    selectedPaymentMethod,
+    setSelectedPaymentMethod,
+    placeMockOrder,
+  } = useOrderFlow();
 
-  const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const [method, setMethod] = useState<MockPaymentMethod | null>(
+    selectedPaymentMethod,
+  );
   const [card, setCard] = useState<CardDraft>(emptyCard);
   const [errors, setErrors] = useState<PaymentErrors>({});
-  const [orderPlaced, setOrderPlaced] = useState(false);
 
   const isEmpty = items.length === 0;
   const canPay =
@@ -68,11 +68,11 @@ export default function PaymentPageClient() {
       delete next.form;
       return next;
     });
-    setOrderPlaced(false);
   }
 
-  function selectMethod(next: PaymentMethod) {
+  function selectMethod(next: MockPaymentMethod) {
     setMethod(next);
+    setSelectedPaymentMethod(next);
     setErrors((current) => {
       if (!current.method && !current.form) return current;
       const cleared = { ...current };
@@ -80,7 +80,6 @@ export default function PaymentPageClient() {
       delete cleared.form;
       return cleared;
     });
-    setOrderPlaced(false);
   }
 
   function validatePayment(): boolean {
@@ -110,13 +109,11 @@ export default function PaymentPageClient() {
 
   function handlePlaceOrder(event: FormEvent) {
     event.preventDefault();
-    if (!canPay) return;
-    if (!validatePayment()) {
-      setOrderPlaced(false);
-      return;
-    }
+    if (!canPay || !method) return;
+    if (!validatePayment()) return;
     // Local mock only — no gateway, API, or charge.
-    setOrderPlaced(true);
+    placeMockOrder(method);
+    router.push("/order-confirmation");
   }
 
   return (
@@ -286,7 +283,7 @@ export default function PaymentPageClient() {
                       "promptpay-qr",
                       "apple-pay",
                       "google-pay",
-                    ] as PaymentMethod[]
+                    ] as MockPaymentMethod[]
                   ).map((id) => {
                     const selected = method === id;
                     return (
@@ -304,7 +301,7 @@ export default function PaymentPageClient() {
                         />
                         <span className="payment-method__body">
                           <span className="payment-method__title">
-                            {METHOD_LABELS[id]}
+                            {MOCK_PAYMENT_METHOD_LABELS[id]}
                           </span>
                           <span className="payment-method__sub">
                             Placeholder only
@@ -448,8 +445,9 @@ export default function PaymentPageClient() {
                 {method === "apple-pay" || method === "google-pay" ? (
                   <div className="payment-panel">
                     <p className="payment-wallet-placeholder">
-                      {METHOD_LABELS[method]} placeholder only — wallet checkout
-                      is not connected. [CONTENT PENDING APPROVAL]
+                      {MOCK_PAYMENT_METHOD_LABELS[method]} placeholder only —
+                      wallet checkout is not connected. [CONTENT PENDING
+                      APPROVAL]
                     </p>
                   </div>
                 ) : null}
@@ -457,25 +455,6 @@ export default function PaymentPageClient() {
                 <button type="submit" className="payment-submit">
                   Place Order
                 </button>
-
-                {orderPlaced ? (
-                  <div
-                    className="payment-success"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    Payment successful!
-                    <br />
-                    Mock order only — no payment was processed. Gateway: [CONTENT
-                    PENDING APPROVAL]
-                    {method ? (
-                      <>
-                        <br />
-                        Selected method: {METHOD_LABELS[method]}
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
               </form>
             </section>
           </>

@@ -308,7 +308,11 @@ export default function Home() {
                           <ul className="dropdown-menu-getz" role="menu">
                             {menuCategories.map((item) => (
                               <li key={item.href} role="none">
-                                <a role="menuitem" href={item.href}>
+                                <a
+                                  role="menuitem"
+                                  href={item.href}
+                                  onClick={(e) => e.preventDefault()}
+                                >
                                   {item.label}
                                 </a>
                               </li>
@@ -317,10 +321,20 @@ export default function Home() {
                         </div>
                       </li>
                       <li>
-                        <a href="/Recommendations">RECOMMENDED</a>
+                        <a
+                          href="#recommended"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          RECOMMENDED
+                        </a>
                       </li>
                       <li>
-                        <a href="/Home/Hours">About Us</a>
+                        <a
+                          href="#about-us"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          About Us
+                        </a>
                       </li>
                     </ul>
                   </nav>
@@ -506,19 +520,34 @@ export default function Home() {
               </li>
               <li>
                 <a
-                  href="/Recommendations"
-                  onClick={() => setMobileMenuOpen(false)}
+                  href="#recommended"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMobileMenuOpen(false);
+                  }}
                 >
                   <span>Recommended</span>
                 </a>
               </li>
               <li>
-                <a href="/Promotion" onClick={() => setMobileMenuOpen(false)}>
+                <a
+                  href="#promotions"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMobileMenuOpen(false);
+                  }}
+                >
                   <span>Promotions</span>
                 </a>
               </li>
               <li>
-                <a href="/Home/Hours" onClick={() => setMobileMenuOpen(false)}>
+                <a
+                  href="#about-us"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMobileMenuOpen(false);
+                  }}
+                >
                   <span>About Us</span>
                 </a>
               </li>
@@ -527,18 +556,21 @@ export default function Home() {
               <h2 className="menu-mb-categories-title title-5">
                 Menu Categories
               </h2>
-              <ul className="menu-mb-categories list-1">
-                {menuCategories.map((item) => (
-                  <li key={item.href}>
-                    <a
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+                  <ul className="menu-mb-categories list-1">
+                    {menuCategories.map((item) => (
+                      <li key={item.href}>
+                        <a
+                          href={item.href}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setMobileMenuOpen(false);
+                          }}
+                        >
+                          {item.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
             </div>
           </div>
         </nav>
@@ -694,7 +726,7 @@ export default function Home() {
                       <div>
                         <hr className="announcement-divider" />
                         <p className="announcement-summary-title">
-                          <strong>Summary of Delivery Charges:</strong>
+                          <strong>[CONTENT PENDING APPROVAL]</strong>
                         </p>
                         <div className="announcement-table-wrap">
                           <table className="announcement-delivery-table">
@@ -818,7 +850,16 @@ export default function Home() {
                     >
                       <div className="title-group" id={`scroll-${section.id}`}>
                         <h2 className="title-2">
-                          <a href={`/Category/${section.id}.html`}>
+                          <a
+                            href={`#scroll-${section.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveCategoryId(section.id);
+                              document
+                                .getElementById(`scroll-${section.id}`)
+                                ?.scrollIntoView({ behavior: "smooth" });
+                            }}
+                          >
                             <span className="color-by-theme">
                               {section.title}
                             </span>
@@ -866,13 +907,23 @@ export default function Home() {
                                 </div>
                                 <div className="btn-add">
                                   <div className="product-item__footer">
-                                    <a
-                                      href="#"
-                                      className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
-                                      onClick={(e) => e.preventDefault()}
-                                    >
-                                      ADD
-                                    </a>
+                                    {title ===
+                                    "« Napoléon III » Macaron - 8pcs" ? (
+                                      <Link
+                                        href="/product/napoleon-iii-macaron-8pcs"
+                                        className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
+                                      >
+                                        ADD
+                                      </Link>
+                                    ) : (
+                                      <a
+                                        href="#"
+                                        className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
+                                        onClick={(e) => e.preventDefault()}
+                                      >
+                                        ADD
+                                      </a>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -963,19 +1014,18 @@ export default function Home() {
           <div className="container-fluid">
             <ul className="list-inline footer-menu">
               <li>
-                <a href="/Home/TermsConditions" title="Allergen Information">
+                <a
+                  href="#allergen-information"
+                  title="Allergen Information"
+                  onClick={(e) => e.preventDefault()}
+                >
                   Allergen Information
                 </a>
               </li>
             </ul>
             <ul className="list-inline socials" />
             <p className="copy">
-              <span className="copyrights-copy">
-                ©2026 Laduree Paris. Powered by{" "}
-              </span>
-              <a href="http://getz.co" title="http://getz.co" rel="noreferrer">
-                Getz
-              </a>
+              <span className="copyrights-copy">©2026 Laduree Paris.</span>
             </p>
           </div>
 

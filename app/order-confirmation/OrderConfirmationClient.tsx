@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
+import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
 import {
   formatPickupDateLong,
@@ -11,30 +11,30 @@ import {
 } from "../pickup/mock-pickup";
 import "./order-confirmation.css";
 
-function createMockOrderNumber() {
-  const stamp = Date.now().toString(36).toUpperCase();
-  return `MOCK-${stamp}`;
-}
-
 export default function OrderConfirmationClient() {
   const { items, itemCount } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
   const { confirmed: pickup, isPickupComplete } = usePickup();
-  const [orderNumber] = useState(createMockOrderNumber);
+  const { placedOrder, isOrderPlaced } = useOrderFlow();
 
   const isEmpty = items.length === 0;
   const canShow =
     !isEmpty &&
     isPickupComplete &&
     isCheckoutInfoComplete &&
+    isOrderPlaced &&
     !!pickup &&
-    !!checkout;
+    !!checkout &&
+    !!placedOrder;
 
   return (
     <main className="order-confirmation-page">
       <div className="order-confirmation-page__inner">
         <div className="order-confirmation-page__top">
-          <Link href="/" className="order-confirmation-page__back">
+          <Link
+            href={isOrderPlaced ? "/" : "/payment"}
+            className="order-confirmation-page__back"
+          >
             ← Back
           </Link>
         </div>
@@ -62,7 +62,17 @@ export default function OrderConfirmationClient() {
           </div>
         ) : null}
 
-        {canShow && pickup && checkout && orderNumber ? (
+        {!isEmpty &&
+        isPickupComplete &&
+        isCheckoutInfoComplete &&
+        !isOrderPlaced ? (
+          <div className="order-confirmation-gate" role="alert">
+            Place a mock order before viewing confirmation.{" "}
+            <Link href="/payment">Payment</Link>
+          </div>
+        ) : null}
+
+        {canShow && pickup && checkout && placedOrder ? (
           <>
             <section className="order-confirmation-banner" aria-live="polite">
               <p className="order-confirmation-banner__message">
@@ -88,7 +98,9 @@ export default function OrderConfirmationClient() {
               >
                 Order number
               </h2>
-              <p className="order-confirmation-order-number">{orderNumber}</p>
+              <p className="order-confirmation-order-number">
+                {placedOrder.orderNumber}
+              </p>
             </section>
 
             <section
@@ -150,6 +162,23 @@ export default function OrderConfirmationClient() {
                   Special Request / Remarks: {checkout.specialRequest}
                 </p>
               ) : null}
+            </section>
+
+            <section
+              className="order-confirmation-card"
+              aria-labelledby="confirmation-payment"
+            >
+              <h2
+                id="confirmation-payment"
+                className="order-confirmation-card__title"
+              >
+                Payment summary
+              </h2>
+              <p className="order-confirmation-meta">
+                Payment Method: {placedOrder.paymentMethodLabel}
+                <br />
+                Gateway: [CONTENT PENDING APPROVAL]
+              </p>
             </section>
 
             <section
