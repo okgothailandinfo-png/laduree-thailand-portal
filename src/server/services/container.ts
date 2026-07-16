@@ -1,5 +1,6 @@
 import { createRepositories } from "@/src/server/repositories/create-repositories";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
+import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
 import { DefaultOrderService } from "@/src/server/services/order.service";
 import { DefaultPickupService } from "@/src/server/services/pickup.service";
@@ -23,4 +24,8 @@ export const orderService = new DefaultOrderService(
   repositories.products,
   repositories.boutiques,
   repositories.pickup,
+);
+export const cartService = new DefaultCartService(
+  repositories.carts,
+  repositories.products,
 );

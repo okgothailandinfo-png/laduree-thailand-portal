@@ -1,10 +1,12 @@
 import type { Boutique } from "@/src/server/models/boutique";
+import type { Cart } from "@/src/server/models/cart";
 import type { Category } from "@/src/server/models/category";
 import type { Order } from "@/src/server/models/order";
 import type { PickupAvailability } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
 import type {
   BoutiqueDto,
+  CartDto,
   CategoryDto,
   OrderDto,
   PickupAvailabilityDto,
@@ -77,5 +79,24 @@ export function toOrderDto(order: Order): OrderDto {
     customer: { ...order.customer },
     pickup: { ...order.pickup },
     payment: { ...order.payment },
+  };
+}
+
+export function toCartDto(cart: Cart): CartDto {
+  const items = cart.items.map((item) => ({
+    id: item.id,
+    productId: item.productId,
+    name: item.name,
+    imageSrc: item.imageSrc,
+    quantity: item.quantity,
+    modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
+    note: item.note,
+  }));
+
+  return {
+    id: cart.id,
+    currency: cart.currency,
+    items,
+    itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
   };
 }
