@@ -1,0 +1,47 @@
+import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
+
+export type OrderStatus = "mock_placed";
+
+export type OrderItem = {
+  productId: string;
+  name: string;
+  quantity: number;
+  modifiers: Array<{ label: string; quantity?: number }>;
+  note?: string;
+};
+
+export type OrderCustomer = {
+  customerName: string;
+  mobileNumber: string;
+  email: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  specialRequest?: string;
+};
+
+export type OrderPickup = {
+  boutiqueId: string;
+  boutiqueName: string;
+  address: string;
+  dateKey: string;
+  timeSlotId: string;
+  timeSlotLabel: string;
+};
+
+export type OrderPayment = {
+  method: CreateOrderPaymentDto["method"];
+  methodLabel: string;
+  status: "mock_accepted";
+};
+
+export type Order = {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  currency: "THB";
+  createdAt: string;
+  items: OrderItem[];
+  customer: OrderCustomer;
+  pickup: OrderPickup;
+  payment: OrderPayment;
+};
