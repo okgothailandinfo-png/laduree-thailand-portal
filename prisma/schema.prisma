@@ -1,0 +1,195 @@
+// Ladurée Thailand Pickup — Prisma foundation (PostgreSQL)
+// Schema only: not wired to APIs/services/repositories yet.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PLACED
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  PROMPTPAY_QR
+  APPLE_PAY
+  GOOGLE_PAY
+}
+
+enum PaymentStatus {
+  PENDING
+  MOCK_ACCEPTED
+  FAILED
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@index([sortOrder])
+}
+
+model Product {
+  id           String   @id @default(uuid()) @db.Uuid
+  categoryId   String   @db.Uuid
+  slug         String   @unique
+  title        String
+  description  String[] @default([])
+  storageLabel String?
+  storageText  String?
+  /// Thailand retail price in satang (minor units). Null until owner-approved.
+  priceMinor   Int?
+  currency     String   @default("THB") @db.Char(3)
+  available    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category   Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images     ProductImage[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([available])
+}
+
+model ProductImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model Boutique {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  code          String   @unique
+  address       String
+  openingHours  String
+  lastOrderTime String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  pickupSlots PickupSlot[]
+  orders      Order[]
+}
+
+model PickupSlot {
+  id         String   @id @default(uuid()) @db.Uuid
+  boutiqueId String   @db.Uuid
+  /// Calendar day key in Asia/Bangkok, format YYYY-MM-DD
+  dateKey    String
+  startTime  String
+  endTime    String
+  label      String
+  capacity   Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  boutique Boutique @relation(fields: [boutiqueId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@unique([boutiqueId, dateKey, startTime, endTime])
+  @@index([boutiqueId, dateKey])
+}
+
+model Customer {
+  id             String   @id @default(uuid()) @db.Uuid
+  customerName   String
+  mobileNumber   String
+  email          String
+  recipientName  String?
+  recipientPhone String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders Order[]
+
+  @@unique([email, mobileNumber])
+  @@index([email])
+  @@index([mobileNumber])
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  orderNumber    String      @unique
+  status         OrderStatus @default(PENDING)
+  customerId     String      @db.Uuid
+  boutiqueId     String      @db.Uuid
+  pickupSlotId   String      @db.Uuid
+  currency       String      @default("THB") @db.Char(3)
+  /// Order total in satang (minor units)
+  totalMinor     Int         @default(0)
+  specialRequest String?
+  termsAccepted  Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  boutique   Boutique       @relation(fields: [boutiqueId], references: [id], onDelete: Restrict)
+  pickupSlot PickupSlot     @relation(fields: [pickupSlotId], references: [id], onDelete: Restrict)
+  items      OrderItem[]
+  payment    PaymentRecord?
+
+  @@index([customerId])
+  @@index([boutiqueId])
+  @@index([pickupSlotId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  orderId        String   @db.Uuid
+  productId      String   @db.Uuid
+  /// Snapshot of product title at order time
+  productName    String
+  quantity       Int
+  /// Unit price snapshot in satang (minor units)
+  unitPriceMinor Int
+  currency       String   @default("THB") @db.Char(3)
+  modifiers      Json?
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model PaymentRecord {
+  id          String        @id @default(uuid()) @db.Uuid
+  orderId     String        @unique @db.Uuid
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  /// Charged amount in satang (minor units)
+  amountMinor Int
+  currency    String        @default("THB") @db.Char(3)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
