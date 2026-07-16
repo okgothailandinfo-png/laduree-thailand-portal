@@ -1,105 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import CatalogStatus from "./catalog/CatalogStatus";
+import { useAsyncResource } from "./catalog/useAsyncResource";
 import DesktopCartAside from "./cart/DesktopCartAside";
 import MobileViewCartButton from "./cart/MobileViewCartButton";
 import ServiceDateTimeBar from "./pickup/ServiceDateTimeBar";
+import {
+  fetchCategories,
+  fetchProducts,
+  formatPriceThb,
+} from "@/lib/api/catalog";
+import type { Category, ProductSummary } from "@/lib/api/types";
 
-const menuCategories = [
-  { label: "All Items", href: "/Category" },
-  { label: "Macaron Gift Boxes", href: "/Category/macaron-gift-boxes.html" },
-  {
-    label: "Eugénie Chocolates Gift Boxes",
-    href: "/Category/eug%C3%A9nie-chocolates-gift-boxes.html",
-  },
-  { label: "Chocolates", href: "/Category/chocolates.html" },
-  { label: "Biscuits", href: "/Category/biscuits.html" },
-  { label: "Tea Boxes", href: "/Category/tea-boxes.html" },
-  { label: "Merchandise", href: "/Category/merchandise.html" },
-] as const;
+type CatalogSection = {
+  id: string;
+  categoryId: string;
+  title: string;
+  products: ProductSummary[];
+};
 
-/** Singapore-verified category structure for layout parity (Thailand content TBD). */
-const catalogSections = [
-  {
-    id: "macaron-gift-boxes",
-    title: "Macaron Gift Boxes",
-    intro:
-      "Macaron gift boxes include protective inserts for online orders only.",
-    products: [
-      "« Napoléon III » Macaron - 8pcs",
-      "« Prestige » Macaron - 15pcs",
-      "« Prestige » Macaron - 20pcs",
-      "« Prestige » Macaron - 28pcs",
-      "« Prestige » Macaron - 35pcs",
-      "« Arabesque » Macaron - 42pcs",
-    ],
-  },
-  {
-    id: "eugenie-chocolates-gift-boxes",
-    title: "Eugénie Chocolates Gift Boxes",
-    intro:
-      "A delicious, unexpected marriage of a crunchy sablé, a melting heart, and a delicate chocolate coating.",
-    products: [
-      "Eugénie Chocolates - 6pcs",
-      "Eugénie Chocolates - 12pcs",
-      "Eugénie Chocolates - 18pcs",
-    ],
-  },
-  {
-    id: "chocolates",
-    title: "Chocolates",
-    intro: "Soft marshmallow bears coated in rich, silky chocolate.",
-    products: [
-      "Marshmallow Bear Milk Chocolate",
-      "Marshmallow Bear Dark Chocolate",
-      "Dark Chocolate Candied Orange « Orangette »",
-      "Dark Chocolate Almond Praline « 16 Royale » - 12pcs",
-    ],
-  },
-  {
-    id: "biscuits",
-    title: "Biscuits",
-    intro: "Delicate langue de chat biscuits with a light, buttery crunch.",
-    products: [
-      "Langue de Chat Vanilla & Strawberry",
-      "Langue de Chat Vanilla & Caramel",
-      "Langue de Chat Dark & Milk Chocolate",
-    ],
-  },
-  {
-    id: "tea-boxes",
-    title: "Tea Boxes",
-    intro:
-      "A curated selection of aromatic teas inspired by Parisian tradition.",
-    products: [
-      "Marie-Antoinette Tea Box - 20 sachets",
-      "Roi Soleil Tea Box - 20 sachets",
-      "Mélange Ladurée Tea Box - 20 sachets",
-      "Earl Grey Tea Box - 20 sachets",
-      "1001 Nuits Tea Box - 20 sachets",
-    ],
-  },
-  {
-    id: "merchandise",
-    title: "Merchandise",
-    intro:
-      "Beautifully crafted items inspired by Ladurée's timeless Parisian style.",
-    products: [
-      "« Pampille » Keyring",
-      "« Macarons » Keyring",
-      "« Little Bag » Keyring",
-      "Vichy Travel Mug",
-      "Pink Thermo Bottle",
-      "Toile De Jouy Thermo Bottle",
-      "Toile De Jouy (Pouch)",
-      "Toile De Jouy (Notebook)",
-      "Organic Cotton Pink Mini Tote Bag",
-      "Organic Cotton Green Tote Bag",
-      "Picnic Cooler Bag",
-    ],
-  },
-] as const;
+function buildCatalogSections(
+  categories: Category[],
+  products: ProductSummary[],
+): CatalogSection[] {
+  return [...categories]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((category) => ({
+      id: category.slug,
+      categoryId: category.id,
+      title: category.name,
+      products: products.filter(
+        (product) => product.categoryId === category.id,
+      ),
+    }));
+}
 
 function SearchIcon({ size = 14 }: { size?: number }) {
   return (
@@ -197,6 +133,33 @@ export default function Home() {
   const [footerSlide, setFooterSlide] = useState(0);
   const menuRef = useRef<HTMLLIElement>(null);
   const serviceRef = useRef<HTMLDivElement>(null);
+
+  const catalog = useAsyncResource(
+    async (signal) => {
+      const [categories, products] = await Promise.all([
+        fetchCategories({ signal }),
+        fetchProducts({ signal }),
+      ]);
+      return { categories, products };
+    },
+    {
+      isEmpty: (data) =>
+        data.categories.length === 0 && data.products.length === 0,
+    },
+  );
+
+  const menuCategories = catalog.data?.categories ?? [];
+  const catalogSections = useMemo(
+    () =>
+      buildCatalogSections(
+        catalog.data?.categories ?? [],
+        catalog.data?.products ?? [],
+      ),
+    [catalog.data],
+  );
+
+  const resolvedActiveCategoryId =
+    activeCategoryId ?? catalogSections[0]?.id ?? null;
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -307,13 +270,16 @@ export default function Home() {
                         <div className="wrapper" hidden={!menuOpen}>
                           <ul className="dropdown-menu-getz" role="menu">
                             {menuCategories.map((item) => (
-                              <li key={item.href} role="none">
+                              <li key={item.id} role="none">
                                 <a
                                   role="menuitem"
-                                  href={item.href}
-                                  onClick={(e) => e.preventDefault()}
+                                  href={`#scroll-${item.slug}`}
+                                  onClick={() => {
+                                    setMenuOpen(false);
+                                    setActiveCategoryId(item.slug);
+                                  }}
                                 >
-                                  {item.label}
+                                  {item.name}
                                 </a>
                               </li>
                             ))}
@@ -558,15 +524,15 @@ export default function Home() {
               </h2>
                   <ul className="menu-mb-categories list-1">
                     {menuCategories.map((item) => (
-                      <li key={item.href}>
+                      <li key={item.id}>
                         <a
-                          href={item.href}
-                          onClick={(e) => {
-                            e.preventDefault();
+                          href={`#scroll-${item.slug}`}
+                          onClick={() => {
                             setMobileMenuOpen(false);
+                            setActiveCategoryId(item.slug);
                           }}
                         >
-                          {item.label}
+                          {item.name}
                         </a>
                       </li>
                     ))}
@@ -668,28 +634,43 @@ export default function Home() {
                 className="category-nav-mobile"
                 aria-label="Menu Categories"
               >
-                <ul className="category-menu-mobile category-menu-iconic">
-                  {catalogSections.map((section) => (
-                    <li
-                      key={`mobile-nav-${section.id}`}
-                      className="menu-mobile-item"
-                    >
-                      <a href={`#scroll-${section.id}`} title={section.title}>
-                        <span
-                          className="img-category-iconic b-radius"
-                          style={{
-                            backgroundImage:
-                              "url(/category-icon-placeholder.svg)",
-                          }}
-                          aria-hidden="true"
-                        />
-                        <span className="slide__title item-menu-title">
-                          {section.title}
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                {catalog.status === "loading" ||
+                catalog.status === "error" ||
+                catalog.status === "empty" ? (
+                  <CatalogStatus
+                    status={catalog.status}
+                    errorMessage={catalog.errorMessage}
+                    emptyMessage="No categories available."
+                    onRetry={catalog.reload}
+                  />
+                ) : (
+                  <ul className="category-menu-mobile category-menu-iconic">
+                    {catalogSections.map((section) => (
+                      <li
+                        key={`mobile-nav-${section.id}`}
+                        className="menu-mobile-item"
+                      >
+                        <a
+                          href={`#scroll-${section.id}`}
+                          title={section.title}
+                          onClick={() => setActiveCategoryId(section.id)}
+                        >
+                          <span
+                            className="img-category-iconic b-radius"
+                            style={{
+                              backgroundImage:
+                                "url(/category-icon-placeholder.svg)",
+                            }}
+                            aria-hidden="true"
+                          />
+                          <span className="slide__title item-menu-title">
+                            {section.title}
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </nav>
 
               <div
@@ -808,7 +789,7 @@ export default function Home() {
                 >
                   <ul className="nav category-menu-mobile item-menu-floating position-fixed">
                     {catalogSections.map((section) => {
-                      const isActive = activeCategoryId === section.id;
+                      const isActive = resolvedActiveCategoryId === section.id;
                       return (
                         <li
                           key={`rail-${section.id}`}
@@ -841,98 +822,110 @@ export default function Home() {
                     </div>
                   </section>
 
-                  {catalogSections.map((section) => (
-                    <section
-                      key={section.id}
-                      id={`category-${section.id}`}
-                      data-category-id={section.id}
-                      className="full-menu-block style-1 item-products-floating"
-                    >
-                      <div className="title-group" id={`scroll-${section.id}`}>
-                        <h2 className="title-2">
-                          <a
-                            href={`#scroll-${section.id}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setActiveCategoryId(section.id);
-                              document
-                                .getElementById(`scroll-${section.id}`)
-                                ?.scrollIntoView({ behavior: "smooth" });
-                            }}
-                          >
-                            <span className="color-by-theme">
-                              {section.title}
-                            </span>
-                          </a>
-                          <i
-                            className="fa fa-chevron-circle-right visible-xs"
-                            aria-hidden="true"
-                          />
-                        </h2>
-                        <div className="desc text-clamp-overflow">
-                          <p>{section.intro}</p>
-                        </div>
-                      </div>
-
-                      <div
-                        className="LazyLoading product-container vertical-products"
-                        data-item-per-row="3"
+                  {catalog.status === "loading" ||
+                  catalog.status === "error" ||
+                  catalog.status === "empty" ? (
+                    <CatalogStatus
+                      status={catalog.status}
+                      errorMessage={catalog.errorMessage}
+                      emptyMessage="No items available."
+                      onRetry={catalog.reload}
+                    />
+                  ) : (
+                    catalogSections.map((section) => (
+                      <section
+                        key={section.id}
+                        id={`category-${section.id}`}
+                        data-category-id={section.id}
+                        className="full-menu-block style-1 item-products-floating"
                       >
-                        {section.products.map((title) => (
-                          <div
-                            key={title}
-                            className="lazy item-products"
-                            data-full-height-item=""
-                          >
-                            <div className="thumbnail thumbnail-1 style-1">
-                              <div className="thumbnail-group__top">
-                                <div className="product__img">
-                                  <span className="img-1">
-                                    <img
-                                      className="img-responsive-2"
-                                      src="/product-placeholder.svg"
-                                      alt=""
-                                    />
-                                  </span>
-                                </div>
-                                <div className="title-4">
-                                  <div className="text-clamp-overflow-item">
-                                    {title}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="thumbnail-group__bottom">
-                                <div className="price-bottom">
-                                  <span>฿ —</span>
-                                </div>
-                                <div className="btn-add">
-                                  <div className="product-item__footer">
-                                    {title ===
-                                    "« Napoléon III » Macaron - 8pcs" ? (
-                                      <Link
-                                        href="/product/napoleon-iii-macaron-8pcs"
-                                        className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
-                                      >
-                                        ADD
-                                      </Link>
-                                    ) : (
-                                      <a
-                                        href="#"
-                                        className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
-                                        onClick={(e) => e.preventDefault()}
-                                      >
-                                        ADD
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                        <div
+                          className="title-group"
+                          id={`scroll-${section.id}`}
+                        >
+                          <h2 className="title-2">
+                            <a
+                              href={`#scroll-${section.id}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setActiveCategoryId(section.id);
+                                document
+                                  .getElementById(`scroll-${section.id}`)
+                                  ?.scrollIntoView({ behavior: "smooth" });
+                              }}
+                            >
+                              <span className="color-by-theme">
+                                {section.title}
+                              </span>
+                            </a>
+                            <i
+                              className="fa fa-chevron-circle-right visible-xs"
+                              aria-hidden="true"
+                            />
+                          </h2>
+                          <div className="desc text-clamp-overflow">
+                            <p>[CONTENT PENDING APPROVAL]</p>
                           </div>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
+                        </div>
+
+                        <div
+                          className="LazyLoading product-container vertical-products"
+                          data-item-per-row="3"
+                        >
+                          {section.products.length === 0 ? (
+                            <CatalogStatus
+                              status="empty"
+                              emptyMessage="No items available."
+                            />
+                          ) : (
+                            section.products.map((product) => (
+                              <div
+                                key={product.id}
+                                className="lazy item-products"
+                                data-full-height-item=""
+                              >
+                                <div className="thumbnail thumbnail-1 style-1">
+                                  <div className="thumbnail-group__top">
+                                    <div className="product__img">
+                                      <span className="img-1">
+                                        <img
+                                          className="img-responsive-2"
+                                          src={product.imagePlaceholder}
+                                          alt=""
+                                        />
+                                      </span>
+                                    </div>
+                                    <div className="title-4">
+                                      <div className="text-clamp-overflow-item">
+                                        {product.title}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="thumbnail-group__bottom">
+                                    <div className="price-bottom">
+                                      <span>
+                                        {formatPriceThb(product.priceThb)}
+                                      </span>
+                                    </div>
+                                    <div className="btn-add">
+                                      <div className="product-item__footer">
+                                        <Link
+                                          href={`/product/${product.slug}`}
+                                          className="btn btn-3 btn-sm btn-add-to-cart product__btn btn-grey"
+                                        >
+                                          ADD
+                                        </Link>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </section>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

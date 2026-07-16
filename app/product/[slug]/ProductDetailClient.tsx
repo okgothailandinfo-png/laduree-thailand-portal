@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import CatalogStatus from "../../catalog/CatalogStatus";
+import { useAsyncResource } from "../../catalog/useAsyncResource";
 import { useCart } from "../../cart/CartContext";
-import { SAMPLE_PRODUCT } from "../sample-product";
+import {
+  fetchProductBySlug,
+  formatPriceThb,
+} from "@/lib/api/catalog";
 import "../product-detail.css";
 
 function clampQty(value: number) {
@@ -13,7 +18,6 @@ function clampQty(value: number) {
 }
 
 export default function ProductDetailClient({ slug }: { slug: string }) {
-  const product = SAMPLE_PRODUCT;
   const { addItem } = useCart();
   const [activeImage, setActiveImage] = useState(0);
   const [productQty, setProductQty] = useState(1);
@@ -23,7 +27,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   );
   const [remark, setRemark] = useState("");
 
-  const title = product.title;
+  const productQuery = useAsyncResource(
+    (signal) => fetchProductBySlug(slug, { signal }),
+    { deps: [slug] },
+  );
+
+  const product = productQuery.data;
+  const imageCount = 4;
 
   function changeModifierQty(key: string, delta: number) {
     setModifierQty((current) => {
@@ -33,6 +43,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   }
 
   function handleAddToCart() {
+    if (!product) return;
     const modifiers: { label: string; quantity?: number }[] = [];
 
     for (const group of product.modifierGroups) {
@@ -49,14 +60,61 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     }
 
     addItem({
-      productId: slug || product.slug,
+      productId: product.id,
       name: product.title,
-      imageSrc: "/product-placeholder.svg",
+      imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
       quantity: productQty,
       modifiers,
       note: remark.trim() || undefined,
     });
   }
+
+  if (
+    productQuery.status === "loading" ||
+    productQuery.status === "error" ||
+    productQuery.status === "empty" ||
+    !product
+  ) {
+    return (
+      <div className="product-detail-page modal-product-detail">
+        <div className="modal-header header-title">
+          <div className="header-title__product-contaner">
+            <Link
+              href="/"
+              className="close-left"
+              aria-label="Close"
+              title="Close"
+            >
+              <i className="fa fa-arrow-left" aria-hidden="true" />
+            </Link>
+            <div className="header-title__product">
+              <h4 className="header-title__product-title">Product</h4>
+            </div>
+            <Link
+              href="/"
+              className="close padding-right-10 desktop-close"
+              aria-label="Close"
+              title="Close"
+            >
+              <span aria-hidden="true" className="close-icon" />
+            </Link>
+          </div>
+        </div>
+        <div className="modal-body">
+          <CatalogStatus
+            status={
+              productQuery.status === "success" ? "empty" : productQuery.status
+            }
+            errorMessage={productQuery.errorMessage}
+            emptyMessage="Product not found."
+            onRetry={productQuery.reload}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const priceLabel = formatPriceThb(product.priceThb);
 
   return (
     <div className="product-detail-page modal-product-detail">
@@ -72,7 +130,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           </Link>
 
           <div className="header-title__product">
-            <h4 className="header-title__product-title">{title}</h4>
+            <h4 className="header-title__product-title">{product.title}</h4>
           </div>
 
           <Link
@@ -99,51 +157,45 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                         transform: `translate3d(-${activeImage * 100}%, 0, 0)`,
                       }}
                     >
-                      {Array.from({ length: product.imageCount }).map(
-                        (_, index) => (
-                          <div
-                            key={`pdp-img-${index}`}
-                            className={`slide${index === activeImage ? " slick-current slick-active" : ""}`}
-                          >
-                            <button
-                              type="button"
-                              className="product-detail-image-button"
-                              onClick={() => setActiveImage(index)}
-                              aria-label={`Product image ${index + 1}`}
-                            >
-                              <img
-                                className="img-product-detail img-responsive"
-                                src="/product-placeholder.svg"
-                                alt=""
-                              />
-                            </button>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                  <ul className="slick-dots" role="tablist">
-                    {Array.from({ length: product.imageCount }).map(
-                      (_, index) => (
-                        <li
-                          key={`pdp-dot-${index}`}
-                          className={
-                            index === activeImage ? "slick-active" : ""
-                          }
-                          role="presentation"
+                      {Array.from({ length: imageCount }).map((_, index) => (
+                        <div
+                          key={`pdp-img-${index}`}
+                          className={`slide${index === activeImage ? " slick-current slick-active" : ""}`}
                         >
                           <button
                             type="button"
-                            role="tab"
-                            aria-selected={index === activeImage}
-                            aria-label={`Product image ${index + 1}`}
+                            className="product-detail-image-button"
                             onClick={() => setActiveImage(index)}
+                            aria-label={`Product image ${index + 1}`}
                           >
-                            {index + 1}
+                            <img
+                              className="img-product-detail img-responsive"
+                              src={product.imagePlaceholder}
+                              alt=""
+                            />
                           </button>
-                        </li>
-                      ),
-                    )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <ul className="slick-dots" role="tablist">
+                    {Array.from({ length: imageCount }).map((_, index) => (
+                      <li
+                        key={`pdp-dot-${index}`}
+                        className={index === activeImage ? "slick-active" : ""}
+                        role="presentation"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={index === activeImage}
+                          aria-label={`Product image ${index + 1}`}
+                          onClick={() => setActiveImage(index)}
+                        >
+                          {index + 1}
+                        </button>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -151,7 +203,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               <div className="col-md-6 col-sm-12 col-xs-12 smoov-product-detail-right-panel">
                 <div className="product-detail-text-right">
                   <span className="cls_from">from</span>
-                  <span>฿ —</span>
+                  <span>{priceLabel}</span>
                 </div>
 
                 <div className="product-detail-content">
@@ -168,14 +220,21 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   </div>
 
                   <div id="description-render">
-                    <p>{product.description[0]}</p>
-                    <hr />
-                    <p>{product.description[1]}</p>
-                    <p>
-                      <strong>{product.storageLabel}</strong>
-                      <br />
-                      {product.storageText}
-                    </p>
+                    {product.description.map((paragraph, index) => (
+                      <p key={`desc-${index}`}>{paragraph}</p>
+                    ))}
+                    {product.description.length > 0 ? <hr /> : null}
+                    {product.storageLabel || product.storageText ? (
+                      <p>
+                        {product.storageLabel ? (
+                          <strong>{product.storageLabel}</strong>
+                        ) : null}
+                        {product.storageLabel && product.storageText ? (
+                          <br />
+                        ) : null}
+                        {product.storageText}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -372,7 +431,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 >
                   ADD
                   <span>
-                    -<span id="totalPriceOfProduct"> ฿ —</span>
+                    -<span id="totalPriceOfProduct"> {priceLabel}</span>
                   </span>
                 </button>
               </div>
@@ -380,11 +439,6 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           </div>
         </div>
       </div>
-
-      {/* Keep slug referenced for future catalog wiring without homepage changes */}
-      <span className="sr-only" data-product-slug={slug}>
-        {slug}
-      </span>
     </div>
   );
 }

@@ -2169,3 +2169,32 @@ body {
   }
 }
 
+/* Catalog / boutique API status shells — keep layout quiet */
+.catalog-status {
+  padding: 1.25rem 0.75rem;
+  color: var(--color-gray-555);
+  font-family: var(--main-font-family);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.catalog-status--error p {
+  margin: 0 0 0.75rem;
+}
+
+.catalog-status__retry {
+  appearance: none;
+  border: 1px solid var(--main-color);
+  background: var(--color-white);
+  color: var(--main-color);
+  font-family: var(--main-font-family);
+  font-size: 0.875rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.catalog-status__retry:hover {
+  background: var(--main-light-color);
+}
+

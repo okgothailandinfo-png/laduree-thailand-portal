@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { SAMPLE_PRODUCT } from "../sample-product";
 import ProductDetailClient from "./ProductDetailClient";
 
+export const dynamic = "force-dynamic";
+export const dynamicParams = true;
+
 export function generateStaticParams() {
-  return [{ slug: SAMPLE_PRODUCT.slug }];
+  return [] as Array<{ slug: string }>;
 }
 
 export async function generateMetadata({
@@ -11,10 +13,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  await params;
-
+  const { slug } = await params;
   return {
-    title: `${SAMPLE_PRODUCT.title} | Ladurée Thailand`,
+    title: `${slug} | Ladurée Thailand`,
   };
 }
 
@@ -24,5 +25,5 @@ export default async function ProductDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  return <ProductDetailClient slug={slug} />;
+  return <ProductDetailClient key={slug} slug={slug} />;
 }

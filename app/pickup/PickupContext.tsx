@@ -4,16 +4,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import {
-  MOCK_BOUTIQUE,
-  MOCK_TIME_SLOTS,
-  type MockBoutique,
-  type MockTimeSlot,
-} from "./mock-pickup";
+import { ApiClientError } from "@/lib/api/client";
+import { fetchBoutiques } from "@/lib/api/catalog";
+import type { Boutique } from "@/lib/api/types";
+import { MOCK_TIME_SLOTS, type MockTimeSlot } from "./mock-pickup";
 
 export type PickupDraft = {
   boutiqueId: string | null;
@@ -22,7 +21,7 @@ export type PickupDraft = {
 };
 
 export type ConfirmedPickup = {
-  boutique: MockBoutique;
+  boutique: Boutique;
   dateKey: string;
   timeSlot: MockTimeSlot;
 };
@@ -43,6 +42,10 @@ type PickupContextValue = {
   confirmed: ConfirmedPickup | null;
   isPickupComplete: boolean;
   resetSelection: () => void;
+  boutiques: Boutique[];
+  boutiquesStatus: "loading" | "success" | "error" | "empty";
+  boutiquesError: string | null;
+  reloadBoutiques: () => void;
 };
 
 export type PickupStep = "service" | "boutique" | "datetime";
@@ -61,6 +64,44 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<PickupDraft>(emptyDraft);
   const [confirmed, setConfirmed] = useState<ConfirmedPickup | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [boutiques, setBoutiques] = useState<Boutique[]>([]);
+  const [boutiquesStatus, setBoutiquesStatus] = useState<
+    "loading" | "success" | "error" | "empty"
+  >("loading");
+  const [boutiquesError, setBoutiquesError] = useState<string | null>(null);
+  const [boutiquesReloadToken, setBoutiquesReloadToken] = useState(0);
+
+  const reloadBoutiques = useCallback(() => {
+    setBoutiquesStatus("loading");
+    setBoutiquesError(null);
+    setBoutiquesReloadToken((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchBoutiques({ signal: controller.signal })
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        setBoutiques(rows);
+        setBoutiquesStatus(rows.length === 0 ? "empty" : "success");
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        const message =
+          error instanceof ApiClientError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Unable to load boutiques.";
+        setBoutiques([]);
+        setBoutiquesError(message);
+        setBoutiquesStatus("error");
+      });
+
+    return () => controller.abort();
+  }, [boutiquesReloadToken]);
 
   const openPickupSelection = useCallback((opts?: { step?: PickupStep }) => {
     setValidationError(null);
@@ -120,7 +161,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     }
 
     const boutique =
-      draft.boutiqueId === MOCK_BOUTIQUE.id ? MOCK_BOUTIQUE : null;
+      boutiques.find((item) => item.id === draft.boutiqueId) ?? null;
     const timeSlot = MOCK_TIME_SLOTS.find((s) => s.id === draft.timeSlotId);
 
     if (!boutique || !timeSlot || !draft.dateKey) {
@@ -136,7 +177,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     setValidationError(null);
     setIsOpen(false);
     return true;
-  }, [draft]);
+  }, [boutiques, draft]);
 
   const resetSelection = useCallback(() => {
     setConfirmed(null);
@@ -162,6 +203,10 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       confirmed,
       isPickupComplete: confirmed !== null,
       resetSelection,
+      boutiques,
+      boutiquesStatus,
+      boutiquesError,
+      reloadBoutiques,
     }),
     [
       isOpen,
@@ -177,6 +222,10 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       confirmSelection,
       confirmed,
       resetSelection,
+      boutiques,
+      boutiquesStatus,
+      boutiquesError,
+      reloadBoutiques,
     ],
   );
 
