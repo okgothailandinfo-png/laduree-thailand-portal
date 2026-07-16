@@ -1,0 +1,25 @@
+# Local development PostgreSQL only.
+# Defaults are for local machines — change before any shared/staging use.
+# Do not use these values in production.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: laduree-pickup-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: laduree
+      POSTGRES_PASSWORD: laduree
+      POSTGRES_DB: laduree_pickup
+    volumes:
+      - laduree_pickup_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U laduree -d laduree_pickup"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  laduree_pickup_pgdata:
