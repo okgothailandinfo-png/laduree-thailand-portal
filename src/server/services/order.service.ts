@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import type { Order } from "@/src/server/models/order";
 import type {
   BoutiqueRepository,
@@ -40,12 +41,12 @@ const PAYMENT_METHODS = new Set<CreateOrderPaymentDto["method"]>([
   "google-pay",
 ]);
 
-function createOrderId() {
-  return `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 function createOrderNumber() {
   return `MOCK-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function unitPriceMinorFromProduct(priceMinor: number | null): number {
+  return priceMinor ?? 0;
 }
 
 export class DefaultOrderService implements OrderService {
@@ -151,11 +152,9 @@ export class DefaultOrderService implements OrderService {
     }
 
     if (!termsAccepted) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "termsAccepted must be true.",
-        { details: { field: "termsAccepted" } },
-      );
+      throw new AppError("VALIDATION_ERROR", "termsAccepted must be true.", {
+        details: { field: "termsAccepted" },
+      });
     }
 
     return {
@@ -214,6 +213,8 @@ export class DefaultOrderService implements OrderService {
     }
 
     const items: Order["items"] = [];
+    let totalMinor = 0;
+
     for (const line of input.items) {
       const product = await this.products.findById(line.productId);
       if (!product || !product.available) {
@@ -223,22 +224,29 @@ export class DefaultOrderService implements OrderService {
           { details: { field: "items.productId", productId: line.productId } },
         );
       }
+
+      const unitPriceMinor = unitPriceMinorFromProduct(product.priceMinor);
+      totalMinor += unitPriceMinor * line.quantity;
+
       items.push({
         productId: product.id,
         name: product.title,
         quantity: line.quantity,
         modifiers: line.modifiers ?? [],
         note: line.note,
+        unitPriceMinor,
       });
     }
 
     const order: Order = {
-      id: createOrderId(),
+      id: randomUUID(),
       orderNumber: createOrderNumber(),
       status: "mock_placed",
       currency: "THB",
       createdAt: new Date().toISOString(),
       items,
+      totalMinor,
+      termsAccepted: input.termsAccepted,
       customer: { ...input.customer },
       pickup: {
         boutiqueId: boutique.id,
@@ -256,9 +264,10 @@ export class DefaultOrderService implements OrderService {
     };
 
     const saved = await this.orders.create(order);
-    logger.info("Mock order placed", {
+    logger.info("Order placed", {
       orderId: saved.id,
       orderNumber: saved.orderNumber,
+      totalMinor: saved.totalMinor,
     });
     return toOrderDto(saved);
   }
@@ -268,6 +277,15 @@ export class DefaultOrderService implements OrderService {
     const order = await this.orders.findById(orderId);
     if (!order) {
       throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+    }
+    return toOrderDto(order);
+  }
+
+  async getOrderByOrderNumber(orderNumber: string): Promise<OrderDto> {
+    const value = requireString(orderNumber, "orderNumber");
+    const order = await this.orders.findByOrderNumber(value);
+    if (!order) {
+      throw new AppError("NOT_FOUND", `Order not found: ${value}`);
     }
     return toOrderDto(order);
   }

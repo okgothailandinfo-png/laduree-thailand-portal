@@ -5,18 +5,23 @@ import type { PickupAvailability } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
 
 export interface ProductRepository {
+  /** Active/available products only. */
   list(): Promise<Product[]>;
   findBySlug(slug: string): Promise<Product | null>;
   findById(id: string): Promise<Product | null>;
 }
 
 export interface CategoryRepository {
+  /** Active categories (all rows until an isActive column exists). */
   list(): Promise<Category[]>;
+  findBySlug(slug: string): Promise<Category | null>;
 }
 
 export interface BoutiqueRepository {
+  /** Active boutiques (all rows until an isActive column exists). */
   list(): Promise<Boutique[]>;
   findById(id: string): Promise<Boutique | null>;
+  findByCode(code: string): Promise<Boutique | null>;
 }
 
 export interface PickupRepository {
@@ -30,4 +35,13 @@ export interface PickupRepository {
 export interface OrderRepository {
   create(order: Order): Promise<Order>;
   findById(id: string): Promise<Order | null>;
+  findByOrderNumber(orderNumber: string): Promise<Order | null>;
 }
+
+export type RepositoryBundle = {
+  products: ProductRepository;
+  categories: CategoryRepository;
+  boutiques: BoutiqueRepository;
+  pickup: PickupRepository;
+  orders: OrderRepository;
+};

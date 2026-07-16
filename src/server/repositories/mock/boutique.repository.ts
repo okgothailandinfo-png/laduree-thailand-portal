@@ -10,4 +10,8 @@ export class MockBoutiqueRepository implements BoutiqueRepository {
   async findById(id: string): Promise<Boutique | null> {
     return MOCK_BOUTIQUES.find((boutique) => boutique.id === id) ?? null;
   }
+
+  async findByCode(code: string): Promise<Boutique | null> {
+    return MOCK_BOUTIQUES.find((boutique) => boutique.code === code) ?? null;
+  }
 }

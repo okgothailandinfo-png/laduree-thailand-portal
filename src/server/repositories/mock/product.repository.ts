@@ -4,7 +4,7 @@ import { MOCK_PRODUCTS } from "@/src/server/repositories/mock/data";
 
 export class MockProductRepository implements ProductRepository {
   async list(): Promise<Product[]> {
-    return [...MOCK_PRODUCTS];
+    return MOCK_PRODUCTS.filter((product) => product.available);
   }
 
   async findBySlug(slug: string): Promise<Product | null> {

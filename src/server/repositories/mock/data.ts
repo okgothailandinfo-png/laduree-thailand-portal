@@ -36,6 +36,7 @@ export const MOCK_PRODUCTS: Product[] = [
     storageLabel: "Storage Information:",
     storageText: "Macarons can be stored for up to 4 days in the Chiller.",
     priceThb: null,
+    priceMinor: null,
     imagePlaceholder: "/product-placeholder.svg",
     available: true,
     modifierGroups: [
