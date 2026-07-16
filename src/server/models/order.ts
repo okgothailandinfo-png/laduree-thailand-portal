@@ -8,6 +8,8 @@ export type OrderItem = {
   quantity: number;
   modifiers: Array<{ label: string; quantity?: number }>;
   note?: string;
+  /** Snapshot unit price in satang; used for persistence, omitted from API DTO. */
+  unitPriceMinor: number;
 };
 
 export type OrderCustomer = {
@@ -44,4 +46,7 @@ export type Order = {
   customer: OrderCustomer;
   pickup: OrderPickup;
   payment: OrderPayment;
+  /** Order total in satang; calculated in the service layer. */
+  totalMinor: number;
+  termsAccepted: boolean;
 };

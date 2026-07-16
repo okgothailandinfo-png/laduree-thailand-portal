@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 /**
  * Prisma Client singleton for Next.js (dev hot-reload safe).
- * Foundation only — not wired into repositories/services yet.
+ * Used by Prisma repository implementations when DATA_SOURCE=prisma.
  */
 
 const globalForPrisma = globalThis as unknown as {

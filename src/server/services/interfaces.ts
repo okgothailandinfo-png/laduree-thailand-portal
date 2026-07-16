@@ -31,4 +31,5 @@ export interface PickupService {
 export interface OrderService {
   createOrder(input: CreateOrderRequestDto): Promise<OrderDto>;
   getOrderById(id: string): Promise<OrderDto>;
+  getOrderByOrderNumber(orderNumber: string): Promise<OrderDto>;
 }

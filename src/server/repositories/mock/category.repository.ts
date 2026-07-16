@@ -6,4 +6,8 @@ export class MockCategoryRepository implements CategoryRepository {
   async list(): Promise<Category[]> {
     return [...MOCK_CATEGORIES].sort((a, b) => a.sortOrder - b.sortOrder);
   }
+
+  async findBySlug(slug: string): Promise<Category | null> {
+    return MOCK_CATEGORIES.find((category) => category.slug === slug) ?? null;
+  }
 }
