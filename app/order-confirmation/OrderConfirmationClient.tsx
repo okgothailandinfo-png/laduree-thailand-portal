@@ -5,10 +5,7 @@ import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
 import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
-import {
-  formatPickupDateLong,
-  parseDateKey,
-} from "../pickup/mock-pickup";
+import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import "./order-confirmation.css";
 
 export default function OrderConfirmationClient() {
@@ -121,7 +118,7 @@ export default function OrderConfirmationClient() {
               <p className="order-confirmation-meta">
                 Pickup date &amp; time
                 <br />
-                {formatPickupDateLong(parseDateKey(pickup.dateKey))}
+                {formatPickupDateKeyLong(pickup.dateKey)}
                 <br />
                 {pickup.timeSlot.start} To {pickup.timeSlot.end}
               </p>

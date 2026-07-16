@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useCart } from "../cart/CartContext";
 import { usePickup } from "../pickup/PickupContext";
-import {
-  formatPickupDateLong,
-  parseDateKey,
-} from "../pickup/mock-pickup";
+import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import { useCheckout } from "./CheckoutContext";
 import "./checkout.css";
 
@@ -76,7 +73,7 @@ export default function CheckoutPageClient() {
                   <p className="checkout-summary-meta">
                     Pickup Time
                     <br />
-                    {formatPickupDateLong(parseDateKey(pickup.dateKey))}
+                    {formatPickupDateKeyLong(pickup.dateKey)}
                     <br />
                     {pickup.timeSlot.start} To {pickup.timeSlot.end}
                   </p>

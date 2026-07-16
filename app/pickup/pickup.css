@@ -294,6 +294,13 @@
   cursor: not-allowed;
 }
 
+.pickup-slots-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #666;
+}
+
 /* Service bar selected summary (mobile header strip) */
 .select-datetime-service__text {
   display: flex;
