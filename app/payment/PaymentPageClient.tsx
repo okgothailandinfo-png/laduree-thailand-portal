@@ -11,10 +11,7 @@ import {
   type MockPaymentMethod,
 } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
-import {
-  formatPickupDateLong,
-  parseDateKey,
-} from "../pickup/mock-pickup";
+import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import "./payment.css";
 
 type CardDraft = {
@@ -216,7 +213,7 @@ export default function PaymentPageClient() {
               <p className="payment-summary-meta">
                 Pickup Time
                 <br />
-                {formatPickupDateLong(parseDateKey(pickup.dateKey))}
+                {formatPickupDateKeyLong(pickup.dateKey)}
                 <br />
                 {pickup.timeSlot.start} To {pickup.timeSlot.end}
               </p>

@@ -1,10 +1,7 @@
 "use client";
 
 import { usePickup } from "./PickupContext";
-import {
-  formatPickupDateLong,
-  parseDateKey,
-} from "./mock-pickup";
+import { formatPickupDateKeyLong } from "./pickup-dates";
 
 /** Cart fulfillment strip — Singapore #divPickupMyCart patterns. */
 export default function CartFulfillmentStrip() {
@@ -39,7 +36,7 @@ export default function CartFulfillmentStrip() {
             <div className="cart-pickup-time">
               <span className="cart-pickup-label">Pickup Time</span>
               <span className="cart-pickup-values">
-                {formatPickupDateLong(parseDateKey(confirmed.dateKey))}
+                {formatPickupDateKeyLong(confirmed.dateKey)}
                 <br />
                 {confirmed.timeSlot.start} To {confirmed.timeSlot.end}
               </span>

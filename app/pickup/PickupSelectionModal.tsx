@@ -3,12 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { usePickup, type PickupStep } from "./PickupContext";
-import {
-  formatPickupDate,
-  getMockPickupDates,
-  MOCK_TIME_SLOTS,
-  toDateKey,
-} from "./mock-pickup";
+import { formatPickupDateKey } from "./pickup-dates";
 import "./pickup.css";
 
 const STEP_TITLES: Record<PickupStep, string> = {
@@ -33,12 +28,19 @@ export default function PickupSelectionModal() {
     boutiquesStatus,
     boutiquesError,
     reloadBoutiques,
+    availableDateKeys,
+    datesStatus,
+    datesError,
+    reloadDates,
+    timeSlots,
+    slotsStatus,
+    slotsError,
+    reloadSlots,
   } = usePickup();
 
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const dates = getMockPickupDates();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -83,7 +85,8 @@ export default function PickupSelectionModal() {
   const canConfirm =
     draft.boutiqueId !== null &&
     draft.dateKey !== null &&
-    draft.timeSlotId !== null;
+    draft.timeSlotId !== null &&
+    timeSlots.some((slot) => slot.id === draft.timeSlotId);
 
   return (
     <div
@@ -121,11 +124,6 @@ export default function PickupSelectionModal() {
         </div>
 
         <div className="pickup-modal-body">
-          <p className="pickup-placeholder-note">
-            Placeholder data only — boutique, address, dates, and time slots are
-            not approved Thailand operational content.
-          </p>
-
           {validationError ? (
             <div className="pickup-error" role="alert">
               {validationError}
@@ -204,54 +202,85 @@ export default function PickupSelectionModal() {
                 <p className="pickup-datetime-label" id="pickup-date-label">
                   Select Date
                 </p>
-                <div
-                  className="pickup-date-chips"
-                  role="group"
-                  aria-labelledby="pickup-date-label"
-                >
-                  {dates.map((date) => {
-                    const key = toDateKey(date);
-                    const selected = draft.dateKey === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className={`pickup-date-chip${selected ? " is-selected" : ""}`}
-                        aria-pressed={selected}
-                        onClick={() => setDraftDate(key)}
-                      >
-                        {formatPickupDate(date)}
-                      </button>
-                    );
-                  })}
-                </div>
+                {datesStatus === "idle" ? (
+                  <p className="pickup-slots-hint" role="status">
+                    Select an outlet to load pickup dates.
+                  </p>
+                ) : datesStatus === "loading" ||
+                  datesStatus === "error" ||
+                  datesStatus === "empty" ? (
+                  <CatalogStatus
+                    status={datesStatus}
+                    errorMessage={datesError}
+                    emptyMessage="No pickup dates available."
+                    onRetry={reloadDates}
+                  />
+                ) : (
+                  <div
+                    className="pickup-date-chips"
+                    role="group"
+                    aria-labelledby="pickup-date-label"
+                  >
+                    {availableDateKeys.map((dateKey) => {
+                      const selected = draft.dateKey === dateKey;
+                      return (
+                        <button
+                          key={dateKey}
+                          type="button"
+                          className={`pickup-date-chip${selected ? " is-selected" : ""}`}
+                          aria-pressed={selected}
+                          onClick={() => setDraftDate(dateKey)}
+                        >
+                          {formatPickupDateKey(dateKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="pickup-datetime-section">
                 <p className="pickup-datetime-label" id="pickup-slot-label">
                   Select Time slot
                 </p>
-                <div
-                  className="pickup-slot-list"
-                  role="group"
-                  aria-labelledby="pickup-slot-label"
-                >
-                  {MOCK_TIME_SLOTS.map((slot) => {
-                    const selected = draft.timeSlotId === slot.id;
-                    return (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        className={`pickup-slot-btn${selected ? " is-selected" : ""}`}
-                        aria-pressed={selected}
-                        disabled={!draft.dateKey}
-                        onClick={() => setDraftTimeSlot(slot.id)}
-                      >
-                        {slot.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {!draft.dateKey ? (
+                  <p className="pickup-slots-hint" role="status">
+                    Select a date to load time slots.
+                  </p>
+                ) : slotsStatus === "idle" ||
+                  slotsStatus === "loading" ||
+                  slotsStatus === "error" ||
+                  slotsStatus === "empty" ? (
+                  <CatalogStatus
+                    status={
+                      slotsStatus === "idle" ? "loading" : slotsStatus
+                    }
+                    errorMessage={slotsError}
+                    emptyMessage="There is currently no valid collect time in this day."
+                    onRetry={reloadSlots}
+                  />
+                ) : (
+                  <div
+                    className="pickup-slot-list"
+                    role="group"
+                    aria-labelledby="pickup-slot-label"
+                  >
+                    {timeSlots.map((slot) => {
+                      const selected = draft.timeSlotId === slot.id;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          className={`pickup-slot-btn${selected ? " is-selected" : ""}`}
+                          aria-pressed={selected}
+                          onClick={() => setDraftTimeSlot(slot.id)}
+                        >
+                          {slot.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </>
           ) : null}

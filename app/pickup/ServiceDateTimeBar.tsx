@@ -1,10 +1,7 @@
 "use client";
 
 import { usePickup } from "./PickupContext";
-import {
-  formatPickupDate,
-  parseDateKey,
-} from "./mock-pickup";
+import { formatPickupDateKey } from "./pickup-dates";
 
 /** Mobile header strip — Singapore `.select-datetime-service`. */
 export default function ServiceDateTimeBar() {
@@ -30,7 +27,7 @@ export default function ServiceDateTimeBar() {
                 {confirmed.boutique.name}
               </span>
               <span className="select-datetime-service__summary-meta">
-                {formatPickupDate(parseDateKey(confirmed.dateKey))} ·{" "}
+                {formatPickupDateKey(confirmed.dateKey)} ·{" "}
                 {confirmed.timeSlot.label}
               </span>
             </>

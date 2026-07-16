@@ -11,8 +11,9 @@ import {
 } from "react";
 import { ApiClientError } from "@/lib/api/client";
 import { fetchBoutiques } from "@/lib/api/catalog";
-import type { Boutique } from "@/lib/api/types";
-import { MOCK_TIME_SLOTS, type MockTimeSlot } from "./mock-pickup";
+import { fetchPickupAvailability } from "@/lib/api/pickup";
+import type { Boutique, PickupTimeSlot } from "@/lib/api/types";
+import { getCandidateDateKeys } from "./pickup-dates";
 
 export type PickupDraft = {
   boutiqueId: string | null;
@@ -23,8 +24,10 @@ export type PickupDraft = {
 export type ConfirmedPickup = {
   boutique: Boutique;
   dateKey: string;
-  timeSlot: MockTimeSlot;
+  timeSlot: PickupTimeSlot;
 };
+
+export type AsyncStatus = "idle" | "loading" | "success" | "error" | "empty";
 
 type PickupContextValue = {
   isOpen: boolean;
@@ -46,6 +49,14 @@ type PickupContextValue = {
   boutiquesStatus: "loading" | "success" | "error" | "empty";
   boutiquesError: string | null;
   reloadBoutiques: () => void;
+  availableDateKeys: string[];
+  datesStatus: AsyncStatus;
+  datesError: string | null;
+  reloadDates: () => void;
+  timeSlots: PickupTimeSlot[];
+  slotsStatus: AsyncStatus;
+  slotsError: string | null;
+  reloadSlots: () => void;
 };
 
 export type PickupStep = "service" | "boutique" | "datetime";
@@ -57,6 +68,12 @@ const emptyDraft: PickupDraft = {
   dateKey: null,
   timeSlotId: null,
 };
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
 
 export function PickupProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,11 +88,44 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   const [boutiquesError, setBoutiquesError] = useState<string | null>(null);
   const [boutiquesReloadToken, setBoutiquesReloadToken] = useState(0);
 
+  const [availableDateKeys, setAvailableDateKeys] = useState<string[]>([]);
+  const [datesStatus, setDatesStatus] = useState<AsyncStatus>("idle");
+  const [datesError, setDatesError] = useState<string | null>(null);
+  const [datesReloadToken, setDatesReloadToken] = useState(0);
+
+  const [timeSlots, setTimeSlots] = useState<PickupTimeSlot[]>([]);
+  const [slotsStatus, setSlotsStatus] = useState<AsyncStatus>("idle");
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [slotsReloadToken, setSlotsReloadToken] = useState(0);
+
+  const clearAvailability = useCallback(() => {
+    setAvailableDateKeys([]);
+    setDatesStatus("idle");
+    setDatesError(null);
+    setTimeSlots([]);
+    setSlotsStatus("idle");
+    setSlotsError(null);
+  }, []);
+
   const reloadBoutiques = useCallback(() => {
     setBoutiquesStatus("loading");
     setBoutiquesError(null);
     setBoutiquesReloadToken((value) => value + 1);
   }, []);
+
+  const reloadDates = useCallback(() => {
+    if (!draft.boutiqueId) return;
+    setDatesStatus("loading");
+    setDatesError(null);
+    setDatesReloadToken((value) => value + 1);
+  }, [draft.boutiqueId]);
+
+  const reloadSlots = useCallback(() => {
+    if (!draft.boutiqueId || !draft.dateKey) return;
+    setSlotsStatus("loading");
+    setSlotsError(null);
+    setSlotsReloadToken((value) => value + 1);
+  }, [draft.boutiqueId, draft.dateKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -89,35 +139,113 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
-        const message =
-          error instanceof ApiClientError
-            ? error.message
-            : error instanceof Error
-              ? error.message
-              : "Unable to load boutiques.";
         setBoutiques([]);
-        setBoutiquesError(message);
+        setBoutiquesError(errorMessage(error, "Unable to load boutiques."));
         setBoutiquesStatus("error");
       });
 
     return () => controller.abort();
   }, [boutiquesReloadToken]);
 
-  const openPickupSelection = useCallback((opts?: { step?: PickupStep }) => {
-    setValidationError(null);
-    if (confirmed) {
-      setDraft({
-        boutiqueId: confirmed.boutique.id,
-        dateKey: confirmed.dateKey,
-        timeSlotId: confirmed.timeSlot.id,
+  // Probe candidate dates via the availability API for the selected boutique.
+  useEffect(() => {
+    const boutiqueId = draft.boutiqueId;
+    if (!boutiqueId) return;
+
+    const controller = new AbortController();
+    const candidateKeys = getCandidateDateKeys();
+
+    Promise.all(
+      candidateKeys.map(async (dateKey) => {
+        const availability = await fetchPickupAvailability(
+          { boutiqueId, dateKey },
+          { signal: controller.signal },
+        );
+        return { dateKey, slotCount: availability.slots.length };
+      }),
+    )
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        const keys = rows
+          .filter((row) => row.slotCount > 0)
+          .map((row) => row.dateKey);
+        setAvailableDateKeys(keys);
+        setDatesStatus(keys.length === 0 ? "empty" : "success");
+        setDraft((prev) => {
+          if (!prev.dateKey || keys.includes(prev.dateKey)) return prev;
+          return { ...prev, dateKey: null, timeSlotId: null };
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setAvailableDateKeys([]);
+        setDatesError(errorMessage(error, "Unable to load pickup dates."));
+        setDatesStatus("error");
       });
-      setStep(opts?.step ?? "datetime");
-    } else {
-      setDraft(emptyDraft);
-      setStep(opts?.step ?? "service");
-    }
-    setIsOpen(true);
-  }, [confirmed]);
+
+    return () => controller.abort();
+  }, [draft.boutiqueId, datesReloadToken]);
+
+  // Load time slots for the selected boutique + date.
+  useEffect(() => {
+    const boutiqueId = draft.boutiqueId;
+    const dateKey = draft.dateKey;
+    if (!boutiqueId || !dateKey) return;
+
+    const controller = new AbortController();
+
+    fetchPickupAvailability(
+      { boutiqueId, dateKey },
+      { signal: controller.signal },
+    )
+      .then((availability) => {
+        if (controller.signal.aborted) return;
+        const slots = availability.slots;
+        setTimeSlots(slots);
+        setSlotsStatus(slots.length === 0 ? "empty" : "success");
+        setDraft((prev) => {
+          if (!prev.timeSlotId) return prev;
+          if (slots.some((slot) => slot.id === prev.timeSlotId)) return prev;
+          return { ...prev, timeSlotId: null };
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setTimeSlots([]);
+        setSlotsError(errorMessage(error, "Unable to load time slots."));
+        setSlotsStatus("error");
+      });
+
+    return () => controller.abort();
+  }, [draft.boutiqueId, draft.dateKey, slotsReloadToken]);
+
+  const openPickupSelection = useCallback(
+    (opts?: { step?: PickupStep }) => {
+      setValidationError(null);
+      if (confirmed) {
+        setDraft({
+          boutiqueId: confirmed.boutique.id,
+          dateKey: confirmed.dateKey,
+          timeSlotId: confirmed.timeSlot.id,
+        });
+        setAvailableDateKeys([]);
+        setDatesStatus("loading");
+        setDatesError(null);
+        setTimeSlots([]);
+        setSlotsStatus("loading");
+        setSlotsError(null);
+        setStep(opts?.step ?? "datetime");
+      } else {
+        setDraft(emptyDraft);
+        clearAvailability();
+        setStep(opts?.step ?? "service");
+      }
+      setIsOpen(true);
+    },
+    [clearAvailability, confirmed],
+  );
 
   const closePickupSelection = useCallback(() => {
     setIsOpen(false);
@@ -125,13 +253,34 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setDraftBoutique = useCallback((id: string) => {
-    setDraft((prev) => ({ ...prev, boutiqueId: id }));
+    let changed = false;
+    setDraft((prev) => {
+      if (prev.boutiqueId === id) return prev;
+      changed = true;
+      return { boutiqueId: id, dateKey: null, timeSlotId: null };
+    });
     setValidationError(null);
+    if (!changed) return;
+    setAvailableDateKeys([]);
+    setDatesStatus("loading");
+    setDatesError(null);
+    setTimeSlots([]);
+    setSlotsStatus("idle");
+    setSlotsError(null);
   }, []);
 
   const setDraftDate = useCallback((dateKey: string) => {
-    setDraft((prev) => ({ ...prev, dateKey, timeSlotId: null }));
+    let changed = false;
+    setDraft((prev) => {
+      if (prev.dateKey === dateKey) return prev;
+      changed = true;
+      return { ...prev, dateKey, timeSlotId: null };
+    });
     setValidationError(null);
+    if (!changed) return;
+    setTimeSlots([]);
+    setSlotsStatus("loading");
+    setSlotsError(null);
   }, []);
 
   const setDraftTimeSlot = useCallback((slotId: string) => {
@@ -162,7 +311,8 @@ export function PickupProvider({ children }: { children: ReactNode }) {
 
     const boutique =
       boutiques.find((item) => item.id === draft.boutiqueId) ?? null;
-    const timeSlot = MOCK_TIME_SLOTS.find((s) => s.id === draft.timeSlotId);
+    const timeSlot =
+      timeSlots.find((slot) => slot.id === draft.timeSlotId) ?? null;
 
     if (!boutique || !timeSlot || !draft.dateKey) {
       setValidationError("Please complete your pickup selection.");
@@ -177,14 +327,15 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     setValidationError(null);
     setIsOpen(false);
     return true;
-  }, [boutiques, draft]);
+  }, [boutiques, draft, timeSlots]);
 
   const resetSelection = useCallback(() => {
     setConfirmed(null);
     setDraft(emptyDraft);
+    clearAvailability();
     setValidationError(null);
     setStep("service");
-  }, []);
+  }, [clearAvailability]);
 
   const value = useMemo<PickupContextValue>(
     () => ({
@@ -207,6 +358,14 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       boutiquesStatus,
       boutiquesError,
       reloadBoutiques,
+      availableDateKeys,
+      datesStatus,
+      datesError,
+      reloadDates,
+      timeSlots,
+      slotsStatus,
+      slotsError,
+      reloadSlots,
     }),
     [
       isOpen,
@@ -226,6 +385,14 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       boutiquesStatus,
       boutiquesError,
       reloadBoutiques,
+      availableDateKeys,
+      datesStatus,
+      datesError,
+      reloadDates,
+      timeSlots,
+      slotsStatus,
+      slotsError,
+      reloadSlots,
     ],
   );
 
