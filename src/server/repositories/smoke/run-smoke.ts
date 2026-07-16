@@ -1,12 +1,13 @@
 /**
  * Executable repository/service smoke checks.
  *
- * Default: DATA_SOURCE=mock (no database required).
- * Prisma path: set DATA_SOURCE=prisma and DATABASE_URL, migrate + seed first.
+ * Default: DATA_SOURCE unset/mock (no database required).
+ * Prisma path: set DATA_SOURCE=prisma and DATABASE_URL, then migrate + seed.
  *
  * Run: npm run smoke:repos
  */
 
+import { getDataSource } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
@@ -14,9 +15,12 @@ import { DefaultOrderService } from "@/src/server/services/order.service";
 import { DefaultPickupService } from "@/src/server/services/pickup.service";
 import { DefaultProductService } from "@/src/server/services/product.service";
 import { AppError } from "@/src/server/utils/errors";
-import { getDataSource } from "@/src/server/config/env";
 
 type CheckResult = { name: string; ok: boolean; detail?: string };
+
+function bangkokTodayKey() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+}
 
 async function run(): Promise<void> {
   const dataSource = getDataSource();
@@ -48,20 +52,27 @@ async function run(): Promise<void> {
     detail: `count=${products.length}`,
   });
 
-  try {
-    const product = await productService.getProductBySlug(
-      "napoleon-iii-macaron-8pcs",
-    );
-    results.push({
-      name: "product lookup by slug",
-      ok: product.slug === "napoleon-iii-macaron-8pcs",
-      detail: product.title,
-    });
-  } catch (error) {
+  const lookupSlug = products[0]?.slug;
+  if (lookupSlug) {
+    try {
+      const product = await productService.getProductBySlug(lookupSlug);
+      results.push({
+        name: "product lookup by slug",
+        ok: product.slug === lookupSlug,
+        detail: product.title,
+      });
+    } catch (error) {
+      results.push({
+        name: "product lookup by slug",
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
     results.push({
       name: "product lookup by slug",
       ok: false,
-      detail: error instanceof Error ? error.message : String(error),
+      detail: "no products available",
     });
   }
 
@@ -88,27 +99,25 @@ async function run(): Promise<void> {
   });
 
   const boutique = boutiques[0];
+  const dateKey = bangkokTodayKey();
   let availabilityOk = false;
   let availabilityDetail = "skipped";
   let slotId: string | null = null;
-  let dateKey = "2099-01-01";
+  let availabilitySlots: Array<{ id: string; label: string }> = [];
 
   if (boutique) {
-    if (dataSource === "mock") {
-      dateKey = new Date().toLocaleDateString("en-CA", {
-        timeZone: "Asia/Bangkok",
-      });
-    }
     try {
       const availability = await pickupService.getAvailability({
         boutiqueId: boutique.id,
         dateKey,
       });
+      availabilitySlots = availability.slots;
       availabilityOk = availability.slots.length > 0;
       availabilityDetail = `slots=${availability.slots.length}`;
       slotId = availability.slots[0]?.id ?? null;
     } catch (error) {
-      availabilityDetail = error instanceof Error ? error.message : String(error);
+      availabilityDetail =
+        error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -118,7 +127,25 @@ async function run(): Promise<void> {
     detail: availabilityDetail,
   });
 
-  // Invalid order payload
+  if (dataSource === "prisma") {
+    const hasReservedLabel = availabilitySlots.some(
+      (slot) => slot.label === "10:30–11:00",
+    );
+    results.push({
+      name: "reserved pickup filtering",
+      ok: !hasReservedLabel && availabilitySlots.length > 0,
+      detail: hasReservedLabel
+        ? "capacity=0 slot unexpectedly returned"
+        : "capacity=0 slot excluded",
+    });
+  } else {
+    results.push({
+      name: "reserved pickup filtering",
+      ok: true,
+      detail: "skipped on mock (no capacity model)",
+    });
+  }
+
   try {
     orderService.parseCreateOrderBody({ items: [] });
     results.push({
@@ -134,7 +161,6 @@ async function run(): Promise<void> {
     });
   }
 
-  // Valid order creation + retrieval (mock always; prisma only if seeded)
   if (boutique && slotId && products[0]) {
     try {
       const created = await orderService.createOrder({
@@ -142,7 +168,7 @@ async function run(): Promise<void> {
           {
             productId: products[0].id,
             quantity: 1,
-            modifiers: [{ label: "Vanilla", quantity: 1 }],
+            modifiers: [{ label: "Placeholder modifier", quantity: 1 }],
           },
         ],
         customer: {
@@ -171,7 +197,9 @@ async function run(): Promise<void> {
       );
       results.push({
         name: "order retrieval",
-        ok: byId.id === created.id && byNumber.orderNumber === created.orderNumber,
+        ok:
+          byId.id === created.id &&
+          byNumber.orderNumber === created.orderNumber,
         detail: byId.id,
       });
     } catch (error) {
@@ -202,7 +230,9 @@ async function run(): Promise<void> {
   const failed = results.filter((result) => !result.ok);
   for (const result of results) {
     const mark = result.ok ? "PASS" : "FAIL";
-    console.log(`[${mark}] ${result.name}${result.detail ? ` — ${result.detail}` : ""}`);
+    console.log(
+      `[${mark}] ${result.name}${result.detail ? ` — ${result.detail}` : ""}`,
+    );
   }
 
   console.log(

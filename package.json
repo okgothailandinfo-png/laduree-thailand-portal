@@ -7,7 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "smoke:repos": "DATA_SOURCE=mock tsx src/server/repositories/smoke/run-smoke.ts"
+    "prisma:format": "prisma format",
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "prisma db seed",
+    "smoke:repos": "tsx src/server/repositories/smoke/run-smoke.ts",
+    "smoke:api": "tsx src/server/repositories/smoke/run-api-smoke.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
