@@ -57,6 +57,39 @@ export type PickupAvailabilityDto = {
   slots: PickupTimeSlotDto[];
 };
 
+export type CartModifierDto = {
+  label: string;
+  quantity?: number;
+};
+
+export type CartItemDto = {
+  id: string;
+  productId: string;
+  name: string;
+  imageSrc: string;
+  quantity: number;
+  modifiers: CartModifierDto[];
+  note?: string;
+};
+
+export type CartDto = {
+  id: string;
+  currency: "THB";
+  items: CartItemDto[];
+  itemCount: number;
+};
+
+export type AddCartItemRequestDto = {
+  productId: string;
+  quantity: number;
+  modifiers?: CartModifierDto[];
+  note?: string;
+};
+
+export type UpdateCartItemRequestDto = {
+  quantity: number;
+};
+
 export type CreateOrderItemDto = {
   productId: string;
   quantity: number;

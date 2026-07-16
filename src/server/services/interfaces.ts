@@ -1,11 +1,14 @@
 import type {
+  AddCartItemRequestDto,
   BoutiqueDto,
+  CartDto,
   CategoryDto,
   CreateOrderRequestDto,
   OrderDto,
   PickupAvailabilityDto,
   ProductDetailDto,
   ProductSummaryDto,
+  UpdateCartItemRequestDto,
 } from "@/src/server/types/dto";
 
 export interface ProductService {
@@ -32,4 +35,19 @@ export interface OrderService {
   createOrder(input: CreateOrderRequestDto): Promise<OrderDto>;
   getOrderById(id: string): Promise<OrderDto>;
   getOrderByOrderNumber(orderNumber: string): Promise<OrderDto>;
+}
+
+export interface CartService {
+  getCart(cartId?: string): Promise<CartDto>;
+  addItem(
+    cartId: string | undefined,
+    input: AddCartItemRequestDto,
+  ): Promise<CartDto>;
+  updateItem(
+    cartId: string | undefined,
+    itemId: string,
+    input: UpdateCartItemRequestDto,
+  ): Promise<CartDto>;
+  removeItem(cartId: string | undefined, itemId: string): Promise<CartDto>;
+  clearCart(cartId: string | undefined): Promise<CartDto>;
 }

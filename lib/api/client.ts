@@ -16,23 +16,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/**
- * Typed GET against the existing `{ success, data }` / `{ success:false, error }` envelope.
- * Browser-relative paths (`/api/...`) only — no server/Prisma imports.
- */
-export async function apiGet<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-
+async function parseEnvelope<T>(response: Response): Promise<T> {
   let payload: unknown;
   try {
     payload = await response.json();
@@ -63,4 +47,49 @@ export async function apiGet<T>(
     envelope.error?.message ?? "Request failed.",
     response.status,
   );
+}
+
+/**
+ * Typed GET against the existing `{ success, data }` / `{ success:false, error }` envelope.
+ * Browser-relative paths (`/api/...`) only — no server/Prisma imports.
+ */
+export async function apiGet<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    method: "GET",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  return parseEnvelope<T>(response);
+}
+
+/**
+ * Typed JSON mutation (POST / PATCH / DELETE) using native fetch.
+ */
+export async function apiMutate<T>(
+  path: string,
+  method: "POST" | "PATCH" | "DELETE",
+  body?: unknown,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    method,
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  return parseEnvelope<T>(response);
 }

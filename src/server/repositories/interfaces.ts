@@ -1,4 +1,5 @@
 import type { Boutique } from "@/src/server/models/boutique";
+import type { Cart } from "@/src/server/models/cart";
 import type { Category } from "@/src/server/models/category";
 import type { Order } from "@/src/server/models/order";
 import type { PickupAvailability } from "@/src/server/models/pickup";
@@ -38,10 +39,17 @@ export interface OrderRepository {
   findByOrderNumber(orderNumber: string): Promise<Order | null>;
 }
 
+export interface CartRepository {
+  findById(id: string): Promise<Cart | null>;
+  save(cart: Cart): Promise<Cart>;
+  delete(id: string): Promise<void>;
+}
+
 export type RepositoryBundle = {
   products: ProductRepository;
   categories: CategoryRepository;
   boutiques: BoutiqueRepository;
   pickup: PickupRepository;
   orders: OrderRepository;
+  carts: CartRepository;
 };

@@ -73,3 +73,36 @@ export type PickupAvailability = {
   timezone: string;
   slots: PickupTimeSlot[];
 };
+
+export type CartModifier = {
+  label: string;
+  quantity?: number;
+};
+
+export type CartItem = {
+  id: string;
+  productId: string;
+  name: string;
+  imageSrc: string;
+  quantity: number;
+  modifiers: CartModifier[];
+  note?: string;
+};
+
+export type Cart = {
+  id: string;
+  currency: "THB";
+  items: CartItem[];
+  itemCount: number;
+};
+
+export type AddCartItemRequest = {
+  productId: string;
+  quantity: number;
+  modifiers?: CartModifier[];
+  note?: string;
+};
+
+export type UpdateCartItemRequest = {
+  quantity: number;
+};
