@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import CatalogStatus from "../catalog/CatalogStatus";
 import { usePickup, type PickupStep } from "./PickupContext";
 import {
   formatPickupDate,
   getMockPickupDates,
-  MOCK_BOUTIQUE,
   MOCK_TIME_SLOTS,
   toDateKey,
 } from "./mock-pickup";
@@ -29,6 +29,10 @@ export default function PickupSelectionModal() {
     setDraftTimeSlot,
     validationError,
     confirmSelection,
+    boutiques,
+    boutiquesStatus,
+    boutiquesError,
+    reloadBoutiques,
   } = usePickup();
 
   const titleId = useId();
@@ -160,25 +164,38 @@ export default function PickupSelectionModal() {
           ) : null}
 
           {step === "boutique" ? (
-            <ul className="pickup-outlet-list">
-              <li>
-                <button
-                  type="button"
-                  className={`pickup-outlet-item${
-                    draft.boutiqueId === MOCK_BOUTIQUE.id ? " is-selected" : ""
-                  }`}
-                  aria-pressed={draft.boutiqueId === MOCK_BOUTIQUE.id}
-                  onClick={() => setDraftBoutique(MOCK_BOUTIQUE.id)}
-                >
-                  <span className="pickup-outlet-item__name">
-                    1. {MOCK_BOUTIQUE.name}
-                  </span>
-                  <span className="pickup-outlet-item__address">
-                    {MOCK_BOUTIQUE.address}
-                  </span>
-                </button>
-              </li>
-            </ul>
+            boutiquesStatus === "loading" ||
+            boutiquesStatus === "error" ||
+            boutiquesStatus === "empty" ? (
+              <CatalogStatus
+                status={boutiquesStatus}
+                errorMessage={boutiquesError}
+                emptyMessage="No boutiques available."
+                onRetry={reloadBoutiques}
+              />
+            ) : (
+              <ul className="pickup-outlet-list">
+                {boutiques.map((boutique, index) => (
+                  <li key={boutique.id}>
+                    <button
+                      type="button"
+                      className={`pickup-outlet-item${
+                        draft.boutiqueId === boutique.id ? " is-selected" : ""
+                      }`}
+                      aria-pressed={draft.boutiqueId === boutique.id}
+                      onClick={() => setDraftBoutique(boutique.id)}
+                    >
+                      <span className="pickup-outlet-item__name">
+                        {index + 1}. {boutique.name}
+                      </span>
+                      <span className="pickup-outlet-item__address">
+                        {boutique.address}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
           ) : null}
 
           {step === "datetime" ? (
