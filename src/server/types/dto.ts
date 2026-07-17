@@ -127,7 +127,7 @@ export type CreateOrderRequestDto = {
 export type OrderDto = {
   id: string;
   orderNumber: string;
-  status: "pending" | "mock_placed";
+  status: "pending" | "confirmed" | "mock_placed";
   currency: "THB";
   createdAt: string;
   items: Array<{

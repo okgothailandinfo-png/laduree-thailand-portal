@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { Payment } from "@/src/server/models/payment";
 import type {
   CreatePaymentInput,
   CreatePaymentResult,
@@ -6,42 +7,69 @@ import type {
   PaymentStatus,
 } from "@/src/server/payment/dto";
 import type { PaymentProvider } from "@/src/server/payment/interfaces";
+import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import { AppError } from "@/src/server/utils/errors";
 
-type StoredPayment = PaymentRecordDto;
-
-const paymentsById = new Map<string, StoredPayment>();
+function toDto(payment: Payment): PaymentRecordDto {
+  return {
+    paymentId: payment.paymentId,
+    orderId: payment.orderId,
+    status: payment.status,
+    paymentUrl: payment.paymentUrl,
+    createdAt: payment.createdAt,
+    updatedAt: payment.updatedAt,
+  };
+}
 
 export class MockPaymentProvider implements PaymentProvider {
+  constructor(private readonly payments: PaymentRepository) {}
+
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
     const paymentId = randomUUID();
     const now = new Date().toISOString();
-    const record: StoredPayment = {
+    const paymentUrl = `/payment/mock?paymentId=${encodeURIComponent(paymentId)}`;
+    const record: Payment = {
       paymentId,
       orderId: input.orderId,
       status: "PENDING",
-      redirectUrl: `/payment/mock?paymentId=${encodeURIComponent(paymentId)}`,
+      paymentUrl,
       createdAt: now,
       updatedAt: now,
     };
-    paymentsById.set(paymentId, record);
+    await this.payments.save(record);
     return {
       paymentId: record.paymentId,
+      paymentUrl: record.paymentUrl,
       status: "PENDING",
-      redirectUrl: record.redirectUrl,
     };
   }
 
   async getPayment(paymentId: string): Promise<PaymentRecordDto> {
-    return this.requirePayment(paymentId);
+    return toDto(await this.requirePayment(paymentId));
+  }
+
+  async confirmPayment(
+    paymentId: string,
+    result: Extract<PaymentStatus, "SUCCESS" | "FAILED">,
+  ): Promise<PaymentRecordDto> {
+    const current = await this.requirePayment(paymentId);
+    if (current.status !== "PENDING") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Only pending payments can be confirmed.",
+        { details: { field: "paymentId", status: current.status } },
+      );
+    }
+    return toDto(await this.setStatus(current, result));
   }
 
   async cancelPayment(paymentId: string): Promise<PaymentRecordDto> {
-    return this.setStatus(paymentId, "CANCELLED");
+    const current = await this.requirePayment(paymentId);
+    return toDto(await this.setStatus(current, "CANCELLED"));
   }
 
   async refundPayment(paymentId: string): Promise<PaymentRecordDto> {
-    const current = this.requirePayment(paymentId);
+    const current = await this.requirePayment(paymentId);
     if (current.status !== "SUCCESS") {
       throw new AppError(
         "VALIDATION_ERROR",
@@ -49,40 +77,23 @@ export class MockPaymentProvider implements PaymentProvider {
         { details: { field: "paymentId", status: current.status } },
       );
     }
-    return this.setStatus(paymentId, "REFUNDED");
+    return toDto(await this.setStatus(current, "REFUNDED"));
   }
 
-  async settlePayment(
-    paymentId: string,
-    status: Extract<PaymentStatus, "SUCCESS" | "FAILED">,
-  ): Promise<PaymentRecordDto> {
-    const current = this.requirePayment(paymentId);
-    if (current.status !== "PENDING") {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Only pending payments can be settled.",
-        { details: { field: "paymentId", status: current.status } },
-      );
-    }
-    return this.setStatus(paymentId, status);
-  }
-
-  private setStatus(
-    paymentId: string,
+  private async setStatus(
+    current: Payment,
     status: PaymentStatus,
-  ): PaymentRecordDto {
-    const current = this.requirePayment(paymentId);
-    const next: StoredPayment = {
+  ): Promise<Payment> {
+    const next: Payment = {
       ...current,
       status,
       updatedAt: new Date().toISOString(),
     };
-    paymentsById.set(paymentId, next);
-    return { ...next };
+    return this.payments.save(next);
   }
 
-  private requirePayment(paymentId: string): StoredPayment {
-    const record = paymentsById.get(paymentId);
+  private async requirePayment(paymentId: string): Promise<Payment> {
+    const record = await this.payments.findById(paymentId);
     if (!record) {
       throw new AppError("NOT_FOUND", `Payment not found: ${paymentId}`);
     }

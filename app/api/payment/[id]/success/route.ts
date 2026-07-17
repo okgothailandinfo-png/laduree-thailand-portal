@@ -6,11 +6,11 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-/** Mock-provider settlement only — not a real gateway webhook. */
+/** Convenience alias for POST /api/payment/confirm with SUCCESS. */
 export async function POST(_request: Request, context: RouteContext) {
   return handleApi(async () => {
     const { id } = await context.params;
-    const data = await paymentService.settleMockPayment(id, "SUCCESS");
+    const data = await paymentService.confirmPayment(id, "SUCCESS");
     return ok(data);
   });
 }
