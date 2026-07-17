@@ -1,4 +1,4 @@
-/** Payment gateway DTOs — provider-agnostic architecture layer. */
+/** Payment gateway DTOs — provider-agnostic processing layer. */
 
 export type PaymentStatus =
   | "PENDING"
@@ -13,19 +13,31 @@ export type CreatePaymentInput = {
 
 export type CreatePaymentResult = {
   paymentId: string;
+  paymentUrl: string;
   status: "PENDING";
-  redirectUrl: string;
 };
 
 export type PaymentRecordDto = {
   paymentId: string;
   orderId: string;
   status: PaymentStatus;
-  redirectUrl: string;
+  paymentUrl: string;
   createdAt: string;
   updatedAt: string;
 };
 
 export type CreatePaymentRequestDto = {
   orderId: string;
+};
+
+export type ConfirmPaymentRequestDto = {
+  paymentId: string;
+  result: "SUCCESS" | "FAILED";
+};
+
+export type ConfirmPaymentResponseDto = {
+  paymentId: string;
+  orderId: string;
+  status: PaymentStatus;
+  orderStatus: "pending" | "confirmed" | "mock_placed";
 };

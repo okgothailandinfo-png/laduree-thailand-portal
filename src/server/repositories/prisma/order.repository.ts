@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import type { Order } from "@/src/server/models/order";
+import type { Order, OrderStatus } from "@/src/server/models/order";
 import type { OrderRepository } from "@/src/server/repositories/interfaces";
 import {
   toDomainOrder,
@@ -16,6 +16,14 @@ const orderInclude = {
   items: true,
   payment: true,
 } satisfies Prisma.OrderInclude;
+
+function toPrismaOrderStatus(
+  status: OrderStatus,
+): "PENDING" | "PLACED" | "CONFIRMED" {
+  if (status === "pending") return "PENDING";
+  if (status === "confirmed") return "CONFIRMED";
+  return "PLACED";
+}
 
 export class PrismaOrderRepository implements OrderRepository {
   async create(order: Order): Promise<Order> {
@@ -46,7 +54,7 @@ export class PrismaOrderRepository implements OrderRepository {
           data: {
             id: order.id,
             orderNumber: order.orderNumber,
-            status: order.status === "pending" ? "PENDING" : "PLACED",
+            status: toPrismaOrderStatus(order.status),
             customerId: customer.id,
             boutiqueId: order.pickup.boutiqueId,
             pickupSlotId: order.pickup.timeSlotId,
@@ -114,5 +122,24 @@ export class PrismaOrderRepository implements OrderRepository {
       include: orderInclude,
     });
     return row ? toDomainOrder(row as PrismaOrderWithRelations) : null;
+  }
+
+  async updateStatus(id: string, status: OrderStatus): Promise<Order> {
+    try {
+      const row = await prisma.order.update({
+        where: { id },
+        data: { status: toPrismaOrderStatus(status) },
+        include: orderInclude,
+      });
+      return toDomainOrder(row as PrismaOrderWithRelations);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+      }
+      throw error;
+    }
   }
 }

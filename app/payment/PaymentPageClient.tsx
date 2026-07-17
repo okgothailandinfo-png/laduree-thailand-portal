@@ -132,7 +132,7 @@ export default function PaymentPageClient({
     try {
       const result = await createPayment({ orderId });
       setSubmitStatus("idle");
-      router.push(result.redirectUrl);
+      router.push(result.paymentUrl);
     } catch (error: unknown) {
       setSubmitStatus("error");
       setSubmitError(

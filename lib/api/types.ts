@@ -131,7 +131,7 @@ export type CheckoutResponse = {
 export type OrderDetail = {
   id: string;
   orderNumber: string;
-  status: "pending" | "mock_placed";
+  status: "pending" | "confirmed" | "mock_placed";
   currency: "THB";
   createdAt: string;
   items: Array<{
@@ -177,15 +177,27 @@ export type CreatePaymentRequest = {
 
 export type CreatePaymentResponse = {
   paymentId: string;
+  paymentUrl: string;
   status: "PENDING";
-  redirectUrl: string;
 };
 
 export type PaymentRecord = {
   paymentId: string;
   orderId: string;
   status: PaymentStatus;
-  redirectUrl: string;
+  paymentUrl: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ConfirmPaymentRequest = {
+  paymentId: string;
+  result: "SUCCESS" | "FAILED";
+};
+
+export type ConfirmPaymentResponse = {
+  paymentId: string;
+  orderId: string;
+  status: PaymentStatus;
+  orderStatus: "pending" | "confirmed" | "mock_placed";
 };

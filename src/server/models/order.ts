@@ -1,6 +1,6 @@
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
-export type OrderStatus = "pending" | "mock_placed";
+export type OrderStatus = "pending" | "confirmed" | "mock_placed";
 
 export type OrderItem = {
   productId: string;

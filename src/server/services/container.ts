@@ -38,4 +38,7 @@ export const checkoutService = new DefaultCheckoutService(
   repositories.pickup,
   repositories.orders,
 );
-export const paymentService = new PaymentService(orderService);
+export const paymentService = new PaymentService(
+  repositories.orders,
+  repositories.payments,
+);

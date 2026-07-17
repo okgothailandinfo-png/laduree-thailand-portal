@@ -4,6 +4,7 @@ import { MockBoutiqueRepository } from "@/src/server/repositories/mock/boutique.
 import { MockCartRepository } from "@/src/server/repositories/mock/cart.repository";
 import { MockCategoryRepository } from "@/src/server/repositories/mock/category.repository";
 import { MockOrderRepository } from "@/src/server/repositories/mock/order.repository";
+import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
 import { MockPickupRepository } from "@/src/server/repositories/mock/pickup.repository";
 import { MockProductRepository } from "@/src/server/repositories/mock/product.repository";
 import { PrismaBoutiqueRepository } from "@/src/server/repositories/prisma/boutique.repository";
@@ -20,8 +21,9 @@ function createMockRepositories(): RepositoryBundle {
     boutiques: new MockBoutiqueRepository(),
     pickup: new MockPickupRepository(),
     orders: new MockOrderRepository(),
-    // Cart has no Prisma model yet — in-memory for both sources.
+    // Cart / gateway payments have no Prisma model yet — in-memory for both sources.
     carts: new MockCartRepository(),
+    payments: new MockPaymentRepository(),
   };
 }
 
@@ -32,8 +34,8 @@ function createPrismaRepositories(): RepositoryBundle {
     boutiques: new PrismaBoutiqueRepository(),
     pickup: new PrismaPickupRepository(),
     orders: new PrismaOrderRepository(),
-    // Cart persistence stays in-memory until a Prisma Cart model is approved.
     carts: new MockCartRepository(),
+    payments: new MockPaymentRepository(),
   };
 }
 

@@ -168,10 +168,16 @@ export type PrismaOrderWithRelations = PrismaOrder & {
 
 export function toDomainOrder(row: PrismaOrderWithRelations): Order {
   const payment = toDomainPayment(row.payment);
+  const status =
+    row.status === "PENDING"
+      ? "pending"
+      : row.status === "CONFIRMED"
+        ? "confirmed"
+        : "mock_placed";
   return {
     id: row.id,
     orderNumber: row.orderNumber,
-    status: row.status === "PENDING" ? "pending" : "mock_placed",
+    status,
     currency: "THB",
     createdAt: row.createdAt.toISOString(),
     totalMinor: row.totalMinor,

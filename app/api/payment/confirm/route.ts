@@ -1,9 +1,8 @@
 import { handleApi } from "@/src/server/api/handle";
-import { created } from "@/src/server/api/responses";
+import { ok } from "@/src/server/api/responses";
 import { paymentService } from "@/src/server/services/container";
 import { AppError } from "@/src/server/utils/errors";
 
-/** @deprecated Prefer POST /api/payment/create */
 export async function POST(request: Request) {
   return handleApi(async () => {
     let raw: unknown;
@@ -13,8 +12,11 @@ export async function POST(request: Request) {
       throw new AppError("BAD_REQUEST", "Request body must be valid JSON.");
     }
 
-    const input = paymentService.parseCreatePaymentBody(raw);
-    const data = await paymentService.createPayment(input.orderId);
-    return created(data);
+    const input = paymentService.parseConfirmPaymentBody(raw);
+    const data = await paymentService.confirmPayment(
+      input.paymentId,
+      input.result,
+    );
+    return ok(data);
   });
 }
