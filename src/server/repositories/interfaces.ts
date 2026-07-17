@@ -8,6 +8,7 @@ import type {
 } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
+import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 
 export interface ProductRepository {
   /** Active/available products only. */
@@ -59,4 +60,5 @@ export type RepositoryBundle = {
   orders: OrderRepository;
   carts: CartRepository;
   payments: PaymentRepository;
+  webhookEvents: WebhookEventRepository;
 };

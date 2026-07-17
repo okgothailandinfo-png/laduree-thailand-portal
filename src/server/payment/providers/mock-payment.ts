@@ -80,6 +80,17 @@ export class MockPaymentProvider implements PaymentProvider {
     return toDto(await this.setStatus(current, "REFUNDED"));
   }
 
+  async applyStatus(
+    paymentId: string,
+    status: PaymentStatus,
+  ): Promise<PaymentRecordDto> {
+    const current = await this.requirePayment(paymentId);
+    if (current.status === status) {
+      return toDto(current);
+    }
+    return toDto(await this.setStatus(current, status));
+  }
+
   private async setStatus(
     current: Payment,
     status: PaymentStatus,

@@ -11,6 +11,9 @@ export type ServerEnv = {
   currency: "THB";
   logLevel: "debug" | "info" | "warn" | "error";
   databaseUrl: string | null;
+  paymentProvider: "mock";
+  mockPaymentWebhookSecret: string;
+  mockPaymentWebhookToleranceSeconds: number;
 };
 
 function resolveNodeEnv(value: string | undefined): ServerEnv["nodeEnv"] {
@@ -35,6 +38,27 @@ function isProductionBuildPhase(): boolean {
     process.env.NEXT_PHASE === "phase-production-build" ||
     process.env.npm_lifecycle_event === "build"
   );
+}
+
+function resolvePaymentProvider(
+  value: string | undefined,
+): ServerEnv["paymentProvider"] {
+  const raw = value?.trim().toLowerCase();
+  if (!raw || raw === "mock") return "mock";
+  throw new Error(
+    `Invalid PAYMENT_PROVIDER="${raw}". Only "mock" is supported in this sprint.`,
+  );
+}
+
+function resolveWebhookTolerance(value: string | undefined): number {
+  if (!value?.trim()) return 300;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      "MOCK_PAYMENT_WEBHOOK_TOLERANCE_SECONDS must be a positive number.",
+    );
+  }
+  return parsed;
 }
 
 /**
@@ -90,6 +114,12 @@ export const env: ServerEnv = {
   currency: "THB",
   logLevel: resolveLogLevel(process.env.LOG_LEVEL),
   databaseUrl: process.env.DATABASE_URL?.trim() || null,
+  paymentProvider: resolvePaymentProvider(process.env.PAYMENT_PROVIDER),
+  mockPaymentWebhookSecret:
+    process.env.MOCK_PAYMENT_WEBHOOK_SECRET?.trim() || "",
+  mockPaymentWebhookToleranceSeconds: resolveWebhookTolerance(
+    process.env.MOCK_PAYMENT_WEBHOOK_TOLERANCE_SECONDS,
+  ),
 };
 
 export function getDataSource(): DataSource {
