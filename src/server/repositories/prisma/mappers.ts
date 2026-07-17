@@ -173,7 +173,9 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
       ? "pending"
       : row.status === "CONFIRMED"
         ? "confirmed"
-        : "mock_placed";
+        : row.status === "CANCELLED"
+          ? "cancelled"
+          : "mock_placed";
   return {
     id: row.id,
     orderNumber: row.orderNumber,

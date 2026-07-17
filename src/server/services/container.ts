@@ -1,3 +1,4 @@
+import { env } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
@@ -41,4 +42,7 @@ export const checkoutService = new DefaultCheckoutService(
 export const paymentService = new PaymentService(
   repositories.orders,
   repositories.payments,
+  repositories.webhookEvents,
+  env.mockPaymentWebhookSecret,
+  env.mockPaymentWebhookToleranceSeconds,
 );

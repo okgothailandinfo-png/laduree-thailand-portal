@@ -14,4 +14,9 @@ export interface PaymentProvider {
   ): Promise<PaymentRecordDto>;
   cancelPayment(paymentId: string): Promise<PaymentRecordDto>;
   refundPayment(paymentId: string): Promise<PaymentRecordDto>;
+  /** Webhook-driven status apply (idempotent when already at target status). */
+  applyStatus(
+    paymentId: string,
+    status: PaymentStatus,
+  ): Promise<PaymentRecordDto>;
 }

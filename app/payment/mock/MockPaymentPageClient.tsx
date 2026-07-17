@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiClientError } from "@/lib/api/client";
 import { confirmPayment, fetchPayment } from "@/lib/api/payment";
-import type { PaymentRecord } from "@/lib/api/types";
+import type { PaymentRecord, PaymentStatus } from "@/lib/api/types";
 import CatalogStatus from "../../catalog/CatalogStatus";
-import { useAsyncResource } from "../../catalog/useAsyncResource";
 import "../payment.css";
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -16,7 +15,27 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-type UiPhase = "loading" | "pending" | "success" | "failed" | "error";
+type UiPhase =
+  | "loading"
+  | "processing"
+  | "success"
+  | "failed"
+  | "cancelled"
+  | "error";
+
+const TERMINAL: ReadonlySet<PaymentStatus> = new Set([
+  "SUCCESS",
+  "FAILED",
+  "CANCELLED",
+  "REFUNDED",
+]);
+
+function phaseFromPayment(status: PaymentStatus): UiPhase {
+  if (status === "SUCCESS") return "success";
+  if (status === "FAILED") return "failed";
+  if (status === "CANCELLED" || status === "REFUNDED") return "cancelled";
+  return "processing";
+}
 
 export default function MockPaymentPageClient({
   paymentId,
@@ -24,67 +43,108 @@ export default function MockPaymentPageClient({
   paymentId: string | null;
 }) {
   const router = useRouter();
-  const [actionStatus, setActionStatus] = useState<"idle" | "loading" | "error">(
-    "idle",
+  const [payment, setPayment] = useState<PaymentRecord | null>(null);
+  const [phase, setPhase] = useState<UiPhase>(paymentId ? "loading" : "error");
+  const [error, setError] = useState<string | null>(
+    paymentId ? null : "Missing paymentId.",
   );
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [latest, setLatest] = useState<PaymentRecord | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const redirected = useRef(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const paymentQuery = useAsyncResource(
-    (signal) => {
-      if (!paymentId) return Promise.resolve(null);
-      return fetchPayment(paymentId, { signal });
-    },
-    {
-      deps: [paymentId],
-      isEmpty: (data) => data === null,
-    },
-  );
+  useEffect(() => {
+    if (!paymentId) return;
+    const id = paymentId;
 
-  const payment = latest ?? paymentQuery.data;
-  const isBusy = actionStatus === "loading";
+    let cancelled = false;
+    const controller = new AbortController();
 
-  const phase: UiPhase = (() => {
-    if (!paymentId) return "error";
-    if (paymentQuery.status === "loading" && !payment) return "loading";
-    if (paymentQuery.status === "error" || paymentQuery.status === "empty") {
-      return "error";
+    async function loadOnce() {
+      try {
+        const data = await fetchPayment(id, {
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        setPayment(data);
+        setPhase(phaseFromPayment(data.status));
+        setError(null);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(errorMessage(err, "Unable to load payment."));
+        setPhase("error");
+      }
     }
-    if (!payment) return "loading";
-    if (payment.status === "SUCCESS") return "success";
-    if (payment.status === "FAILED") return "failed";
-    if (actionStatus === "error") return "error";
-    return "pending";
-  })();
+
+    void loadOnce();
+
+    const interval = window.setInterval(() => {
+      if (cancelled) return;
+      void fetchPayment(id, { signal: controller.signal })
+        .then((data) => {
+          if (cancelled) return;
+          setPayment(data);
+          setPhase(phaseFromPayment(data.status));
+          setError(null);
+          if (TERMINAL.has(data.status)) {
+            window.clearInterval(interval);
+          }
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          setError(errorMessage(err, "Unable to refresh payment status."));
+        });
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [paymentId, reloadKey]);
+
+  useEffect(() => {
+    if (!payment || payment.status !== "SUCCESS" || redirected.current) return;
+    redirected.current = true;
+    router.push(
+      `/order-confirmation?orderId=${encodeURIComponent(payment.orderId)}`,
+    );
+  }, [payment, router]);
 
   async function runConfirm(result: "SUCCESS" | "FAILED"): Promise<void> {
-    if (!paymentId || isBusy) return;
-    setActionStatus("loading");
-    setActionError(null);
-
+    if (!paymentId || actionBusy) return;
+    setActionBusy(true);
+    setError(null);
     try {
       const confirmed = await confirmPayment({ paymentId, result });
-      setLatest({
-        paymentId: confirmed.paymentId,
-        orderId: confirmed.orderId,
-        status: confirmed.status,
-        paymentUrl: payment?.paymentUrl ?? "",
-        createdAt: payment?.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      setActionStatus("idle");
-
-      if (result === "SUCCESS") {
-        router.push(
-          `/order-confirmation?orderId=${encodeURIComponent(confirmed.orderId)}`,
-        );
-      }
-    } catch (error: unknown) {
-      setActionStatus("error");
-      setActionError(
-        errorMessage(error, "Unable to confirm payment. Please try again."),
+      setPayment((current) =>
+        current
+          ? {
+              ...current,
+              status: confirmed.status,
+              paymentId: confirmed.paymentId,
+              orderId: confirmed.orderId,
+              updatedAt: new Date().toISOString(),
+            }
+          : current,
       );
+      setPhase(phaseFromPayment(confirmed.status));
+    } catch (err: unknown) {
+      setError(
+        errorMessage(err, "Unable to confirm payment. Please try again."),
+      );
+      setPhase("error");
+    } finally {
+      setActionBusy(false);
     }
+  }
+
+  function retry() {
+    setReloadKey((value) => value + 1);
+    setPhase(paymentId ? "loading" : "error");
+    setError(paymentId ? null : "Missing paymentId.");
+    redirected.current = false;
   }
 
   return (
@@ -112,16 +172,8 @@ export default function MockPaymentPageClient({
         {paymentId && phase === "error" ? (
           <CatalogStatus
             status="error"
-            errorMessage={
-              actionError ??
-              paymentQuery.errorMessage ??
-              "Unable to load payment."
-            }
-            onRetry={() => {
-              setActionStatus("idle");
-              setActionError(null);
-              paymentQuery.reload();
-            }}
+            errorMessage={error ?? "Unable to load payment."}
+            onRetry={retry}
           />
         ) : null}
 
@@ -138,25 +190,28 @@ export default function MockPaymentPageClient({
               Status: {payment.status}
             </p>
 
-            {phase === "pending" ? (
+            {phase === "processing" ? (
               <p className="payment-note" role="status">
-                Pending
+                Processing
               </p>
             ) : null}
-
-            {phase === "failed" ? (
-              <p className="payment-note" role="alert">
-                Failed
-              </p>
-            ) : null}
-
             {phase === "success" ? (
               <p className="payment-note" role="status">
                 Success
               </p>
             ) : null}
+            {phase === "failed" ? (
+              <p className="payment-note" role="alert">
+                Failed
+              </p>
+            ) : null}
+            {phase === "cancelled" ? (
+              <p className="payment-note" role="status">
+                Cancelled
+              </p>
+            ) : null}
 
-            {actionStatus === "loading" ? (
+            {actionBusy ? (
               <div className="payment-submit-status">
                 <CatalogStatus status="loading" />
               </div>
@@ -166,7 +221,7 @@ export default function MockPaymentPageClient({
               <button
                 type="button"
                 className="payment-submit"
-                disabled={isBusy || payment.status !== "PENDING"}
+                disabled={actionBusy || payment.status !== "PENDING"}
                 onClick={() => void runConfirm("SUCCESS")}
               >
                 Success
@@ -174,7 +229,7 @@ export default function MockPaymentPageClient({
               <button
                 type="button"
                 className="payment-submit payment-submit--secondary"
-                disabled={isBusy || payment.status !== "PENDING"}
+                disabled={actionBusy || payment.status !== "PENDING"}
                 onClick={() => void runConfirm("FAILED")}
               >
                 Fail

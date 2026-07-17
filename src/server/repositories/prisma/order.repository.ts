@@ -19,9 +19,10 @@ const orderInclude = {
 
 function toPrismaOrderStatus(
   status: OrderStatus,
-): "PENDING" | "PLACED" | "CONFIRMED" {
+): "PENDING" | "PLACED" | "CONFIRMED" | "CANCELLED" {
   if (status === "pending") return "PENDING";
   if (status === "confirmed") return "CONFIRMED";
+  if (status === "cancelled") return "CANCELLED";
   return "PLACED";
 }
 

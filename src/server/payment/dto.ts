@@ -39,5 +39,5 @@ export type ConfirmPaymentResponseDto = {
   paymentId: string;
   orderId: string;
   status: PaymentStatus;
-  orderStatus: "pending" | "confirmed" | "mock_placed";
+  orderStatus: "pending" | "confirmed" | "cancelled" | "mock_placed";
 };

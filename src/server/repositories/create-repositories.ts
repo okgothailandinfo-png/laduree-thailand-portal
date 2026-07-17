@@ -7,6 +7,7 @@ import { MockOrderRepository } from "@/src/server/repositories/mock/order.reposi
 import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
 import { MockPickupRepository } from "@/src/server/repositories/mock/pickup.repository";
 import { MockProductRepository } from "@/src/server/repositories/mock/product.repository";
+import { MockWebhookEventRepository } from "@/src/server/repositories/mock/webhook-event.repository";
 import { PrismaBoutiqueRepository } from "@/src/server/repositories/prisma/boutique.repository";
 import { PrismaCategoryRepository } from "@/src/server/repositories/prisma/category.repository";
 import { PrismaOrderRepository } from "@/src/server/repositories/prisma/order.repository";
@@ -21,9 +22,10 @@ function createMockRepositories(): RepositoryBundle {
     boutiques: new MockBoutiqueRepository(),
     pickup: new MockPickupRepository(),
     orders: new MockOrderRepository(),
-    // Cart / gateway payments have no Prisma model yet — in-memory for both sources.
+    // Cart / gateway payments / webhook idempotency — in-memory until persistent models exist.
     carts: new MockCartRepository(),
     payments: new MockPaymentRepository(),
+    webhookEvents: new MockWebhookEventRepository(),
   };
 }
 
@@ -36,6 +38,7 @@ function createPrismaRepositories(): RepositoryBundle {
     orders: new PrismaOrderRepository(),
     carts: new MockCartRepository(),
     payments: new MockPaymentRepository(),
+    webhookEvents: new MockWebhookEventRepository(),
   };
 }
 
