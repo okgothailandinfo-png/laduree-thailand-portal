@@ -29,7 +29,9 @@ export function toDomainCategory(row: PrismaCategory): Category {
     id: row.id,
     name: row.name,
     slug: row.slug,
+    description: row.description ?? null,
     sortOrder: row.sortOrder,
+    isActive: row.isActive,
   };
 }
 
@@ -47,13 +49,22 @@ export function toDomainBoutique(row: PrismaBoutique): Boutique {
 export function toDomainProduct(
   row: PrismaProduct & { images?: PrismaProductImage[] },
 ): Product {
-  const images = [...(row.images ?? [])].sort(
-    (a, b) => a.sortOrder - b.sortOrder,
-  );
+  const images = [...(row.images ?? [])]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((image) => ({
+      id: image.id,
+      url: image.url,
+      altText: image.altText,
+      sortOrder: image.sortOrder,
+      isPrimary: image.isPrimary,
+    }));
+  const primary =
+    images.find((image) => image.isPrimary) ?? images[0] ?? null;
   const priceMinor = row.priceMinor;
   return {
     id: row.id,
     slug: row.slug,
+    sku: row.sku,
     title: row.title,
     categoryId: row.categoryId,
     description: [...row.description],
@@ -61,8 +72,12 @@ export function toDomainProduct(
     storageText: row.storageText ?? "",
     priceMinor,
     priceThb: priceMinor === null ? null : priceMinor / 100,
-    imagePlaceholder: images[0]?.url ?? DEFAULT_IMAGE,
+    currency: "THB",
+    imagePlaceholder: primary?.url ?? DEFAULT_IMAGE,
+    images,
+    isActive: row.isActive,
     available: row.available,
+    sortOrder: row.sortOrder,
     // Modifier groups are not persisted in the current Prisma schema.
     modifierGroups: [],
   };

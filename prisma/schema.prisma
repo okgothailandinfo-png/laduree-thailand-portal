@@ -31,22 +31,26 @@ enum PaymentStatus {
 }
 
 model Category {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  slug      String   @unique
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   products Product[]
 
   @@index([sortOrder])
+  @@index([isActive])
 }
 
 model Product {
   id           String   @id @default(uuid()) @db.Uuid
   categoryId   String   @db.Uuid
   slug         String   @unique
+  sku          String   @unique
   title        String
   description  String[] @default([])
   storageLabel String?
@@ -54,7 +58,11 @@ model Product {
   /// Thailand retail price in satang (minor units). Null until owner-approved.
   priceMinor   Int?
   currency     String   @default("THB") @db.Char(3)
+  /// Catalog visibility (soft-deactivate without removing order history).
+  isActive     Boolean  @default(true)
+  /// Pickup availability for the storefront catalog.
   available    Boolean  @default(true)
+  sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -64,6 +72,8 @@ model Product {
 
   @@index([categoryId])
   @@index([available])
+  @@index([isActive])
+  @@index([sortOrder])
 }
 
 model ProductImage {
@@ -72,12 +82,14 @@ model ProductImage {
   url       String
   altText   String?
   sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, sortOrder])
+  @@index([productId, isPrimary])
 }
 
 model Boutique {

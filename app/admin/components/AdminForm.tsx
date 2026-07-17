@@ -8,18 +8,19 @@ export default function AdminForm({
   submitLabel = "Save",
   secondaryLabel,
   onSecondary,
-  disabled = true,
+  disabled = false,
 }: {
   children: ReactNode;
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
   submitLabel?: string;
   secondaryLabel?: string;
   onSecondary?: () => void;
-  /** Foundation forms are disabled until CRUD is implemented. */
+  /** When true, disables the primary submit button. */
   disabled?: boolean;
 }) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (disabled) return;
     onSubmit?.(event);
   }
 

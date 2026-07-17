@@ -13,13 +13,17 @@ export const MOCK_CATEGORIES: Category[] = [
     id: "cat-macaron-gift-boxes",
     name: "Macaron Gift Boxes",
     slug: "macaron-gift-boxes",
+    description: null,
     sortOrder: 1,
+    isActive: true,
   },
   {
     id: "cat-all-items",
     name: "All Items",
     slug: "all-items",
+    description: null,
     sortOrder: 2,
+    isActive: true,
   },
 ];
 
@@ -27,6 +31,7 @@ export const MOCK_PRODUCTS: Product[] = [
   {
     id: "prod-napoleon-iii-macaron-8pcs",
     slug: "napoleon-iii-macaron-8pcs",
+    sku: "SKU-NAPOLEON-8",
     title: "« Napoléon III » Macaron - 8pcs",
     categoryId: "cat-macaron-gift-boxes",
     description: [
@@ -37,8 +42,20 @@ export const MOCK_PRODUCTS: Product[] = [
     storageText: "Macarons can be stored for up to 4 days in the Chiller.",
     priceThb: null,
     priceMinor: null,
+    currency: "THB",
     imagePlaceholder: "/product-placeholder.svg",
+    images: [
+      {
+        id: "img-napoleon",
+        url: "/product-placeholder.svg",
+        altText: "« Napoléon III » Macaron - 8pcs",
+        sortOrder: 0,
+        isPrimary: true,
+      },
+    ],
+    isActive: true,
     available: true,
+    sortOrder: 1,
     modifierGroups: [
       {
         id: "choice-of-macarons",
