@@ -147,14 +147,8 @@ function parseModifiers(value: unknown): OrderItem["modifiers"] {
 
 function toDomainPayment(
   payment: PrismaPaymentRecord | null | undefined,
-): OrderPayment {
-  if (!payment) {
-    return {
-      method: "promptpay-qr",
-      methodLabel: METHOD_LABELS["promptpay-qr"],
-      status: "mock_accepted",
-    };
-  }
+): OrderPayment | undefined {
+  if (!payment) return undefined;
 
   const method = toDomainPaymentMethod(payment.method);
   return {
@@ -173,10 +167,11 @@ export type PrismaOrderWithRelations = PrismaOrder & {
 };
 
 export function toDomainOrder(row: PrismaOrderWithRelations): Order {
+  const payment = toDomainPayment(row.payment);
   return {
     id: row.id,
     orderNumber: row.orderNumber,
-    status: "mock_placed",
+    status: row.status === "PENDING" ? "pending" : "mock_placed",
     currency: "THB",
     createdAt: row.createdAt.toISOString(),
     totalMinor: row.totalMinor,
@@ -205,6 +200,6 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
       timeSlotId: row.pickupSlotId,
       timeSlotLabel: row.pickupSlot.label,
     },
-    payment: toDomainPayment(row.payment),
+    ...(payment ? { payment } : {}),
   };
 }

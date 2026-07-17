@@ -2,7 +2,10 @@ import type { Boutique } from "@/src/server/models/boutique";
 import type { Cart } from "@/src/server/models/cart";
 import type { Category } from "@/src/server/models/category";
 import type { Order } from "@/src/server/models/order";
-import type { PickupAvailability } from "@/src/server/models/pickup";
+import type {
+  PickupAvailability,
+  PickupSlotRecord,
+} from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
 
 export interface ProductRepository {
@@ -31,6 +34,7 @@ export interface PickupRepository {
     dateKey: string;
   }): Promise<PickupAvailability | null>;
   listSlots(): Promise<PickupAvailability["slots"]>;
+  findSlotById(id: string): Promise<PickupSlotRecord | null>;
 }
 
 export interface OrderRepository {

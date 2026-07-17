@@ -1,6 +1,6 @@
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
-export type OrderStatus = "mock_placed";
+export type OrderStatus = "pending" | "mock_placed";
 
 export type OrderItem = {
   productId: string;
@@ -45,7 +45,8 @@ export type Order = {
   items: OrderItem[];
   customer: OrderCustomer;
   pickup: OrderPickup;
-  payment: OrderPayment;
+  /** Omitted for draft checkout orders (PENDING, no payment yet). */
+  payment?: OrderPayment;
   /** Order total in satang; calculated in the service layer. */
   totalMinor: number;
   termsAccepted: boolean;

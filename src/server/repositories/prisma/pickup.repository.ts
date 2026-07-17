@@ -1,4 +1,7 @@
-import type { PickupAvailability } from "@/src/server/models/pickup";
+import type {
+  PickupAvailability,
+  PickupSlotRecord,
+} from "@/src/server/models/pickup";
 import type { PickupRepository } from "@/src/server/repositories/interfaces";
 import {
   toDomainPickupAvailability,
@@ -60,5 +63,18 @@ export class PrismaPickupRepository implements PickupRepository {
       params.dateKey,
       available,
     );
+  }
+
+  async findSlotById(id: string): Promise<PickupSlotRecord | null> {
+    const row = await prisma.pickupSlot.findUnique({ where: { id } });
+    if (!row || !isSlotAvailable(row.capacity)) return null;
+    return {
+      id: row.id,
+      boutiqueId: row.boutiqueId,
+      dateKey: row.dateKey,
+      label: row.label,
+      start: row.startTime,
+      end: row.endTime,
+    };
   }
 }

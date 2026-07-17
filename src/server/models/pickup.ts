@@ -11,3 +11,14 @@ export type PickupAvailability = {
   timezone: string;
   slots: PickupTimeSlot[];
 };
+
+/** Persisted slot row used to validate checkout pickupSlotId. */
+export type PickupSlotRecord = {
+  id: string;
+  /** Null when the mock source does not bind slots to a boutique. */
+  boutiqueId: string | null;
+  dateKey: string;
+  label: string;
+  start: string;
+  end: string;
+};

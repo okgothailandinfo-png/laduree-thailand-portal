@@ -2,12 +2,34 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { submitCheckout } from "@/lib/api/checkout";
+import { ApiClientError } from "@/lib/api/client";
+import CatalogStatus from "../catalog/CatalogStatus";
 import { useCart } from "../cart/CartContext";
 import { usePickup } from "../pickup/PickupContext";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import { useCheckout } from "./CheckoutContext";
 import "./checkout.css";
+
+function splitCustomerName(fullName: string): {
+  firstName: string;
+  lastName: string;
+} {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] };
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(" "),
+  };
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
 
 export default function CheckoutPageClient() {
   const router = useRouter();
@@ -15,16 +37,52 @@ export default function CheckoutPageClient() {
   const { confirmed: pickup, isPickupComplete, openPickupSelection } =
     usePickup();
   const { info, setField, errors, confirmCheckoutInfo } = useCheckout();
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "loading" | "error"
+  >("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isEmpty = items.length === 0;
   const canProceedToForm = !isEmpty && isPickupComplete;
+  const isSubmitting = submitStatus === "loading";
+
+  async function runCheckout() {
+    if (!canProceedToForm || !pickup) return;
+    if (!confirmCheckoutInfo()) return;
+
+    const { firstName, lastName } = splitCustomerName(info.customerName);
+    setSubmitStatus("loading");
+    setSubmitError(null);
+
+    try {
+      const result = await submitCheckout({
+        customer: {
+          firstName,
+          lastName,
+          email: info.email.trim(),
+          phone: info.mobileNumber.trim(),
+        },
+        pickup: {
+          boutiqueId: pickup.boutique.id,
+          pickupSlotId: pickup.timeSlot.id,
+        },
+      });
+      setSubmitStatus("idle");
+      router.push(
+        `/order-confirmation?orderId=${encodeURIComponent(result.orderId)}`,
+      );
+    } catch (error: unknown) {
+      setSubmitStatus("error");
+      setSubmitError(
+        errorMessage(error, "Unable to create draft order. Please try again."),
+      );
+    }
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!canProceedToForm) return;
-    if (confirmCheckoutInfo()) {
-      router.push("/payment");
-    }
+    if (!canProceedToForm || isSubmitting) return;
+    void runCheckout();
   }
 
   return (
@@ -289,7 +347,26 @@ export default function CheckoutPageClient() {
                   </p>
                 ) : null}
 
-                <button type="submit" className="checkout-submit">
+                {submitStatus === "loading" || submitStatus === "error" ? (
+                  <div className="checkout-submit-status">
+                    <CatalogStatus
+                      status={submitStatus === "loading" ? "loading" : "error"}
+                      errorMessage={submitError}
+                      onRetry={
+                        submitStatus === "error"
+                          ? () => void runCheckout()
+                          : undefined
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="checkout-submit"
+                  disabled={isSubmitting}
+                  aria-busy={isSubmitting}
+                >
                   Continue to Payment
                 </button>
               </form>

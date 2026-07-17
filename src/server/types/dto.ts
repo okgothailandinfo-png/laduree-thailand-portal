@@ -127,7 +127,7 @@ export type CreateOrderRequestDto = {
 export type OrderDto = {
   id: string;
   orderNumber: string;
-  status: "mock_placed";
+  status: "pending" | "mock_placed";
   currency: "THB";
   createdAt: string;
   items: Array<{
@@ -146,9 +146,34 @@ export type OrderDto = {
     timeSlotId: string;
     timeSlotLabel: string;
   };
-  payment: {
+  payment?: {
     method: CreateOrderPaymentDto["method"];
     methodLabel: string;
     status: "mock_accepted";
   };
+};
+
+export type CheckoutCustomerRequestDto = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+};
+
+export type CheckoutPickupRequestDto = {
+  boutiqueId: string;
+  pickupSlotId: string;
+};
+
+export type CheckoutRequestDto = {
+  customer: CheckoutCustomerRequestDto;
+  pickup: CheckoutPickupRequestDto;
+};
+
+export type CheckoutResponseDto = {
+  orderId: string;
+  subtotal: number;
+  total: number;
+  itemCount: number;
+  status: "PENDING";
 };

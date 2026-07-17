@@ -3,6 +3,8 @@ import type {
   BoutiqueDto,
   CartDto,
   CategoryDto,
+  CheckoutRequestDto,
+  CheckoutResponseDto,
   CreateOrderRequestDto,
   OrderDto,
   PickupAvailabilityDto,
@@ -50,4 +52,11 @@ export interface CartService {
   ): Promise<CartDto>;
   removeItem(cartId: string | undefined, itemId: string): Promise<CartDto>;
   clearCart(cartId: string | undefined): Promise<CartDto>;
+}
+
+export interface CheckoutService {
+  createDraftCheckout(
+    cartId: string | undefined,
+    input: CheckoutRequestDto,
+  ): Promise<CheckoutResponseDto>;
 }

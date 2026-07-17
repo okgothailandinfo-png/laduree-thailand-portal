@@ -2,6 +2,7 @@ import { createRepositories } from "@/src/server/repositories/create-repositorie
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
+import { DefaultCheckoutService } from "@/src/server/services/checkout.service";
 import { DefaultOrderService } from "@/src/server/services/order.service";
 import { DefaultPickupService } from "@/src/server/services/pickup.service";
 import { DefaultProductService } from "@/src/server/services/product.service";
@@ -28,4 +29,11 @@ export const orderService = new DefaultOrderService(
 export const cartService = new DefaultCartService(
   repositories.carts,
   repositories.products,
+);
+export const checkoutService = new DefaultCheckoutService(
+  repositories.carts,
+  repositories.products,
+  repositories.boutiques,
+  repositories.pickup,
+  repositories.orders,
 );
