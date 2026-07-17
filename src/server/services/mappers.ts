@@ -78,7 +78,7 @@ export function toOrderDto(order: Order): OrderDto {
     })),
     customer: { ...order.customer },
     pickup: { ...order.pickup },
-    payment: { ...order.payment },
+    ...(order.payment ? { payment: { ...order.payment } } : {}),
   };
 }
 

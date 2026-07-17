@@ -46,7 +46,7 @@ export class PrismaOrderRepository implements OrderRepository {
           data: {
             id: order.id,
             orderNumber: order.orderNumber,
-            status: "PLACED",
+            status: order.status === "pending" ? "PENDING" : "PLACED",
             customerId: customer.id,
             boutiqueId: order.pickup.boutiqueId,
             pickupSlotId: order.pickup.timeSlotId,
@@ -65,14 +65,18 @@ export class PrismaOrderRepository implements OrderRepository {
                 note: item.note,
               })),
             },
-            payment: {
-              create: {
-                method: toPrismaPaymentMethod(order.payment.method),
-                status: "MOCK_ACCEPTED",
-                amountMinor: order.totalMinor,
-                currency: "THB",
-              },
-            },
+            ...(order.payment
+              ? {
+                  payment: {
+                    create: {
+                      method: toPrismaPaymentMethod(order.payment.method),
+                      status: "MOCK_ACCEPTED",
+                      amountMinor: order.totalMinor,
+                      currency: "THB",
+                    },
+                  },
+                }
+              : {}),
           },
           include: orderInclude,
         });

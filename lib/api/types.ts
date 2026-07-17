@@ -106,3 +106,60 @@ export type AddCartItemRequest = {
 export type UpdateCartItemRequest = {
   quantity: number;
 };
+
+export type CheckoutRequest = {
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+  pickup: {
+    boutiqueId: string;
+    pickupSlotId: string;
+  };
+};
+
+export type CheckoutResponse = {
+  orderId: string;
+  subtotal: number;
+  total: number;
+  itemCount: number;
+  status: "PENDING";
+};
+
+export type OrderDetail = {
+  id: string;
+  orderNumber: string;
+  status: "pending" | "mock_placed";
+  currency: "THB";
+  createdAt: string;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    modifiers: Array<{ label: string; quantity?: number }>;
+    note?: string;
+  }>;
+  customer: {
+    customerName: string;
+    mobileNumber: string;
+    email: string;
+    recipientName?: string;
+    recipientPhone?: string;
+    specialRequest?: string;
+  };
+  pickup: {
+    boutiqueId: string;
+    boutiqueName: string;
+    address: string;
+    dateKey: string;
+    timeSlotId: string;
+    timeSlotLabel: string;
+  };
+  payment?: {
+    method: string;
+    methodLabel: string;
+    status: string;
+  };
+};

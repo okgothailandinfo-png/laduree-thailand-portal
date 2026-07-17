@@ -217,6 +217,10 @@
   cursor: not-allowed;
 }
 
+.checkout-submit-status {
+  margin: 0 0 12px;
+}
+
 .checkout-payment-pending {
   margin-top: 4px;
   padding: 12px;
