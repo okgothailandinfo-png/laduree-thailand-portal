@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { CheckoutProvider } from "../checkout/CheckoutContext";
 import { OrderFlowProvider } from "../order/OrderFlowContext";
@@ -13,6 +14,14 @@ export default function CartProviderShell({
 }: {
   children: ReactNode;
 }) {
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith("/admin") ?? false;
+
+  // Admin CMS must not inherit storefront cart / pickup chrome.
+  if (isAdmin) {
+    return <>{children}</>;
+  }
+
   return (
     <PickupProvider>
       <CartProvider>
