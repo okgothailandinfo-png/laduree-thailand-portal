@@ -68,9 +68,7 @@ export default function CheckoutPageClient() {
         },
       });
       setSubmitStatus("idle");
-      router.push(
-        `/order-confirmation?orderId=${encodeURIComponent(result.orderId)}`,
-      );
+      router.push(`/payment?orderId=${encodeURIComponent(result.orderId)}`);
     } catch (error: unknown) {
       setSubmitStatus("error");
       setSubmitError(

@@ -163,3 +163,29 @@ export type OrderDetail = {
     status: string;
   };
 };
+
+export type PaymentStatus =
+  | "PENDING"
+  | "SUCCESS"
+  | "FAILED"
+  | "CANCELLED"
+  | "REFUNDED";
+
+export type CreatePaymentRequest = {
+  orderId: string;
+};
+
+export type CreatePaymentResponse = {
+  paymentId: string;
+  status: "PENDING";
+  redirectUrl: string;
+};
+
+export type PaymentRecord = {
+  paymentId: string;
+  orderId: string;
+  status: PaymentStatus;
+  redirectUrl: string;
+  createdAt: string;
+  updatedAt: string;
+};

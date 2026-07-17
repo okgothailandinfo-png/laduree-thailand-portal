@@ -16,5 +16,6 @@ export {
   orderService,
   cartService,
   checkoutService,
+  paymentService,
 } from "@/src/server/services/container";
 export { createRepositories } from "@/src/server/repositories/create-repositories";

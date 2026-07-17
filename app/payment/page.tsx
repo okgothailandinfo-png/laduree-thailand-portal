@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: "Payment | Ladurée Thailand",
 };
 
-export default function PaymentPage() {
-  return <PaymentPageClient />;
+type PageProps = {
+  searchParams: Promise<{ orderId?: string }>;
+};
+
+export default async function PaymentPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  return <PaymentPageClient orderId={params.orderId ?? null} />;
 }
