@@ -1,4 +1,5 @@
 import { createRepositories } from "@/src/server/repositories/create-repositories";
+import { PaymentService } from "@/src/server/payment/payment-service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
@@ -37,3 +38,4 @@ export const checkoutService = new DefaultCheckoutService(
   repositories.pickup,
   repositories.orders,
 );
+export const paymentService = new PaymentService(orderService);

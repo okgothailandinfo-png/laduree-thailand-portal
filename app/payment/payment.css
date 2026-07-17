@@ -303,6 +303,23 @@
   cursor: not-allowed;
 }
 
+.payment-submit-status {
+  margin: 0 0 12px;
+}
+
+.payment-mock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.payment-submit--secondary {
+  background: #fff;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
 .payment-success {
   margin-top: 12px;
   padding: 12px;

@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
+import { ApiClientError } from "@/lib/api/client";
+import { createPayment } from "@/lib/api/payment";
+import CatalogStatus from "../catalog/CatalogStatus";
 import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
 import {
@@ -32,27 +35,42 @@ const emptyCard: CardDraft = {
   cvv: "",
 };
 
-export default function PaymentPageClient() {
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
+export default function PaymentPageClient({
+  orderId,
+}: {
+  orderId: string | null;
+}) {
   const router = useRouter();
   const { items, itemCount } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
   const { confirmed: pickup, isPickupComplete, openPickupSelection } =
     usePickup();
-  const {
-    selectedPaymentMethod,
-    setSelectedPaymentMethod,
-    placeMockOrder,
-  } = useOrderFlow();
+  const { selectedPaymentMethod, setSelectedPaymentMethod } = useOrderFlow();
 
   const [method, setMethod] = useState<MockPaymentMethod | null>(
     selectedPaymentMethod,
   );
   const [card, setCard] = useState<CardDraft>(emptyCard);
   const [errors, setErrors] = useState<PaymentErrors>({});
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "loading" | "error"
+  >("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isEmpty = items.length === 0;
   const canPay =
-    !isEmpty && isPickupComplete && isCheckoutInfoComplete && !!checkout;
+    !isEmpty &&
+    isPickupComplete &&
+    isCheckoutInfoComplete &&
+    !!checkout &&
+    !!orderId;
+  const isSubmitting = submitStatus === "loading";
 
   const customer = useMemo(() => checkout, [checkout]);
 
@@ -104,13 +122,29 @@ export default function PaymentPageClient() {
     return Object.keys(next).length === 0;
   }
 
+  async function runCreatePayment() {
+    if (!canPay || !method || !orderId) return;
+    if (!validatePayment()) return;
+
+    setSubmitStatus("loading");
+    setSubmitError(null);
+
+    try {
+      const result = await createPayment({ orderId });
+      setSubmitStatus("idle");
+      router.push(result.redirectUrl);
+    } catch (error: unknown) {
+      setSubmitStatus("error");
+      setSubmitError(
+        errorMessage(error, "Unable to start payment. Please try again."),
+      );
+    }
+  }
+
   function handlePlaceOrder(event: FormEvent) {
     event.preventDefault();
-    if (!canPay || !method) return;
-    if (!validatePayment()) return;
-    // Local mock only — no gateway, API, or charge.
-    placeMockOrder(method);
-    router.push("/order-confirmation");
+    if (!canPay || isSubmitting) return;
+    void runCreatePayment();
   }
 
   return (
@@ -144,6 +178,16 @@ export default function PaymentPageClient() {
         ) : null}
 
         {!isEmpty && isPickupComplete && !isCheckoutInfoComplete ? (
+          <div className="payment-gate" role="alert">
+            Complete checkout information before payment.{" "}
+            <Link href="/checkout">Checkout</Link>
+          </div>
+        ) : null}
+
+        {!isEmpty &&
+        isPickupComplete &&
+        isCheckoutInfoComplete &&
+        !orderId ? (
           <div className="payment-gate" role="alert">
             Complete checkout information before payment.{" "}
             <Link href="/checkout">Checkout</Link>
@@ -449,7 +493,26 @@ export default function PaymentPageClient() {
                   </div>
                 ) : null}
 
-                <button type="submit" className="payment-submit">
+                {submitStatus === "loading" || submitStatus === "error" ? (
+                  <div className="payment-submit-status">
+                    <CatalogStatus
+                      status={submitStatus === "loading" ? "loading" : "error"}
+                      errorMessage={submitError}
+                      onRetry={
+                        submitStatus === "error"
+                          ? () => void runCreatePayment()
+                          : undefined
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="payment-submit"
+                  disabled={isSubmitting}
+                  aria-busy={isSubmitting}
+                >
                   Place Order
                 </button>
               </form>
