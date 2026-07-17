@@ -1,3 +1,11 @@
+export type ProductImage = {
+  id: string;
+  url: string;
+  altText: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+};
+
 export type ProductModifierGroup = {
   id: string;
   title: string;
@@ -9,6 +17,7 @@ export type ProductModifierGroup = {
 export type Product = {
   id: string;
   slug: string;
+  sku: string;
   title: string;
   categoryId: string;
   description: string[];
@@ -18,7 +27,13 @@ export type Product = {
   priceThb: number | null;
   /** Thailand retail price in satang (minor units). Null until owner-approved. */
   priceMinor: number | null;
+  currency: "THB";
   imagePlaceholder: string;
+  images: ProductImage[];
+  /** Catalog visibility. */
+  isActive: boolean;
+  /** Pickup availability. */
   available: boolean;
+  sortOrder: number;
   modifierGroups: ProductModifierGroup[];
 };

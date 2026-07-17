@@ -1,3 +1,11 @@
+import type {
+  AdminCategoryListQuery,
+  AdminCreateCategoryInput,
+  AdminCreateProductInput,
+  AdminProductListQuery,
+  AdminUpdateCategoryInput,
+  AdminUpdateProductInput,
+} from "@/src/server/admin/dto";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Cart } from "@/src/server/models/cart";
 import type { Category } from "@/src/server/models/category";
@@ -10,17 +18,49 @@ import type { Product } from "@/src/server/models/product";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 
+export type AdminProductListRow = {
+  product: Product;
+  categoryName: string;
+};
+
+export type AdminProductListPage = {
+  items: AdminProductListRow[];
+  total: number;
+};
+
+export type AdminCategoryListRow = {
+  category: Category;
+  productCount: number;
+};
+
+export type AdminCategoryListPage = {
+  items: AdminCategoryListRow[];
+  total: number;
+};
+
 export interface ProductRepository {
-  /** Active/available products only. */
+  /** Storefront: active + available products only. */
   list(): Promise<Product[]>;
   findBySlug(slug: string): Promise<Product | null>;
   findById(id: string): Promise<Product | null>;
+  findBySku(sku: string): Promise<Product | null>;
+  adminList(query: AdminProductListQuery): Promise<AdminProductListPage>;
+  create(input: AdminCreateProductInput): Promise<Product>;
+  update(id: string, input: AdminUpdateProductInput): Promise<Product>;
+  /** Soft-deactivate when order history exists; otherwise hard-delete. */
+  remove(id: string): Promise<{ mode: "deleted" | "deactivated"; product: Product | null }>;
+  countByCategoryId(categoryId: string): Promise<number>;
 }
 
 export interface CategoryRepository {
-  /** Active categories (all rows until an isActive column exists). */
+  /** Storefront: active categories only. */
   list(): Promise<Category[]>;
   findBySlug(slug: string): Promise<Category | null>;
+  findById(id: string): Promise<Category | null>;
+  adminList(query: AdminCategoryListQuery): Promise<AdminCategoryListPage>;
+  create(input: AdminCreateCategoryInput): Promise<Category>;
+  update(id: string, input: AdminUpdateCategoryInput): Promise<Category>;
+  remove(id: string): Promise<void>;
 }
 
 export interface BoutiqueRepository {

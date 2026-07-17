@@ -44,7 +44,12 @@ export function toProductDetailDto(product: Product): ProductDetailDto {
 }
 
 export function toCategoryDto(category: Category): CategoryDto {
-  return { ...category };
+  return {
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    sortOrder: category.sortOrder,
+  };
 }
 
 export function toBoutiqueDto(boutique: Boutique): BoutiqueDto {

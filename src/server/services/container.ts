@@ -1,5 +1,7 @@
 import { env } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
+import { AdminCategoryService } from "@/src/server/admin/category.service";
+import { AdminProductService } from "@/src/server/admin/product.service";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCartService } from "@/src/server/services/cart.service";
@@ -45,4 +47,12 @@ export const paymentService = new PaymentService(
   repositories.webhookEvents,
   env.mockPaymentWebhookSecret,
   env.mockPaymentWebhookToleranceSeconds,
+);
+export const adminProductService = new AdminProductService(
+  repositories.products,
+  repositories.categories,
+);
+export const adminCategoryService = new AdminCategoryService(
+  repositories.categories,
+  repositories.products,
 );
