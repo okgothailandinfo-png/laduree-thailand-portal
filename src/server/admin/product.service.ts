@@ -50,23 +50,6 @@ function requireCurrency(value: unknown): "THB" {
   return "THB";
 }
 
-function requireUrl(value: unknown, field: string): string {
-  const url = requireString(value, field);
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new Error("invalid");
-    }
-    return url;
-  } catch {
-    // Allow same-origin relative asset paths used by the catalog placeholders.
-    if (url.startsWith("/")) return url;
-    throw new AppError("VALIDATION_ERROR", `${field} must be a valid URL.`, {
-      details: { field },
-    });
-  }
-}
-
 function parseImages(raw: unknown): AdminCreateProductInput["images"] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw)) {
@@ -77,7 +60,7 @@ function parseImages(raw: unknown): AdminCreateProductInput["images"] {
   return raw.map((item, index) => {
     const image = requireObject(item, `images[${index}]`);
     return {
-      url: requireUrl(image.url, `images[${index}].url`),
+      mediaId: requireString(image.mediaId, `images[${index}].mediaId`),
       altText: optionalString(image.altText, `images[${index}].altText`) ?? null,
       sortOrder: requireInt(image.sortOrder ?? index, `images[${index}].sortOrder`),
       isPrimary: requireBoolean(

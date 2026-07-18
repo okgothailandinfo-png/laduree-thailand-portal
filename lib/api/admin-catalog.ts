@@ -2,7 +2,10 @@ import type {
   AdminCategoryDetailDto,
   AdminCategoryListResult,
   AdminCreateCategoryInput,
+  AdminCreateMediaInput,
   AdminCreateProductInput,
+  AdminMediaDto,
+  AdminMediaListResult,
   AdminProductDetailDto,
   AdminProductListResult,
   AdminUpdateCategoryInput,
@@ -151,6 +154,39 @@ export function updateAdminCategory(
 
 export function deleteAdminCategory(id: string): Promise<{ deleted: boolean }> {
   return adminFetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchAdminMedia(params: {
+  search?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AdminMediaListResult> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.status) query.set("status", params.status);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 12));
+  return adminFetch(`/api/admin/media?${query.toString()}`);
+}
+
+export function fetchAdminMediaById(id: string): Promise<AdminMediaDto> {
+  return adminFetch(`/api/admin/media/${encodeURIComponent(id)}`);
+}
+
+export function createAdminMedia(
+  input: AdminCreateMediaInput,
+): Promise<AdminMediaDto> {
+  return adminFetch(`/api/admin/media`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminMedia(id: string): Promise<{ deleted: boolean }> {
+  return adminFetch(`/api/admin/media/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }

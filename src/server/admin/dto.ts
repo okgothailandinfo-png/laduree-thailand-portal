@@ -1,7 +1,42 @@
 /** Admin catalog DTOs — separate from storefront contracts. */
 
-export type AdminProductImageInput = {
+export type AdminMediaDto = {
+  id: string;
   url: string;
+  altText: string | null;
+  title: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminMediaListQuery = {
+  search?: string;
+  isActive?: boolean;
+  page: number;
+  pageSize: number;
+};
+
+export type AdminMediaListResult = {
+  items: AdminMediaDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type AdminCreateMediaInput = {
+  url: string;
+  altText?: string | null;
+  title?: string | null;
+  isActive: boolean;
+};
+
+export type AdminUpdateMediaInput = Partial<AdminCreateMediaInput>;
+
+/** Product images reference Media by ID only (URL resolved from Media). */
+export type AdminProductImageInput = {
+  mediaId: string;
   altText?: string | null;
   sortOrder: number;
   isPrimary: boolean;
@@ -9,6 +44,7 @@ export type AdminProductImageInput = {
 
 export type AdminProductImageDto = {
   id: string;
+  mediaId: string;
   url: string;
   altText: string | null;
   sortOrder: number;
@@ -109,3 +145,4 @@ export type AdminCreateCategoryInput = {
 };
 
 export type AdminUpdateCategoryInput = Partial<AdminCreateCategoryInput>;
+

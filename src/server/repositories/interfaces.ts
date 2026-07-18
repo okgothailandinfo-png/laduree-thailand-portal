@@ -1,14 +1,18 @@
 import type {
   AdminCategoryListQuery,
   AdminCreateCategoryInput,
+  AdminCreateMediaInput,
   AdminCreateProductInput,
+  AdminMediaListQuery,
   AdminProductListQuery,
   AdminUpdateCategoryInput,
+  AdminUpdateMediaInput,
   AdminUpdateProductInput,
 } from "@/src/server/admin/dto";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Cart } from "@/src/server/models/cart";
 import type { Category } from "@/src/server/models/category";
+import type { Media } from "@/src/server/models/media";
 import type { Order, OrderStatus } from "@/src/server/models/order";
 import type {
   PickupAvailability,
@@ -38,6 +42,11 @@ export type AdminCategoryListPage = {
   total: number;
 };
 
+export type AdminMediaListPage = {
+  items: Media[];
+  total: number;
+};
+
 export interface ProductRepository {
   /** Storefront: active + available products only. */
   list(): Promise<Product[]>;
@@ -61,6 +70,16 @@ export interface CategoryRepository {
   create(input: AdminCreateCategoryInput): Promise<Category>;
   update(id: string, input: AdminUpdateCategoryInput): Promise<Category>;
   remove(id: string): Promise<void>;
+}
+
+export interface MediaRepository {
+  findById(id: string): Promise<Media | null>;
+  findByIds(ids: string[]): Promise<Media[]>;
+  adminList(query: AdminMediaListQuery): Promise<AdminMediaListPage>;
+  create(input: AdminCreateMediaInput): Promise<Media>;
+  update(id: string, input: AdminUpdateMediaInput): Promise<Media>;
+  remove(id: string): Promise<void>;
+  countProductLinks(mediaId: string): Promise<number>;
 }
 
 export interface BoutiqueRepository {
@@ -95,6 +114,7 @@ export interface CartRepository {
 export type RepositoryBundle = {
   products: ProductRepository;
   categories: CategoryRepository;
+  media: MediaRepository;
   boutiques: BoutiqueRepository;
   pickup: PickupRepository;
   orders: OrderRepository;

@@ -47,6 +47,7 @@ export const MOCK_PRODUCTS: Product[] = [
     images: [
       {
         id: "img-napoleon",
+        mediaId: "media-napoleon-placeholder",
         url: "/product-placeholder.svg",
         altText: "« Napoléon III » Macaron - 8pcs",
         sortOrder: 0,

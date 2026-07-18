@@ -40,6 +40,45 @@ function normalizeImages(
   return images;
 }
 
+async function resolveImageCreates(
+  images: AdminCreateProductInput["images"],
+): Promise<
+  Array<{
+    mediaId: string;
+    url: string;
+    altText: string | null;
+    sortOrder: number;
+    isPrimary: boolean;
+  }>
+> {
+  const normalized = normalizeImages(images);
+  if (!normalized.length) return [];
+
+  const mediaIds = [...new Set(normalized.map((image) => image.mediaId))];
+  const mediaRows = await prisma.media.findMany({
+    where: { id: { in: mediaIds }, isActive: true },
+  });
+  const byId = new Map(mediaRows.map((row) => [row.id, row]));
+
+  return normalized.map((image, index) => {
+    const media = byId.get(image.mediaId);
+    if (!media) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        `Media not found or inactive: ${image.mediaId}`,
+        { details: { field: `images[${index}].mediaId` } },
+      );
+    }
+    return {
+      mediaId: media.id,
+      url: media.url,
+      altText: image.altText ?? media.altText,
+      sortOrder: image.sortOrder,
+      isPrimary: image.isPrimary,
+    };
+  });
+}
+
 export class PrismaProductRepository implements ProductRepository {
   async list(): Promise<Product[]> {
     const rows = await prisma.product.findMany({
@@ -110,7 +149,7 @@ export class PrismaProductRepository implements ProductRepository {
   }
 
   async create(input: AdminCreateProductInput): Promise<Product> {
-    const images = normalizeImages(input.images);
+    const images = await resolveImageCreates(input.images);
     const priceMinor = thbMajorToMinor(input.priceThb);
 
     try {
@@ -130,8 +169,9 @@ export class PrismaProductRepository implements ProductRepository {
           sortOrder: input.sortOrder,
           images: {
             create: images.map((image) => ({
+              mediaId: image.mediaId,
               url: image.url,
-              altText: image.altText ?? null,
+              altText: image.altText,
               sortOrder: image.sortOrder,
               isPrimary: image.isPrimary,
             })),
@@ -173,7 +213,7 @@ export class PrismaProductRepository implements ProductRepository {
 
     try {
       if (input.images) {
-        const images = normalizeImages(input.images);
+        const images = await resolveImageCreates(input.images);
         const row = await prisma.$transaction(async (tx) => {
           await tx.productImage.deleteMany({ where: { productId: id } });
           return tx.product.update({
@@ -182,8 +222,9 @@ export class PrismaProductRepository implements ProductRepository {
               ...data,
               images: {
                 create: images.map((image) => ({
+                  mediaId: image.mediaId,
                   url: image.url,
-                  altText: image.altText ?? null,
+                  altText: image.altText,
                   sortOrder: image.sortOrder,
                   isPrimary: image.isPrimary,
                 })),
