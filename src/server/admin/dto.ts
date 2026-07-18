@@ -174,3 +174,105 @@ export type AdminCreateCategoryInput = {
 
 export type AdminUpdateCategoryInput = Partial<AdminCreateCategoryInput>;
 
+/** Homepage CMS — banners, sections, keyed content. */
+
+export type HomepageContentTypeDto =
+  | "plain_text"
+  | "multiline_text"
+  | "url"
+  | "boolean";
+
+export type AdminBannerDto = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  imageMediaId: string;
+  imageUrl: string;
+  imageAltText: string | null;
+  mobileImageMediaId: string | null;
+  mobileImageUrl: string | null;
+  mobileImageAltText: string | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminBannerListQuery = {
+  search?: string;
+  isActive?: boolean;
+  page: number;
+  pageSize: number;
+};
+
+export type AdminBannerListResult = {
+  items: AdminBannerDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type AdminCreateBannerInput = {
+  title: string;
+  subtitle?: string | null;
+  imageMediaId: string;
+  mobileImageMediaId?: string | null;
+  linkUrl?: string | null;
+  linkLabel?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+};
+
+export type AdminUpdateBannerInput = Partial<AdminCreateBannerInput>;
+
+export type AdminHomepageSectionDto = {
+  id: string;
+  key: string;
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminCreateHomepageSectionInput = {
+  key: string;
+  title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type AdminUpdateHomepageSectionInput =
+  Partial<AdminCreateHomepageSectionInput>;
+
+export type AdminHomepageContentDto = {
+  id: string;
+  key: string;
+  value: string;
+  contentType: HomepageContentTypeDto;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminCreateHomepageContentInput = {
+  key: string;
+  value: string;
+  contentType: HomepageContentTypeDto;
+  isActive: boolean;
+};
+
+export type AdminUpdateHomepageContentInput =
+  Partial<AdminCreateHomepageContentInput>;
+

@@ -1,6 +1,8 @@
 import { env } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
+import { AdminBannerService } from "@/src/server/admin/banner.service";
 import { AdminCategoryService } from "@/src/server/admin/category.service";
+import { AdminHomepageService } from "@/src/server/admin/homepage.service";
 import { AdminMediaService } from "@/src/server/admin/media.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
 import { PaymentService } from "@/src/server/payment/payment-service";
@@ -8,6 +10,7 @@ import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
 import { DefaultCheckoutService } from "@/src/server/services/checkout.service";
+import { DefaultHomepageService } from "@/src/server/services/homepage.service";
 import { DefaultOrderService } from "@/src/server/services/order.service";
 import { DefaultPickupService } from "@/src/server/services/pickup.service";
 import { DefaultProductService } from "@/src/server/services/product.service";
@@ -63,4 +66,17 @@ export const adminCategoryService = new AdminCategoryService(
 export const adminMediaService = new AdminMediaService(
   repositories.media,
   storageService,
+);
+export const adminBannerService = new AdminBannerService(
+  repositories.homepageBanners,
+  repositories.media,
+);
+export const adminHomepageService = new AdminHomepageService(
+  repositories.homepageSections,
+  repositories.homepageContent,
+);
+export const homepageService = new DefaultHomepageService(
+  repositories.homepageBanners,
+  repositories.homepageSections,
+  repositories.homepageContent,
 );

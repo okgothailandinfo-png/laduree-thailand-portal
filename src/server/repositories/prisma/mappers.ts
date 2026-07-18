@@ -2,6 +2,9 @@ import type {
   Boutique as PrismaBoutique,
   Category as PrismaCategory,
   Customer as PrismaCustomer,
+  HomepageBanner as PrismaHomepageBanner,
+  HomepageContent as PrismaHomepageContent,
+  HomepageSection as PrismaHomepageSection,
   Media as PrismaMedia,
   Order as PrismaOrder,
   OrderItem as PrismaOrderItem,
@@ -14,6 +17,12 @@ import type {
 import { env } from "@/src/server/config/env";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Category } from "@/src/server/models/category";
+import type {
+  HomepageBanner,
+  HomepageBannerWithMedia,
+  HomepageContent,
+  HomepageSection,
+} from "@/src/server/models/homepage";
 import type { Media } from "@/src/server/models/media";
 import type {
   Order,
@@ -40,6 +49,69 @@ export function toDomainMedia(row: PrismaMedia): Media {
     width: row.width,
     height: row.height,
     storageProvider: row.storageProvider,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function toDomainHomepageBanner(row: PrismaHomepageBanner): HomepageBanner {
+  return {
+    id: row.id,
+    title: row.title,
+    subtitle: row.subtitle,
+    imageMediaId: row.imageMediaId,
+    mobileImageMediaId: row.mobileImageMediaId,
+    linkUrl: row.linkUrl,
+    linkLabel: row.linkLabel,
+    sortOrder: row.sortOrder,
+    isActive: row.isActive,
+    startsAt: row.startsAt ? row.startsAt.toISOString() : null,
+    endsAt: row.endsAt ? row.endsAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function toDomainHomepageBannerWithMedia(
+  row: PrismaHomepageBanner & {
+    imageMedia: PrismaMedia;
+    mobileImageMedia: PrismaMedia | null;
+  },
+): HomepageBannerWithMedia {
+  return {
+    ...toDomainHomepageBanner(row),
+    imageUrl: row.imageMedia.url,
+    imageAltText: row.imageMedia.altText,
+    mobileImageUrl: row.mobileImageMedia?.url ?? null,
+    mobileImageAltText: row.mobileImageMedia?.altText ?? null,
+  };
+}
+
+export function toDomainHomepageSection(
+  row: PrismaHomepageSection,
+): HomepageSection {
+  return {
+    id: row.id,
+    key: row.key,
+    title: row.title,
+    subtitle: row.subtitle,
+    description: row.description,
+    sortOrder: row.sortOrder,
+    isActive: row.isActive,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function toDomainHomepageContent(
+  row: PrismaHomepageContent,
+): HomepageContent {
+  return {
+    id: row.id,
+    key: row.key,
+    value: row.value,
+    contentType: row.contentType,
+    isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

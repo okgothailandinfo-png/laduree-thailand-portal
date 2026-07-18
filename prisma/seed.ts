@@ -365,13 +365,119 @@ async function seedPickupSlots(boutiqueIds: string[]) {
   }
 }
 
+async function seedHomepageCms() {
+  const sections = [
+    {
+      id: "66666666-6666-4666-8666-666666666601",
+      key: "announcement",
+      title: "Announcement",
+      subtitle: null as string | null,
+      description: null as string | null,
+      sortOrder: 1,
+      isActive: true,
+    },
+    {
+      id: "66666666-6666-4666-8666-666666666602",
+      key: "chef_recommendation",
+      title: "Recommended",
+      subtitle: null as string | null,
+      description: null as string | null,
+      sortOrder: 2,
+      isActive: true,
+    },
+    {
+      id: "66666666-6666-4666-8666-666666666603",
+      key: "catalog",
+      title: "Menu",
+      subtitle: null as string | null,
+      description: null as string | null,
+      sortOrder: 3,
+      isActive: true,
+    },
+  ];
+
+  for (const section of sections) {
+    await prisma.homepageSection.upsert({
+      where: { key: section.key },
+      create: section,
+      update: {
+        title: section.title,
+        subtitle: section.subtitle,
+        description: section.description,
+        sortOrder: section.sortOrder,
+        isActive: section.isActive,
+      },
+    });
+  }
+
+  const contentRows = [
+    {
+      id: "77777777-7777-4777-8777-777777777701",
+      key: "brand.display_name",
+      value: "[CONTENT PENDING APPROVAL]",
+      contentType: "plain_text" as const,
+      isActive: true,
+    },
+    {
+      id: "77777777-7777-4777-8777-777777777702",
+      key: "announcement.greeting",
+      value: "Dear Valued Ladurée Customers",
+      contentType: "plain_text" as const,
+      isActive: true,
+    },
+    {
+      id: "77777777-7777-4777-8777-777777777703",
+      key: "announcement.body",
+      value: "[CONTENT PENDING APPROVAL]",
+      contentType: "multiline_text" as const,
+      isActive: true,
+    },
+    {
+      id: "77777777-7777-4777-8777-777777777704",
+      key: "announcement.summary_title",
+      value: "[CONTENT PENDING APPROVAL]",
+      contentType: "plain_text" as const,
+      isActive: true,
+    },
+    {
+      id: "77777777-7777-4777-8777-777777777705",
+      key: "announcement.closing",
+      value: "Thank you for your support and understanding!",
+      contentType: "plain_text" as const,
+      isActive: true,
+    },
+    {
+      id: "77777777-7777-4777-8777-777777777706",
+      key: "catalog.default_section_description",
+      value: "[CONTENT PENDING APPROVAL]",
+      contentType: "plain_text" as const,
+      isActive: true,
+    },
+  ];
+
+  for (const row of contentRows) {
+    await prisma.homepageContent.upsert({
+      where: { key: row.key },
+      create: row,
+      update: {
+        value: row.value,
+        contentType: row.contentType,
+        isActive: row.isActive,
+      },
+    });
+  }
+}
+
 async function main() {
   console.log("Seeding development placeholder data…");
   const categoryIds = await seedCategories();
   await seedProducts(categoryIds);
   const boutiqueIds = await seedBoutiques();
   await seedPickupSlots(boutiqueIds);
-  console.log("Seed complete (categories, products, images, boutiques, slots).");
+  await seedHomepageCms();
+  console.log(
+    "Seed complete (categories, products, images, boutiques, slots, homepage CMS).",
+  );
 }
 
 main()

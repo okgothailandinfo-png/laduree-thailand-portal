@@ -98,12 +98,80 @@ model Media {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  productImages ProductImage[]
+  productImages       ProductImage[]
+  bannerDesktopImages HomepageBanner[] @relation("BannerDesktopImage")
+  bannerMobileImages  HomepageBanner[] @relation("BannerMobileImage")
 
   @@index([isActive])
   @@index([createdAt])
   @@index([url])
   @@index([storageProvider])
+}
+
+enum HomepageContentType {
+  plain_text
+  multiline_text
+  url
+  boolean
+}
+
+/// Homepage hero / promotional banner. Images reference Media (no duplicated URLs).
+model HomepageBanner {
+  id                 String    @id @default(uuid()) @db.Uuid
+  title              String
+  subtitle           String?
+  imageMediaId       String    @db.Uuid
+  mobileImageMediaId String?   @db.Uuid
+  linkUrl            String?
+  linkLabel          String?
+  sortOrder          Int       @default(0)
+  isActive           Boolean   @default(true)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  imageMedia       Media  @relation("BannerDesktopImage", fields: [imageMediaId], references: [id], onDelete: Restrict)
+  mobileImageMedia Media? @relation("BannerMobileImage", fields: [mobileImageMediaId], references: [id], onDelete: Restrict)
+
+  @@index([sortOrder])
+  @@index([isActive])
+  @@index([startsAt])
+  @@index([endsAt])
+  @@index([imageMediaId])
+  @@index([mobileImageMediaId])
+  @@index([isActive, sortOrder])
+}
+
+/// Configurable homepage section metadata (titles, visibility, order).
+model HomepageSection {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  title       String?
+  subtitle    String?
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@index([isActive])
+  @@index([isActive, sortOrder])
+}
+
+/// Keyed homepage content values (announcement, intro, etc.). No HTML.
+model HomepageContent {
+  id          String              @id @default(uuid()) @db.Uuid
+  key         String              @unique
+  value       String
+  contentType HomepageContentType
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([isActive])
+  @@index([contentType])
 }
 
 model ProductImage {

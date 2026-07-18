@@ -1,15 +1,25 @@
 import type {
+  AdminBannerDto,
+  AdminBannerListResult,
   AdminCategoryDetailDto,
   AdminCategoryListResult,
+  AdminCreateBannerInput,
   AdminCreateCategoryInput,
+  AdminCreateHomepageContentInput,
+  AdminCreateHomepageSectionInput,
   AdminCreateMediaInput,
   AdminCreateProductInput,
+  AdminHomepageContentDto,
+  AdminHomepageSectionDto,
   AdminMediaDto,
   AdminMediaListResult,
   AdminMediaUploadResult,
   AdminProductDetailDto,
   AdminProductListResult,
+  AdminUpdateBannerInput,
   AdminUpdateCategoryInput,
+  AdminUpdateHomepageContentInput,
+  AdminUpdateHomepageSectionInput,
   AdminUpdateProductInput,
 } from "@/src/server/admin/dto";
 
@@ -219,6 +229,113 @@ export function uploadAdminMedia(input: {
 
 export function deleteAdminMedia(id: string): Promise<{ deleted: boolean }> {
   return adminFetch(`/api/admin/media/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchAdminBanners(params: {
+  search?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AdminBannerListResult> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.status) query.set("status", params.status);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 10));
+  return adminFetch(`/api/admin/banners?${query.toString()}`);
+}
+
+export function fetchAdminBanner(id: string): Promise<AdminBannerDto> {
+  return adminFetch(`/api/admin/banners/${encodeURIComponent(id)}`);
+}
+
+export function createAdminBanner(
+  input: AdminCreateBannerInput,
+): Promise<AdminBannerDto> {
+  return adminFetch(`/api/admin/banners`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminBanner(
+  id: string,
+  input: AdminUpdateBannerInput,
+): Promise<AdminBannerDto> {
+  return adminFetch(`/api/admin/banners/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminBanner(id: string): Promise<{ deleted: boolean }> {
+  return adminFetch(`/api/admin/banners/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchAdminHomepageSections(): Promise<
+  AdminHomepageSectionDto[]
+> {
+  return adminFetch(`/api/admin/homepage/sections`);
+}
+
+export function createAdminHomepageSection(
+  input: AdminCreateHomepageSectionInput,
+): Promise<AdminHomepageSectionDto> {
+  return adminFetch(`/api/admin/homepage/sections`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminHomepageSection(
+  id: string,
+  input: AdminUpdateHomepageSectionInput,
+): Promise<AdminHomepageSectionDto> {
+  return adminFetch(`/api/admin/homepage/sections/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminHomepageSection(
+  id: string,
+): Promise<{ deleted: boolean }> {
+  return adminFetch(`/api/admin/homepage/sections/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchAdminHomepageContent(): Promise<AdminHomepageContentDto[]> {
+  return adminFetch(`/api/admin/homepage/content`);
+}
+
+export function createAdminHomepageContent(
+  input: AdminCreateHomepageContentInput,
+): Promise<AdminHomepageContentDto> {
+  return adminFetch(`/api/admin/homepage/content`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminHomepageContent(
+  id: string,
+  input: AdminUpdateHomepageContentInput,
+): Promise<AdminHomepageContentDto> {
+  return adminFetch(`/api/admin/homepage/content/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminHomepageContent(
+  id: string,
+): Promise<{ deleted: boolean }> {
+  return adminFetch(`/api/admin/homepage/content/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }

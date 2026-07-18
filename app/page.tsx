@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import CatalogStatus from "./catalog/CatalogStatus";
 import { useAsyncResource } from "./catalog/useAsyncResource";
 import DesktopCartAside from "./cart/DesktopCartAside";
@@ -12,7 +12,16 @@ import {
   fetchProducts,
   formatPriceThb,
 } from "@/lib/api/catalog";
-import type { Category, ProductSummary } from "@/lib/api/types";
+import {
+  contentByKey,
+  fetchHomepage,
+  sectionByKey,
+} from "@/lib/api/homepage";
+import type {
+  Category,
+  HomepageBanner,
+  ProductSummary,
+} from "@/lib/api/types";
 
 type CatalogSection = {
   id: string;
@@ -20,6 +29,87 @@ type CatalogSection = {
   title: string;
   products: ProductSummary[];
 };
+
+const CONTENT_PENDING = "[CONTENT PENDING APPROVAL]";
+
+type HeroSlide = {
+  id: string;
+  desktopSrc: string;
+  mobileSrc: string;
+  alt: string;
+  linkUrl: string | null;
+};
+
+/** Safe empty-banner shell — existing placeholders only, no invented copy. */
+const FALLBACK_HERO_SLIDE: HeroSlide = {
+  id: "fallback-banner",
+  desktopSrc: "/hero-placeholder-desktop.svg",
+  mobileSrc: "/hero-placeholder-mobile.svg",
+  alt: "",
+  linkUrl: null,
+};
+
+function isSafeHref(href: string): boolean {
+  const lower = href.toLowerCase();
+  if (
+    lower.startsWith("javascript:") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("vbscript:")
+  ) {
+    return false;
+  }
+  if (href.startsWith("/") && !href.startsWith("//")) return true;
+  try {
+    const parsed = new URL(href);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function BannerSlideLink({
+  href,
+  children,
+}: {
+  href: string | null;
+  children: ReactNode;
+}) {
+  if (!href || !isSafeHref(href)) {
+    return (
+      <a href="" onClick={(e) => e.preventDefault()}>
+        {children}
+      </a>
+    );
+  }
+  if (href.startsWith("/") && !href.startsWith("//")) {
+    return <Link href={href}>{children}</Link>;
+  }
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+function bannersToSlides(banners: HomepageBanner[]): HeroSlide[] {
+  if (banners.length === 0) return [FALLBACK_HERO_SLIDE];
+  return banners.map((banner) => ({
+    id: banner.id,
+    desktopSrc: banner.imageUrl,
+    mobileSrc: banner.mobileImageUrl || banner.imageUrl,
+    alt: banner.altText ?? banner.title,
+    linkUrl: banner.linkUrl,
+  }));
+}
+
+function multilineParagraphs(value: string | null): string[] {
+  if (!value) return [CONTENT_PENDING];
+  const parts = value
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : [CONTENT_PENDING];
+}
 
 function buildCatalogSections(
   categories: Category[],
@@ -97,19 +187,6 @@ function CartIcon() {
   );
 }
 
-/**
- * Home banner slider shell — Singapore structure (laduree.sg #main-slide).
- * Thailand banner assets pending approval; grey placeholders until then.
- */
-const HOME_SLIDES = [
-  { id: "banner-1" },
-  { id: "banner-2" },
-  { id: "banner-3" },
-  { id: "banner-4" },
-  { id: "banner-5" },
-  { id: "banner-6" },
-] as const;
-
 const HOME_SLIDER_AUTOPLAY_MS = 5000;
 const HOME_SLIDER_SPEED_MS = 500;
 
@@ -148,6 +225,16 @@ export default function Home() {
     },
   );
 
+  const homepage = useAsyncResource(
+    async (signal) => fetchHomepage({ signal }),
+    {
+      isEmpty: (data) =>
+        data.banners.length === 0 &&
+        data.sections.length === 0 &&
+        data.content.length === 0,
+    },
+  );
+
   const menuCategories = catalog.data?.categories ?? [];
   const catalogSections = useMemo(
     () =>
@@ -157,6 +244,37 @@ export default function Home() {
       ),
     [catalog.data],
   );
+
+  const heroSlides = useMemo(() => {
+    if (homepage.status === "success" || homepage.status === "empty") {
+      return bannersToSlides(homepage.data?.banners ?? []);
+    }
+    return [] as HeroSlide[];
+  }, [homepage.status, homepage.data]);
+
+  const homepageContent = homepage.data?.content ?? [];
+  const homepageSections = homepage.data?.sections ?? [];
+  const brandDisplayName =
+    contentByKey(homepageContent, "brand.display_name") ?? CONTENT_PENDING;
+  const announcementGreeting =
+    contentByKey(homepageContent, "announcement.greeting") ??
+    "Dear Valued Ladurée Customers";
+  const announcementParagraphs = multilineParagraphs(
+    contentByKey(homepageContent, "announcement.body"),
+  );
+  const announcementSummaryTitle =
+    contentByKey(homepageContent, "announcement.summary_title") ??
+    CONTENT_PENDING;
+  const announcementClosing =
+    contentByKey(homepageContent, "announcement.closing") ??
+    "Thank you for your support and understanding!";
+  const chefStarBlurb =
+    contentByKey(homepageContent, "homepage.chef_star_blurb") ??
+    sectionByKey(homepageSections, "chef_recommendation")?.description ??
+    null;
+  const defaultSectionDescription =
+    contentByKey(homepageContent, "catalog.default_section_description") ??
+    CONTENT_PENDING;
 
   const resolvedActiveCategoryId =
     activeCategoryId ?? catalogSections[0]?.id ?? null;
@@ -184,13 +302,16 @@ export default function Home() {
     };
   }, [mobileMenuOpen]);
 
+  const activeHeroIndex =
+    heroSlides.length > 0 ? activeSlide % heroSlides.length : 0;
+
   useEffect(() => {
-    if (sliderPaused || HOME_SLIDES.length <= 1) return;
+    if (sliderPaused || heroSlides.length <= 1) return;
     const timer = window.setInterval(() => {
-      setActiveSlide((current) => (current + 1) % HOME_SLIDES.length);
+      setActiveSlide((current) => (current + 1) % heroSlides.length);
     }, HOME_SLIDER_AUTOPLAY_MS);
     return () => window.clearInterval(timer);
-  }, [sliderPaused]);
+  }, [sliderPaused, heroSlides.length]);
 
   useEffect(() => {
     if (FOOTER_SLIDES.length <= 1) return;
@@ -229,7 +350,9 @@ export default function Home() {
                       window.location.href = "/";
                     }}
                   >
-                    [CONTENT PENDING APPROVAL]
+                    {homepage.status === "error"
+                      ? CONTENT_PENDING
+                      : brandDisplayName}
                   </h1>
                   <div className="header-member">
                     <a
@@ -545,84 +668,96 @@ export default function Home() {
       <main className="home-main">
         <section id="main-slide" className="block slider-block">
           <div className="container-fluid">
-            <div
-              className="slider slider-1 home-page-slider slick-initialized slick-slider"
-              data-slider="home-slider"
-              onMouseEnter={() => setSliderPaused(true)}
-              onMouseLeave={() => setSliderPaused(false)}
-              onTouchStart={(event) => {
-                touchStartX.current = event.changedTouches[0]?.clientX ?? null;
-                setSliderPaused(true);
-              }}
-              onTouchEnd={(event) => {
-                const startX = touchStartX.current;
-                const endX = event.changedTouches[0]?.clientX;
-                touchStartX.current = null;
-                setSliderPaused(false);
-                if (startX == null || endX == null) return;
-                const delta = endX - startX;
-                if (Math.abs(delta) < 40) return;
-                setActiveSlide((current) =>
-                  delta < 0
-                    ? (current + 1) % HOME_SLIDES.length
-                    : (current - 1 + HOME_SLIDES.length) % HOME_SLIDES.length,
-                );
-              }}
-            >
-              <div className="slick-list draggable" aria-live="polite">
-                <div
-                  className="slick-track"
-                  style={{
-                    transform: `translate3d(-${activeSlide * 100}%, 0, 0)`,
-                    transition: `transform ${HOME_SLIDER_SPEED_MS}ms ease`,
-                  }}
-                >
-                  {HOME_SLIDES.map((slide, index) => (
-                    <div
-                      key={slide.id}
-                      className={`slide slick-slide${index === activeSlide ? " slick-current slick-active" : ""}`}
-                      data-slick-index={index}
-                      aria-hidden={index !== activeSlide}
-                    >
-                      <a href="" onClick={(e) => e.preventDefault()}>
-                        <picture>
-                          <source
-                            media="(max-width: 767px)"
-                            srcSet="/hero-placeholder-mobile.svg"
-                          />
-                          <img
-                            className="asyncImage img-responsive-1"
-                            src="/hero-placeholder-desktop.svg"
-                            alt=""
-                          />
-                        </picture>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <ul className="slick-dots" role="tablist">
-                {HOME_SLIDES.map((slide, index) => (
-                  <li
-                    key={slide.id}
-                    className={index === activeSlide ? "slick-active" : undefined}
-                    role="presentation"
+            {homepage.status === "loading" || homepage.status === "error" ? (
+              <CatalogStatus
+                status={homepage.status === "loading" ? "loading" : "error"}
+                errorMessage={homepage.errorMessage}
+                emptyMessage="No banners available."
+                onRetry={homepage.reload}
+              />
+            ) : (
+              <div
+                className="slider slider-1 home-page-slider slick-initialized slick-slider"
+                data-slider="home-slider"
+                onMouseEnter={() => setSliderPaused(true)}
+                onMouseLeave={() => setSliderPaused(false)}
+                onTouchStart={(event) => {
+                  touchStartX.current =
+                    event.changedTouches[0]?.clientX ?? null;
+                  setSliderPaused(true);
+                }}
+                onTouchEnd={(event) => {
+                  const startX = touchStartX.current;
+                  const endX = event.changedTouches[0]?.clientX;
+                  touchStartX.current = null;
+                  setSliderPaused(false);
+                  if (startX == null || endX == null) return;
+                  const delta = endX - startX;
+                  if (Math.abs(delta) < 40) return;
+                  setActiveSlide((current) =>
+                    delta < 0
+                      ? (current + 1) % heroSlides.length
+                      : (current - 1 + heroSlides.length) % heroSlides.length,
+                  );
+                }}
+              >
+                <div className="slick-list draggable" aria-live="polite">
+                  <div
+                    className="slick-track"
+                    style={{
+                      transform: `translate3d(-${activeHeroIndex * 100}%, 0, 0)`,
+                      transition: `transform ${HOME_SLIDER_SPEED_MS}ms ease`,
+                    }}
                   >
-                    <button
-                      type="button"
-                      data-role="none"
-                      role="tab"
-                      aria-label={`${index + 1}`}
-                      aria-selected={index === activeSlide}
-                      tabIndex={0}
-                      onClick={() => setActiveSlide(index)}
+                    {heroSlides.map((slide, index) => (
+                      <div
+                        key={slide.id}
+                        className={`slide slick-slide${index === activeHeroIndex ? " slick-current slick-active" : ""}`}
+                        data-slick-index={index}
+                        aria-hidden={index !== activeHeroIndex}
+                      >
+                        <BannerSlideLink href={slide.linkUrl}>
+                          <picture>
+                            <source
+                              media="(max-width: 767px)"
+                              srcSet={slide.mobileSrc}
+                            />
+                            <img
+                              className="asyncImage img-responsive-1"
+                              src={slide.desktopSrc}
+                              alt={slide.alt}
+                            />
+                          </picture>
+                        </BannerSlideLink>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <ul className="slick-dots" role="tablist">
+                  {heroSlides.map((slide, index) => (
+                    <li
+                      key={slide.id}
+                      className={
+                        index === activeHeroIndex ? "slick-active" : undefined
+                      }
+                      role="presentation"
                     >
-                      {index + 1}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                      <button
+                        type="button"
+                        data-role="none"
+                        role="tab"
+                        aria-label={`${index + 1}`}
+                        aria-selected={index === activeHeroIndex}
+                        tabIndex={0}
+                        onClick={() => setActiveSlide(index)}
+                      >
+                        {index + 1}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 
@@ -683,101 +818,97 @@ export default function Home() {
                   className={`announcement-section${announcementExpanded ? " readmore" : ""}`}
                 >
                   <div className="col-xs-12">
-                    <div className="announcement-content">
-                      <p>
-                        <span className="announcement-body-text">
-                          <em>Dear Valued Ladurée Customers</em>,
-                        </span>
-                      </p>
-                      <p>
-                        <span className="announcement-body-text">
-                          [CONTENT PENDING APPROVAL]
-                        </span>
-                      </p>
-                      <p>
-                        <span className="announcement-body-text">
-                          [CONTENT PENDING APPROVAL]
-                        </span>
-                      </p>
-                      <p>
-                        <span className="announcement-body-text">
-                          [CONTENT PENDING APPROVAL]
-                        </span>
-                      </p>
-                      <div>
-                        <hr className="announcement-divider" />
-                        <p className="announcement-summary-title">
-                          <strong>[CONTENT PENDING APPROVAL]</strong>
-                        </p>
-                        <div className="announcement-table-wrap">
-                          <table className="announcement-delivery-table">
-                            <tbody>
-                              <tr>
-                                <td>
-                                  <strong>
-                                    Purchase Value
-                                    <br />
-                                    (with VAT)
-                                  </strong>
-                                </td>
-                                <td>
-                                  <strong>Weekdays</strong>
-                                </td>
-                                <td>
-                                  <strong>
-                                    Weekends /
-                                    <br />
-                                    Special Occasions
-                                  </strong>
-                                </td>
-                              </tr>
-                              <tr>
-                                <td>[CONTENT PENDING APPROVAL]</td>
-                                <td>[CONTENT PENDING APPROVAL]</td>
-                                <td>[CONTENT PENDING APPROVAL]</td>
-                              </tr>
-                              <tr>
-                                <td>[CONTENT PENDING APPROVAL]</td>
-                                <td>[CONTENT PENDING APPROVAL]</td>
-                                <td>[CONTENT PENDING APPROVAL]</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                      <p>
-                        <span className="announcement-body-text">
-                          [CONTENT PENDING APPROVAL]
-                        </span>
-                      </p>
-                      <p>
-                        <span className="announcement-body-text">
-                          [CONTENT PENDING APPROVAL]
-                        </span>
-                      </p>
-                      <p>
-                        <span className="announcement-body-text">
-                          Thank you for your support and understanding!
-                        </span>
-                      </p>
-                    </div>
-                    <div
-                      className="view-actions"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() =>
-                        setAnnouncementExpanded((open) => !open)
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setAnnouncementExpanded((open) => !open);
+                    {homepage.status === "loading" ||
+                    homepage.status === "error" ? (
+                      <CatalogStatus
+                        status={
+                          homepage.status === "loading" ? "loading" : "error"
                         }
-                      }}
-                    >
-                      <span className="view-more">View more</span>
-                      <span className="view-less">View less</span>
-                    </div>
+                        errorMessage={homepage.errorMessage}
+                        emptyMessage="No announcement content."
+                        onRetry={homepage.reload}
+                      />
+                    ) : (
+                      <>
+                        <div className="announcement-content">
+                          <p>
+                            <span className="announcement-body-text">
+                              <em>{announcementGreeting}</em>,
+                            </span>
+                          </p>
+                          {announcementParagraphs.map((paragraph, index) => (
+                            <p key={`announcement-p-${index}`}>
+                              <span className="announcement-body-text">
+                                {paragraph}
+                              </span>
+                            </p>
+                          ))}
+                          <div>
+                            <hr className="announcement-divider" />
+                            <p className="announcement-summary-title">
+                              <strong>{announcementSummaryTitle}</strong>
+                            </p>
+                            <div className="announcement-table-wrap">
+                              <table className="announcement-delivery-table">
+                                <tbody>
+                                  <tr>
+                                    <td>
+                                      <strong>
+                                        Purchase Value
+                                        <br />
+                                        (with VAT)
+                                      </strong>
+                                    </td>
+                                    <td>
+                                      <strong>Weekdays</strong>
+                                    </td>
+                                    <td>
+                                      <strong>
+                                        Weekends /
+                                        <br />
+                                        Special Occasions
+                                      </strong>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td>{CONTENT_PENDING}</td>
+                                    <td>{CONTENT_PENDING}</td>
+                                    <td>{CONTENT_PENDING}</td>
+                                  </tr>
+                                  <tr>
+                                    <td>{CONTENT_PENDING}</td>
+                                    <td>{CONTENT_PENDING}</td>
+                                    <td>{CONTENT_PENDING}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          <p>
+                            <span className="announcement-body-text">
+                              {announcementClosing}
+                            </span>
+                          </p>
+                        </div>
+                        <div
+                          className="view-actions"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() =>
+                            setAnnouncementExpanded((open) => !open)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setAnnouncementExpanded((open) => !open);
+                            }
+                          }}
+                        >
+                          <span className="view-more">View more</span>
+                          <span className="view-less">View less</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </section>
 
@@ -814,11 +945,20 @@ export default function Home() {
                     className="full-menu-block style-1 description-by-recommended"
                   >
                     <div className="group-title">
-                      Items with star{" "}
-                      <i className="fa fa-star color-by-star" aria-hidden="true">
-                        ★
-                      </i>{" "}
-                      are recommended by our chef and patrons
+                      {chefStarBlurb ? (
+                        chefStarBlurb
+                      ) : (
+                        <>
+                          Items with star{" "}
+                          <i
+                            className="fa fa-star color-by-star"
+                            aria-hidden="true"
+                          >
+                            ★
+                          </i>{" "}
+                          are recommended by our chef and patrons
+                        </>
+                      )}
                     </div>
                   </section>
 
@@ -864,7 +1004,17 @@ export default function Home() {
                             />
                           </h2>
                           <div className="desc text-clamp-overflow">
-                            <p>[CONTENT PENDING APPROVAL]</p>
+                            <p>
+                              {contentByKey(
+                                homepageContent,
+                                `catalog.${section.id}.description`,
+                              ) ??
+                                sectionByKey(
+                                  homepageSections,
+                                  `catalog.${section.id}`,
+                                )?.description ??
+                                defaultSectionDescription}
+                            </p>
                           </div>
                         </div>
 

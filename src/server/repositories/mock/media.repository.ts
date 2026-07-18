@@ -40,4 +40,8 @@ export class MockMediaRepository implements MediaRepository {
   async countProductLinks(): Promise<number> {
     return 0;
   }
+
+  async countBannerLinks(): Promise<number> {
+    return 0;
+  }
 }

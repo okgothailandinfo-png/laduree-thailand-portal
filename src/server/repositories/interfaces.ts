@@ -1,17 +1,29 @@
 import type {
+  AdminBannerListQuery,
   AdminCategoryListQuery,
+  AdminCreateBannerInput,
   AdminCreateCategoryInput,
+  AdminCreateHomepageContentInput,
+  AdminCreateHomepageSectionInput,
   AdminCreateMediaInput,
   AdminCreateProductInput,
   AdminMediaListQuery,
   AdminProductListQuery,
+  AdminUpdateBannerInput,
   AdminUpdateCategoryInput,
+  AdminUpdateHomepageContentInput,
+  AdminUpdateHomepageSectionInput,
   AdminUpdateMediaInput,
   AdminUpdateProductInput,
 } from "@/src/server/admin/dto";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Cart } from "@/src/server/models/cart";
 import type { Category } from "@/src/server/models/category";
+import type {
+  HomepageBannerWithMedia,
+  HomepageContent,
+  HomepageSection,
+} from "@/src/server/models/homepage";
 import type { Media } from "@/src/server/models/media";
 import type { Order, OrderStatus } from "@/src/server/models/order";
 import type {
@@ -44,6 +56,11 @@ export type AdminCategoryListPage = {
 
 export type AdminMediaListPage = {
   items: Media[];
+  total: number;
+};
+
+export type AdminBannerListPage = {
+  items: HomepageBannerWithMedia[];
   total: number;
 };
 
@@ -80,6 +97,46 @@ export interface MediaRepository {
   update(id: string, input: AdminUpdateMediaInput): Promise<Media>;
   remove(id: string): Promise<void>;
   countProductLinks(mediaId: string): Promise<number>;
+  countBannerLinks(mediaId: string): Promise<number>;
+}
+
+export interface HomepageBannerRepository {
+  adminList(query: AdminBannerListQuery): Promise<AdminBannerListPage>;
+  findById(id: string): Promise<HomepageBannerWithMedia | null>;
+  create(input: AdminCreateBannerInput): Promise<HomepageBannerWithMedia>;
+  update(
+    id: string,
+    input: AdminUpdateBannerInput,
+  ): Promise<HomepageBannerWithMedia>;
+  remove(id: string): Promise<void>;
+  /** Storefront: active banners within schedule window, ordered by sortOrder. */
+  listActiveForStorefront(now: Date): Promise<HomepageBannerWithMedia[]>;
+}
+
+export interface HomepageSectionRepository {
+  adminList(): Promise<HomepageSection[]>;
+  findById(id: string): Promise<HomepageSection | null>;
+  findByKey(key: string): Promise<HomepageSection | null>;
+  create(input: AdminCreateHomepageSectionInput): Promise<HomepageSection>;
+  update(
+    id: string,
+    input: AdminUpdateHomepageSectionInput,
+  ): Promise<HomepageSection>;
+  remove(id: string): Promise<void>;
+  listActiveForStorefront(): Promise<HomepageSection[]>;
+}
+
+export interface HomepageContentRepository {
+  adminList(): Promise<HomepageContent[]>;
+  findById(id: string): Promise<HomepageContent | null>;
+  findByKey(key: string): Promise<HomepageContent | null>;
+  create(input: AdminCreateHomepageContentInput): Promise<HomepageContent>;
+  update(
+    id: string,
+    input: AdminUpdateHomepageContentInput,
+  ): Promise<HomepageContent>;
+  remove(id: string): Promise<void>;
+  listActiveForStorefront(): Promise<HomepageContent[]>;
 }
 
 export interface BoutiqueRepository {
@@ -115,6 +172,9 @@ export type RepositoryBundle = {
   products: ProductRepository;
   categories: CategoryRepository;
   media: MediaRepository;
+  homepageBanners: HomepageBannerRepository;
+  homepageSections: HomepageSectionRepository;
+  homepageContent: HomepageContentRepository;
   boutiques: BoutiqueRepository;
   pickup: PickupRepository;
   orders: OrderRepository;
