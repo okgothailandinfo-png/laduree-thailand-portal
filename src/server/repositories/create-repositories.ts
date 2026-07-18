@@ -31,11 +31,16 @@ function createMockRepositories(): RepositoryBundle {
 
 function createPrismaRepositories(): RepositoryBundle {
   return {
+    // Catalog + ops persistence (Admin CMS + storefront reads).
     products: new PrismaProductRepository(),
     categories: new PrismaCategoryRepository(),
     boutiques: new PrismaBoutiqueRepository(),
     pickup: new PrismaPickupRepository(),
     orders: new PrismaOrderRepository(),
+    // Intentionally in-memory until dedicated Prisma models exist:
+    // - Cart has no Prisma model yet
+    // - Gateway PaymentRepository is separate from checkout PaymentRecord
+    // - Webhook event store is replaceable later
     carts: new MockCartRepository(),
     payments: new MockPaymentRepository(),
     webhookEvents: new MockWebhookEventRepository(),
@@ -44,6 +49,7 @@ function createPrismaRepositories(): RepositoryBundle {
 
 /**
  * Selects mock or Prisma repository implementations from DATA_SOURCE.
+ * Admin Product/Category CRUD requires DATA_SOURCE=prisma.
  * See docs/backend-repositories.md for selection rules.
  */
 export function createRepositories(): RepositoryBundle {

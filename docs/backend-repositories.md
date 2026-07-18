@@ -99,10 +99,20 @@ npm run db:seed
 # 7. Smoke checks
 npm run smoke:repos
 npm run smoke:api
+npm run smoke:admin
 
 # 8. App
 npm run dev
 ```
+
+### Admin CMS runtime
+
+Admin Product/Category CRUD uses Prisma repositories when `DATA_SOURCE=prisma`.
+
+- Updates accept **PUT** and **PATCH** on `/api/admin/products/[id]` and `/api/admin/categories/[id]`
+- Admin writes refuse mock mode (`CONFIG_ERROR`) — never silently write to mock data
+- Mock admin session cookie remains a non-production placeholder
+- Cart / gateway payment / webhook event stores stay in-memory until dedicated Prisma models exist
 
 ### Useful scripts
 
@@ -117,6 +127,7 @@ npm run dev
 | `db:seed` | `prisma db seed` → `prisma/seed.ts` |
 | `smoke:repos` | repository/service smoke |
 | `smoke:api` | route-handler smoke |
+| `smoke:admin` | admin auth + catalog CRUD smoke |
 
 ## Seed data notes
 
@@ -165,20 +176,28 @@ Invokes route handlers directly (no HTTP server):
 
 Asserts status codes, `{ success, data }` / `{ success:false, error }` envelopes, and DTO-shaped payloads (no raw Prisma client leakage).
 
+### Admin smoke — `npm run smoke:admin`
+
+- Unauthenticated admin product/category APIs → `401`
+- Storefront `/api/products` + `/api/categories` + `/api/products/[slug]` remain compatible
+- Mock mode: admin catalog operations return `CONFIG_ERROR`
+- Prisma mode: create/update/list/search, duplicate slug/SKU conflict, category-with-products delete conflict, product delete
+
 ## Runtime verification status
 
-As of Sprint 12C in this agent environment:
+As of Sprint 16C in this agent environment:
 
-- PostgreSQL client/server tools were **not** available (`psql` / Docker missing, no `.env`)
-- Migration apply / seed / Prisma smoke against a live DB remain **pending** on a machine with local Postgres
-- Mock `smoke:repos` and `smoke:api` are expected to pass without a database
+- PostgreSQL / Docker were **not** available here (port 5432 closed, no `.env`)
+- Live Prisma migrate/seed/admin CRUD against Postgres remain **pending** on a machine with local Postgres
+- Mock `smoke:repos`, `smoke:api`, and `smoke:admin` are expected to pass without a database
 
 ## Remaining production tasks / risks
 
 - Replace development seed with owner-approved Thailand catalog, prices, boutique ops, and hours
 - Product modifier groups not persisted in Prisma yet
-- No `isActive` flags on Category/Boutique
+- Binary image upload not implemented (URL-based images only)
+- Real admin authentication provider not implemented (mock session only)
+- Cart / gateway payment / webhook event persistence still in-memory under `DATA_SOURCE=prisma`
 - Pickup reservation counts not decremented on order create
 - Payment gateway not implemented (mock payment status only)
-- Frontend still defaults to client-side mock state (not yet wired to these APIs)
 - Production must set `DATA_SOURCE` explicitly
