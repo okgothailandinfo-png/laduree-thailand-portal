@@ -11,8 +11,11 @@ import { DefaultCheckoutService } from "@/src/server/services/checkout.service";
 import { DefaultOrderService } from "@/src/server/services/order.service";
 import { DefaultPickupService } from "@/src/server/services/pickup.service";
 import { DefaultProductService } from "@/src/server/services/product.service";
+import { createStorageProvider } from "@/src/server/storage/factory";
+import { StorageService } from "@/src/server/storage/storage-service";
 
 const repositories = createRepositories();
+const storageService = new StorageService(createStorageProvider());
 
 export const productService = new DefaultProductService(repositories.products);
 export const categoryService = new DefaultCategoryService(
@@ -57,4 +60,7 @@ export const adminCategoryService = new AdminCategoryService(
   repositories.categories,
   repositories.products,
 );
-export const adminMediaService = new AdminMediaService(repositories.media);
+export const adminMediaService = new AdminMediaService(
+  repositories.media,
+  storageService,
+);

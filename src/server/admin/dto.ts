@@ -6,8 +6,28 @@ export type AdminMediaDto = {
   altText: string | null;
   title: string | null;
   isActive: boolean;
+  originalFileName: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  width: number | null;
+  height: number | null;
+  storageProvider: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+/** Response from POST /api/admin/media/upload */
+export type AdminMediaUploadResult = {
+  mediaId: string;
+  url: string;
+  fileName: string;
+  originalFileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
 };
 
 export type AdminMediaListQuery = {
@@ -30,6 +50,14 @@ export type AdminCreateMediaInput = {
   altText?: string | null;
   title?: string | null;
   isActive: boolean;
+  /** Upload metadata — omitted for URL-only create. */
+  originalFileName?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  storageProvider?: string | null;
 };
 
 export type AdminUpdateMediaInput = Partial<AdminCreateMediaInput>;

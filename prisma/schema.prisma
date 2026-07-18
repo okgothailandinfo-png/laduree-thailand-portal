@@ -76,23 +76,34 @@ model Product {
   @@index([sortOrder])
 }
 
-/// URL-based media library asset (no binary upload in this sprint).
+/// Media library asset (URL-based and/or binary upload).
 model Media {
-  id        String   @id @default(uuid()) @db.Uuid
+  id               String   @id @default(uuid()) @db.Uuid
   /// Absolute http(s) URL or same-origin relative path.
-  url       String
-  altText   String?
+  url              String
+  altText          String?
   /// Optional CMS label for list/search (operational, not marketing copy).
-  title     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  title            String?
+  isActive         Boolean  @default(true)
+  /// Client-supplied filename before sanitization (upload only).
+  originalFileName String?
+  /// Server-generated storage key / filename (upload only).
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  width            Int?
+  height           Int?
+  /// e.g. "local" for uploaded files; null for URL-only records.
+  storageProvider  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   productImages ProductImage[]
 
   @@index([isActive])
   @@index([createdAt])
   @@index([url])
+  @@index([storageProvider])
 }
 
 model ProductImage {

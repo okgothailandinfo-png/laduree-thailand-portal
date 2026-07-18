@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# Local media uploads (development STORAGE_PROVIDER=local)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
 # debug
 npm-debug.log*
 yarn-debug.log*
