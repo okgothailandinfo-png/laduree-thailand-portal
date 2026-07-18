@@ -2,6 +2,7 @@ import type {
   Boutique as PrismaBoutique,
   Category as PrismaCategory,
   Customer as PrismaCustomer,
+  Media as PrismaMedia,
   Order as PrismaOrder,
   OrderItem as PrismaOrderItem,
   PaymentMethod as PrismaPaymentMethod,
@@ -13,6 +14,7 @@ import type {
 import { env } from "@/src/server/config/env";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Category } from "@/src/server/models/category";
+import type { Media } from "@/src/server/models/media";
 import type {
   Order,
   OrderItem,
@@ -23,6 +25,18 @@ import type { Product } from "@/src/server/models/product";
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
 const DEFAULT_IMAGE = "/product-placeholder.svg";
+
+export function toDomainMedia(row: PrismaMedia): Media {
+  return {
+    id: row.id,
+    url: row.url,
+    altText: row.altText,
+    title: row.title,
+    isActive: row.isActive,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 export function toDomainCategory(row: PrismaCategory): Category {
   return {
@@ -53,6 +67,7 @@ export function toDomainProduct(
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((image) => ({
       id: image.id,
+      mediaId: image.mediaId,
       url: image.url,
       altText: image.altText,
       sortOrder: image.sortOrder,

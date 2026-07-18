@@ -17,6 +17,7 @@ import { GET as getCategories } from "@/app/api/categories/route";
 import { GET as getProductBySlug } from "@/app/api/products/[slug]/route";
 import { GET as getProducts } from "@/app/api/products/route";
 import { AdminCategoryService } from "@/src/server/admin/category.service";
+import { AdminMediaService } from "@/src/server/admin/media.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
 import { getDataSource } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
@@ -134,8 +135,33 @@ async function runPrismaCrud(results: CheckResult[]): Promise<void> {
     repos.products,
     repos.categories,
   );
+  const adminMedia = new AdminMediaService(repos.media);
 
   const stamp = Date.now().toString(36);
+
+  const media = await adminMedia.create({
+    url: `/smoke-media-${stamp}.svg`,
+    altText: "Smoke media",
+    title: `Smoke media ${stamp}`,
+    isActive: true,
+  });
+  results.push({
+    name: "create media",
+    ok: Boolean(media.id),
+    detail: media.id,
+  });
+
+  const mediaList = await adminMedia.list({
+    search: stamp,
+    page: 1,
+    pageSize: 10,
+  });
+  results.push({
+    name: "list/search media",
+    ok: mediaList.items.some((item) => item.id === media.id),
+    detail: `total=${mediaList.total}`,
+  });
+
   const category = await adminCategories.create({
     name: `[SMOKE] Category ${stamp}`,
     slug: `smoke-category-${stamp}`,
@@ -203,23 +229,20 @@ async function runPrismaCrud(results: CheckResult[]): Promise<void> {
     sortOrder: 1,
     images: [
       {
-        url: "/product-placeholder.svg",
+        mediaId: media.id,
         altText: "Smoke image",
         sortOrder: 0,
         isPrimary: true,
-      },
-      {
-        url: "https://example.com/smoke-2.png",
-        altText: "Secondary",
-        sortOrder: 1,
-        isPrimary: false,
       },
     ],
   });
   results.push({
     name: "create product",
-    ok: product.priceMinor === 129000 && product.images.length === 2,
-    detail: `priceMinor=${product.priceMinor}; images=${product.images.length}`,
+    ok:
+      product.priceMinor === 129000 &&
+      product.images.length === 1 &&
+      product.images[0]?.mediaId === media.id,
+    detail: `priceMinor=${product.priceMinor}; mediaId=${product.images[0]?.mediaId}`,
   });
 
   try {
@@ -234,7 +257,7 @@ async function runPrismaCrud(results: CheckResult[]): Promise<void> {
       isActive: true,
       available: true,
       sortOrder: 2,
-      images: [],
+      images: [{ mediaId: media.id, sortOrder: 0, isPrimary: true }],
     });
     results.push({
       name: "duplicate product slug rejected",
@@ -261,7 +284,7 @@ async function runPrismaCrud(results: CheckResult[]): Promise<void> {
       isActive: true,
       available: true,
       sortOrder: 2,
-      images: [],
+      images: [{ mediaId: media.id, sortOrder: 0, isPrimary: true }],
     });
     results.push({
       name: "duplicate product SKU rejected",
@@ -335,6 +358,13 @@ async function runPrismaCrud(results: CheckResult[]): Promise<void> {
     name: "delete empty category",
     ok: true,
     detail: category.id,
+  });
+
+  await adminMedia.remove(media.id);
+  results.push({
+    name: "delete unused media",
+    ok: true,
+    detail: media.id,
   });
 }
 

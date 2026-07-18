@@ -6,6 +6,7 @@ import {
   createAdminProduct,
   deleteAdminProduct,
   fetchAdminCategories,
+  fetchAdminMedia,
   fetchAdminProduct,
   fetchAdminProducts,
   updateAdminProduct,
@@ -13,6 +14,7 @@ import {
 import type {
   AdminCategoryListItemDto,
   AdminCreateProductInput,
+  AdminMediaDto,
   AdminProductDetailDto,
   AdminProductImageInput,
   AdminProductListItemDto,
@@ -25,14 +27,7 @@ import AdminPagination from "../../components/AdminPagination";
 import AdminSearch from "../../components/AdminSearch";
 import AdminTable, { type AdminTableColumn } from "../../components/AdminTable";
 
-type ImageDraft = AdminProductImageInput;
-
-const emptyImage = (): ImageDraft => ({
-  url: "",
-  altText: "",
-  sortOrder: 0,
-  isPrimary: true,
-});
+type ImageDraft = AdminProductImageInput & { url?: string };
 
 const emptyForm = (): AdminCreateProductInput => ({
   name: "",
@@ -47,7 +42,7 @@ const emptyForm = (): AdminCreateProductInput => ({
   sortOrder: 0,
   storageLabel: "",
   storageText: "",
-  images: [emptyImage()],
+  images: [],
 });
 
 function formatPrice(priceThb: number | null): string {
@@ -75,6 +70,8 @@ export default function AdminProductsClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AdminCreateProductInput>(emptyForm);
   const [descriptionText, setDescriptionText] = useState("");
+  const [mediaLibrary, setMediaLibrary] = useState<AdminMediaDto[]>([]);
+  const [imageDrafts, setImageDrafts] = useState<ImageDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -86,6 +83,15 @@ export default function AdminProductsClient() {
   const loadCategories = useCallback(async () => {
     const result = await fetchAdminCategories({ page: 1, pageSize: 100 });
     setCategories(result.items);
+  }, []);
+
+  const loadMediaLibrary = useCallback(async () => {
+    const result = await fetchAdminMedia({
+      status: "active",
+      page: 1,
+      pageSize: 100,
+    });
+    setMediaLibrary(result.items);
   }, []);
 
   const loadProducts = useCallback(async () => {
@@ -121,9 +127,12 @@ export default function AdminProductsClient() {
             : "Unable to load categories.",
         );
       });
+      void loadMediaLibrary().catch(() => {
+        // Media library requires prisma; product list can still load.
+      });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadCategories]);
+  }, [loadCategories, loadMediaLibrary]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -200,9 +209,11 @@ export default function AdminProductsClient() {
       ...emptyForm(),
       categoryId: categories[0]?.id ?? "",
     });
+    setImageDrafts([]);
     setDescriptionText("");
     setFormError(null);
     setSuccess(null);
+    void loadMediaLibrary().catch(() => undefined);
   }
 
   async function openEdit(id: string) {
@@ -236,17 +247,24 @@ export default function AdminProductsClient() {
       sortOrder: product.sortOrder,
       storageLabel: product.storageLabel,
       storageText: product.storageText,
-      images:
-        product.images.length > 0
-          ? product.images.map((image) => ({
-              url: image.url,
-              altText: image.altText,
-              sortOrder: image.sortOrder,
-              isPrimary: image.isPrimary,
-            }))
-          : [emptyImage()],
+      images: product.images.map((image) => ({
+        mediaId: image.mediaId,
+        altText: image.altText,
+        sortOrder: image.sortOrder,
+        isPrimary: image.isPrimary,
+      })),
     });
+    setImageDrafts(
+      product.images.map((image) => ({
+        mediaId: image.mediaId,
+        url: image.url,
+        altText: image.altText,
+        sortOrder: image.sortOrder,
+        isPrimary: image.isPrimary,
+      })),
+    );
     setDescriptionText(product.description.join("\n"));
+    void loadMediaLibrary().catch(() => undefined);
   }
 
   async function saveForm() {
@@ -259,7 +277,12 @@ export default function AdminProductsClient() {
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean),
-      images: form.images.filter((image) => image.url.trim()),
+      images: imageDrafts.map((image, index) => ({
+        mediaId: image.mediaId,
+        altText: image.altText ?? null,
+        sortOrder: image.sortOrder ?? index,
+        isPrimary: image.isPrimary,
+      })),
     };
     try {
       if (mode === "edit" && editingId) {
@@ -307,21 +330,58 @@ export default function AdminProductsClient() {
     }
   }
 
-  function updateImage(index: number, patch: Partial<ImageDraft>) {
-    setForm((current) => {
-      const images = current.images.map((image, i) =>
-        i === index ? { ...image, ...patch } : image,
-      );
-      if (patch.isPrimary) {
-        return {
-          ...current,
-          images: images.map((image, i) => ({
-            ...image,
-            isPrimary: i === index,
-          })),
-        };
+  function toggleMediaSelection(media: AdminMediaDto) {
+    setImageDrafts((current) => {
+      const exists = current.find((image) => image.mediaId === media.id);
+      if (exists) {
+        const next = current.filter((image) => image.mediaId !== media.id);
+        if (next.length > 0 && !next.some((image) => image.isPrimary)) {
+          next[0] = { ...next[0], isPrimary: true };
+        }
+        return next.map((image, index) => ({ ...image, sortOrder: index }));
       }
-      return { ...current, images };
+      return [
+        ...current,
+        {
+          mediaId: media.id,
+          url: media.url,
+          altText: media.altText,
+          sortOrder: current.length,
+          isPrimary: current.length === 0,
+        },
+      ];
+    });
+  }
+
+  function setPrimaryImage(mediaId: string) {
+    setImageDrafts((current) =>
+      current.map((image) => ({
+        ...image,
+        isPrimary: image.mediaId === mediaId,
+      })),
+    );
+  }
+
+  function moveImage(mediaId: string, direction: -1 | 1) {
+    setImageDrafts((current) => {
+      const index = current.findIndex((image) => image.mediaId === mediaId);
+      if (index < 0) return current;
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next.map((image, order) => ({ ...image, sortOrder: order }));
+    });
+  }
+
+  function removeImage(mediaId: string) {
+    setImageDrafts((current) => {
+      const next = current.filter((image) => image.mediaId !== mediaId);
+      if (next.length > 0 && !next.some((image) => image.isPrimary)) {
+        next[0] = { ...next[0], isPrimary: true };
+      }
+      return next.map((image, order) => ({ ...image, sortOrder: order }));
     });
   }
 
@@ -330,7 +390,7 @@ export default function AdminProductsClient() {
       <>
         <AdminPageHeader
           title={mode === "create" ? "Create product" : "Edit product"}
-          description="URL-based images only. Price is entered in THB and stored as integer satang."
+          description="Select media assets by ID. Price is entered in THB and stored as integer satang."
         />
         {formError ? (
           <div className="admin-alert admin-alert--error" role="alert">
@@ -468,94 +528,102 @@ export default function AdminProductsClient() {
           </AdminFormField>
 
           <div>
-            <p className="admin-form__label">Images (URL)</p>
-            <div className="admin-image-rows">
-              {form.images.map((image, index) => (
-                <div className="admin-image-row" key={`image-${index}`}>
-                  <AdminFormField label="URL" htmlFor={`image-url-${index}`}>
-                    <input
-                      id={`image-url-${index}`}
-                      className="admin-form__input"
-                      value={image.url}
-                      onChange={(e) =>
-                        updateImage(index, { url: e.target.value })
+            <p className="admin-form__label">Media library</p>
+            <p className="admin-page-header__description">
+              Select gallery images by Media ID. Mark one as primary.
+            </p>
+            {mediaLibrary.length === 0 ? (
+              <AdminEmptyState
+                title="No media available"
+                text="Add media assets under Media first."
+              />
+            ) : (
+              <div className="admin-media-picker">
+                {mediaLibrary.map((media) => {
+                  const selected = imageDrafts.some(
+                    (image) => image.mediaId === media.id,
+                  );
+                  return (
+                    <button
+                      key={media.id}
+                      type="button"
+                      className={`admin-media-picker__item${selected ? " admin-media-picker__item--selected" : ""}`}
+                      onClick={() => toggleMediaSelection(media)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={media.url}
+                        alt={media.altText ?? media.title ?? "Media"}
+                      />
+                      <span className="admin-media-picker__label">
+                        {media.title || media.url}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="admin-form__label" style={{ marginTop: 16 }}>
+              Selected images
+            </p>
+            {imageDrafts.length === 0 ? (
+              <p className="admin-page-header__description">
+                No images selected.
+              </p>
+            ) : (
+              <div className="admin-selected-images">
+                {imageDrafts.map((image) => (
+                  <div className="admin-selected-image" key={image.mediaId}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className="admin-media-thumb"
+                      src={
+                        image.url ||
+                        mediaLibrary.find((item) => item.id === image.mediaId)
+                          ?.url ||
+                        "/product-placeholder.svg"
                       }
-                      placeholder="https://… or /path.svg"
+                      alt={image.altText ?? "Selected media"}
                     />
-                  </AdminFormField>
-                  <AdminFormField label="Alt text" htmlFor={`image-alt-${index}`}>
-                    <input
-                      id={`image-alt-${index}`}
-                      className="admin-form__input"
-                      value={image.altText ?? ""}
-                      onChange={(e) =>
-                        updateImage(index, { altText: e.target.value })
-                      }
-                    />
-                  </AdminFormField>
-                  <AdminFormField label="Sort" htmlFor={`image-sort-${index}`}>
-                    <input
-                      id={`image-sort-${index}`}
-                      className="admin-form__input"
-                      type="number"
-                      value={image.sortOrder}
-                      onChange={(e) =>
-                        updateImage(index, {
-                          sortOrder: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </AdminFormField>
-                  <AdminFormField
-                    label="Primary"
-                    htmlFor={`image-primary-${index}`}
-                  >
-                    <input
-                      id={`image-primary-${index}`}
-                      type="checkbox"
-                      checked={image.isPrimary}
-                      onChange={(e) =>
-                        updateImage(index, { isPrimary: e.target.checked })
-                      }
-                    />
-                  </AdminFormField>
-                  <button
-                    type="button"
-                    className="admin-btn admin-btn--secondary"
-                    onClick={() =>
-                      setForm((current) => ({
-                        ...current,
-                        images: current.images.filter((_, i) => i !== index),
-                      }))
-                    }
-                    disabled={form.images.length <= 1}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              style={{ marginTop: 12 }}
-              onClick={() =>
-                setForm((current) => ({
-                  ...current,
-                  images: [
-                    ...current.images,
-                    {
-                      url: "",
-                      altText: "",
-                      sortOrder: current.images.length,
-                      isPrimary: false,
-                    },
-                  ],
-                }))
-              }
-            >
-              Add image URL
-            </button>
+                    <div>
+                      <div className="admin-media-url">{image.mediaId}</div>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={image.isPrimary}
+                          onChange={() => setPrimaryImage(image.mediaId)}
+                        />{" "}
+                        Primary
+                      </label>
+                    </div>
+                    <div className="admin-actions">
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary"
+                        onClick={() => moveImage(image.mediaId, -1)}
+                      >
+                        Up
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary"
+                        onClick={() => moveImage(image.mediaId, 1)}
+                      >
+                        Down
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary"
+                        onClick={() => removeImage(image.mediaId)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </AdminForm>
       </>

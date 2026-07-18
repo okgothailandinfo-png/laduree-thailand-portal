@@ -76,9 +76,30 @@ model Product {
   @@index([sortOrder])
 }
 
+/// URL-based media library asset (no binary upload in this sprint).
+model Media {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// Absolute http(s) URL or same-origin relative path.
+  url       String
+  altText   String?
+  /// Optional CMS label for list/search (operational, not marketing copy).
+  title     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productImages ProductImage[]
+
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([url])
+}
+
 model ProductImage {
   id        String   @id @default(uuid()) @db.Uuid
   productId String   @db.Uuid
+  mediaId   String   @db.Uuid
+  /// Denormalized from Media.url for storefront read parity.
   url       String
   altText   String?
   sortOrder Int      @default(0)
@@ -87,9 +108,11 @@ model ProductImage {
   updatedAt DateTime @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@index([productId, sortOrder])
   @@index([productId, isPrimary])
+  @@index([mediaId])
 }
 
 model Boutique {

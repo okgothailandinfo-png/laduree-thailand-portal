@@ -3,6 +3,7 @@ import type { RepositoryBundle } from "@/src/server/repositories/interfaces";
 import { MockBoutiqueRepository } from "@/src/server/repositories/mock/boutique.repository";
 import { MockCartRepository } from "@/src/server/repositories/mock/cart.repository";
 import { MockCategoryRepository } from "@/src/server/repositories/mock/category.repository";
+import { MockMediaRepository } from "@/src/server/repositories/mock/media.repository";
 import { MockOrderRepository } from "@/src/server/repositories/mock/order.repository";
 import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
 import { MockPickupRepository } from "@/src/server/repositories/mock/pickup.repository";
@@ -10,6 +11,7 @@ import { MockProductRepository } from "@/src/server/repositories/mock/product.re
 import { MockWebhookEventRepository } from "@/src/server/repositories/mock/webhook-event.repository";
 import { PrismaBoutiqueRepository } from "@/src/server/repositories/prisma/boutique.repository";
 import { PrismaCategoryRepository } from "@/src/server/repositories/prisma/category.repository";
+import { PrismaMediaRepository } from "@/src/server/repositories/prisma/media.repository";
 import { PrismaOrderRepository } from "@/src/server/repositories/prisma/order.repository";
 import { PrismaPickupRepository } from "@/src/server/repositories/prisma/pickup.repository";
 import { PrismaProductRepository } from "@/src/server/repositories/prisma/product.repository";
@@ -19,6 +21,7 @@ function createMockRepositories(): RepositoryBundle {
   return {
     products: new MockProductRepository(),
     categories: new MockCategoryRepository(),
+    media: new MockMediaRepository(),
     boutiques: new MockBoutiqueRepository(),
     pickup: new MockPickupRepository(),
     orders: new MockOrderRepository(),
@@ -34,6 +37,7 @@ function createPrismaRepositories(): RepositoryBundle {
     // Catalog + ops persistence (Admin CMS + storefront reads).
     products: new PrismaProductRepository(),
     categories: new PrismaCategoryRepository(),
+    media: new PrismaMediaRepository(),
     boutiques: new PrismaBoutiqueRepository(),
     pickup: new PrismaPickupRepository(),
     orders: new PrismaOrderRepository(),

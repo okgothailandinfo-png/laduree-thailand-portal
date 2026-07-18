@@ -24,6 +24,12 @@ const IDS = {
     placeholderTea: "22222222-2222-4222-8222-222222222203",
     placeholderGift: "22222222-2222-4222-8222-222222222204",
   },
+  media: {
+    macaron: "55555555-5555-4555-8555-555555555501",
+    chocolate: "55555555-5555-4555-8555-555555555502",
+    tea: "55555555-5555-4555-8555-555555555503",
+    gift: "55555555-5555-4555-8555-555555555504",
+  },
   images: {
     macaron: "33333333-3333-4333-8333-333333333301",
     chocolate: "33333333-3333-4333-8333-333333333302",
@@ -126,6 +132,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
       storageText: "[CONTENT PENDING APPROVAL]",
       priceMinor: 129000,
       sortOrder: 1,
+      mediaId: IDS.media.macaron,
       imageId: IDS.images.macaron,
     },
     {
@@ -141,6 +148,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
       storageText: "[CONTENT PENDING APPROVAL]",
       priceMinor: 159000,
       sortOrder: 2,
+      mediaId: IDS.media.chocolate,
       imageId: IDS.images.chocolate,
     },
     {
@@ -156,6 +164,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
       storageText: "[CONTENT PENDING APPROVAL]",
       priceMinor: 89000,
       sortOrder: 3,
+      mediaId: IDS.media.tea,
       imageId: IDS.images.tea,
     },
     {
@@ -171,6 +180,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
       storageText: "[CONTENT PENDING APPROVAL]",
       priceMinor: 199000,
       sortOrder: 4,
+      mediaId: IDS.media.gift,
       imageId: IDS.images.gift,
     },
   ] as const;
@@ -213,11 +223,29 @@ async function seedProducts(categoryIds: Map<string, string>) {
       },
     });
 
+    await prisma.media.upsert({
+      where: { id: product.mediaId },
+      create: {
+        id: product.mediaId,
+        url: "/product-placeholder.svg",
+        altText: `${product.title} placeholder image`,
+        title: product.title,
+        isActive: true,
+      },
+      update: {
+        url: "/product-placeholder.svg",
+        altText: `${product.title} placeholder image`,
+        title: product.title,
+        isActive: true,
+      },
+    });
+
     await prisma.productImage.upsert({
       where: { id: product.imageId },
       create: {
         id: product.imageId,
         productId: row.id,
+        mediaId: product.mediaId,
         url: "/product-placeholder.svg",
         altText: `${product.title} placeholder image`,
         sortOrder: 0,
@@ -225,6 +253,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
       },
       update: {
         productId: row.id,
+        mediaId: product.mediaId,
         url: "/product-placeholder.svg",
         altText: `${product.title} placeholder image`,
         sortOrder: 0,

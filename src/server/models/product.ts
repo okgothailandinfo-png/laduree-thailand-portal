@@ -1,5 +1,6 @@
 export type ProductImage = {
   id: string;
+  mediaId: string;
   url: string;
   altText: string | null;
   sortOrder: number;

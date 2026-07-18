@@ -1,6 +1,7 @@
 import { env } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
 import { AdminCategoryService } from "@/src/server/admin/category.service";
+import { AdminMediaService } from "@/src/server/admin/media.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
@@ -56,3 +57,4 @@ export const adminCategoryService = new AdminCategoryService(
   repositories.categories,
   repositories.products,
 );
+export const adminMediaService = new AdminMediaService(repositories.media);
