@@ -8,6 +8,7 @@ import type {
   AdminCreateMediaInput,
   AdminCreateProductInput,
   AdminMediaListQuery,
+  AdminOrderListQuery,
   AdminProductListQuery,
   AdminUpdateBannerInput,
   AdminUpdateCategoryInput,
@@ -25,7 +26,11 @@ import type {
   HomepageSection,
 } from "@/src/server/models/homepage";
 import type { Media } from "@/src/server/models/media";
-import type { Order, OrderStatus } from "@/src/server/models/order";
+import type {
+  Order,
+  OrderHistoryEntry,
+  OrderStatus,
+} from "@/src/server/models/order";
 import type {
   PickupAvailability,
   PickupSlotRecord,
@@ -62,6 +67,36 @@ export type AdminMediaListPage = {
 export type AdminBannerListPage = {
   items: HomepageBannerWithMedia[];
   total: number;
+};
+
+export type AdminOrderListRow = {
+  order: Order;
+  boutiqueCode: string;
+  pickupStartTime: string;
+  paymentStatus: "pending" | "mock_accepted" | "failed" | "none";
+  paymentId: string | null;
+  itemCount: number;
+  updatedAt: string;
+};
+
+export type AdminOrderListPage = {
+  items: AdminOrderListRow[];
+  total: number;
+};
+
+export type AdminOrderDetailRecord = {
+  order: Order;
+  boutiqueCode: string;
+  pickupStartTime: string;
+  paymentStatus: "pending" | "mock_accepted" | "failed" | "none";
+  paymentId: string | null;
+  updatedAt: string;
+  history: OrderHistoryEntry[];
+};
+
+export type OrderStatusUpdateOptions = {
+  note?: string | null;
+  changedBy?: string | null;
 };
 
 export interface ProductRepository {
@@ -159,7 +194,13 @@ export interface OrderRepository {
   create(order: Order): Promise<Order>;
   findById(id: string): Promise<Order | null>;
   findByOrderNumber(orderNumber: string): Promise<Order | null>;
-  updateStatus(id: string, status: OrderStatus): Promise<Order>;
+  updateStatus(
+    id: string,
+    status: OrderStatus,
+    options?: OrderStatusUpdateOptions,
+  ): Promise<Order>;
+  adminList(query: AdminOrderListQuery): Promise<AdminOrderListPage>;
+  adminFindById(id: string): Promise<AdminOrderDetailRecord | null>;
 }
 
 export interface CartRepository {

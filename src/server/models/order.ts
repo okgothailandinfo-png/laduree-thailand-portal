@@ -1,6 +1,13 @@
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
-export type OrderStatus = "pending" | "confirmed" | "cancelled" | "mock_placed";
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready_for_pickup"
+  | "completed"
+  | "cancelled"
+  | "mock_placed";
 
 export type OrderItem = {
   productId: string;
@@ -50,4 +57,14 @@ export type Order = {
   /** Order total in satang; calculated in the service layer. */
   totalMinor: number;
   termsAccepted: boolean;
+};
+
+export type OrderHistoryEntry = {
+  id: string;
+  orderId: string;
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus;
+  note: string | null;
+  changedBy: string | null;
+  createdAt: string;
 };

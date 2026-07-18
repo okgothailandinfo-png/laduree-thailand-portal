@@ -14,6 +14,9 @@ enum OrderStatus {
   PENDING
   PLACED
   CONFIRMED
+  PREPARING
+  READY_FOR_PICKUP
+  COMPLETED
   CANCELLED
 }
 
@@ -264,12 +267,31 @@ model Order {
   pickupSlot PickupSlot     @relation(fields: [pickupSlotId], references: [id], onDelete: Restrict)
   items      OrderItem[]
   payment    PaymentRecord?
+  history    OrderHistory[]
 
   @@index([customerId])
   @@index([boutiqueId])
   @@index([pickupSlotId])
   @@index([status])
   @@index([createdAt])
+}
+
+/// Audit trail for order status changes (admin and system).
+model OrderHistory {
+  id         String       @id @default(uuid()) @db.Uuid
+  orderId    String       @db.Uuid
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  note       String?
+  /// Actor identifier (e.g. mock-admin, system:payment). Never store secrets.
+  changedBy  String?
+  createdAt  DateTime     @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@index([orderId, createdAt])
 }
 
 model OrderItem {

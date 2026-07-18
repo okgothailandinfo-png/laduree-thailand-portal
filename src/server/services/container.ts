@@ -4,6 +4,7 @@ import { AdminBannerService } from "@/src/server/admin/banner.service";
 import { AdminCategoryService } from "@/src/server/admin/category.service";
 import { AdminHomepageService } from "@/src/server/admin/homepage.service";
 import { AdminMediaService } from "@/src/server/admin/media.service";
+import { AdminOrderService } from "@/src/server/admin/order.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
@@ -74,6 +75,10 @@ export const adminBannerService = new AdminBannerService(
 export const adminHomepageService = new AdminHomepageService(
   repositories.homepageSections,
   repositories.homepageContent,
+);
+export const adminOrderService = new AdminOrderService(
+  repositories.orders,
+  repositories.boutiques,
 );
 export const homepageService = new DefaultHomepageService(
   repositories.homepageBanners,
