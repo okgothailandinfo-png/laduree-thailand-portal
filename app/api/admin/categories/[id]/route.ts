@@ -14,7 +14,7 @@ export async function GET(_request: Request, context: RouteContext) {
   });
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
+async function updateCategory(request: Request, context: RouteContext) {
   return handleApi(async () => {
     await requireAdminSession();
     const { id } = await context.params;
@@ -23,6 +23,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     const data = await adminCategoryService.update(id, input);
     return ok(data);
   });
+}
+
+/** Partial update (Sprint 16B). */
+export async function PATCH(request: Request, context: RouteContext) {
+  return updateCategory(request, context);
+}
+
+/** Full update alias required by Admin runtime contract. */
+export async function PUT(request: Request, context: RouteContext) {
+  return updateCategory(request, context);
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {

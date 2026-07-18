@@ -96,7 +96,7 @@ export function updateAdminProduct(
   input: AdminUpdateProductInput,
 ): Promise<AdminProductDetailDto> {
   return adminFetch(`/api/admin/products/${encodeURIComponent(id)}`, {
-    method: "PATCH",
+    method: "PUT",
     body: JSON.stringify(input),
   });
 }
@@ -144,7 +144,7 @@ export function updateAdminCategory(
   input: AdminUpdateCategoryInput,
 ): Promise<AdminCategoryDetailDto> {
   return adminFetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
-    method: "PATCH",
+    method: "PUT",
     body: JSON.stringify(input),
   });
 }
