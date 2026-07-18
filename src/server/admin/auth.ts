@@ -39,7 +39,7 @@ export function requirePrismaDataSource(): void {
   if (!process.env.DATABASE_URL?.trim()) {
     throw new AppError(
       "CONFIG_ERROR",
-      "DATABASE_URL is required for admin catalog operations.",
+      "DATABASE_URL is required for admin operations.",
     );
   }
 }

@@ -9,6 +9,7 @@ import type {
 import { createPaymentProvider } from "@/src/server/payment/factory";
 import type { PaymentProvider } from "@/src/server/payment/interfaces";
 import {
+  canApplyPaymentOrderStatus,
   isSafeToCancelOrder,
   orderStatusFromPaymentStatus,
   toApiOrderStatus,
@@ -256,22 +257,22 @@ export class PaymentService {
       }
     }
 
-    // SUCCESS already confirmed → leave confirmed (idempotent).
+    // Do not demote fulfilment or terminal statuses (idempotent for confirmed).
     if (
-      next === "confirmed" &&
-      (order.status === "confirmed" || order.status === "cancelled")
+      next &&
+      !canApplyPaymentOrderStatus(order.status, next)
     ) {
-      if (order.status === "confirmed") {
-        return toApiOrderStatus(order.status);
-      }
-      next = null;
+      return toApiOrderStatus(order.status);
     }
 
     if (!next || next === order.status) {
       return toApiOrderStatus(order.status);
     }
 
-    const updated = await this.orders.updateStatus(order.id, next);
+    const updated = await this.orders.updateStatus(order.id, next, {
+      changedBy: "system:payment",
+      note: `Payment status: ${paymentStatus}`,
+    });
     logger.info("Order status synchronized from payment", {
       orderId: order.id,
       orderStatus: updated.status,

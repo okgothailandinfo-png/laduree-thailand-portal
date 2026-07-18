@@ -1,12 +1,5 @@
-import AdminResourceScaffold from "../../components/AdminResourceScaffold";
+import AdminOrdersClient from "./AdminOrdersClient";
 
 export default function AdminOrdersPage() {
-  return (
-    <AdminResourceScaffold
-      resourceKey="orders"
-      title="Orders"
-      description="Review pickup orders."
-      searchPlaceholder="Search orders…"
-    />
-  );
+  return <AdminOrdersClient />;
 }

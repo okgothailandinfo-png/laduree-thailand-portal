@@ -276,3 +276,126 @@ export type AdminCreateHomepageContentInput = {
 export type AdminUpdateHomepageContentInput =
   Partial<AdminCreateHomepageContentInput>;
 
+/** Admin order management */
+
+export type AdminOrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready_for_pickup"
+  | "completed"
+  | "cancelled"
+  | "mock_placed";
+
+export type AdminPaymentStatus =
+  | "pending"
+  | "mock_accepted"
+  | "failed"
+  | "none";
+
+export type AdminOrderListItemDto = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  boutiqueId: string;
+  boutiqueName: string;
+  pickupDate: string;
+  pickupTime: string;
+  itemCount: number;
+  currency: "THB";
+  totalMinor: number;
+  totalThb: number;
+  paymentStatus: AdminPaymentStatus;
+  orderStatus: AdminOrderStatus;
+  createdAt: string;
+};
+
+export type AdminOrderListQuery = {
+  search?: string;
+  status?: AdminOrderStatus;
+  paymentStatus?: Exclude<AdminPaymentStatus, "none">;
+  boutiqueId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page: number;
+  pageSize: number;
+};
+
+export type AdminOrderListResult = {
+  items: AdminOrderListItemDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type AdminOrderItemDto = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPriceMinor: number;
+  unitPriceThb: number;
+  lineTotalMinor: number;
+  lineTotalThb: number;
+  currency: "THB";
+  modifiers: Array<{ label: string; quantity?: number }>;
+  note: string | null;
+};
+
+export type AdminOrderHistoryDto = {
+  id: string;
+  fromStatus: AdminOrderStatus | null;
+  toStatus: AdminOrderStatus;
+  note: string | null;
+  changedBy: string | null;
+  createdAt: string;
+};
+
+export type AdminOrderDetailDto = {
+  id: string;
+  orderNumber: string;
+  orderStatus: AdminOrderStatus;
+  allowedNextStatuses: AdminOrderStatus[];
+  paymentStatus: AdminPaymentStatus;
+  paymentMethod: string | null;
+  paymentMethodLabel: string | null;
+  /** Safe payment record id — never card/CVV/secrets. */
+  paymentReference: string | null;
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+    recipientName: string | null;
+    recipientPhone: string | null;
+  };
+  boutique: {
+    id: string;
+    name: string;
+    code: string;
+    address: string;
+  };
+  pickup: {
+    date: string;
+    time: string;
+    slotId: string;
+  };
+  items: AdminOrderItemDto[];
+  notes: string | null;
+  subtotalMinor: number;
+  subtotalThb: number;
+  taxMinor: number | null;
+  taxThb: number | null;
+  totalMinor: number;
+  totalThb: number;
+  currency: "THB";
+  createdAt: string;
+  updatedAt: string;
+  history: AdminOrderHistoryDto[];
+};
+
+export type AdminUpdateOrderStatusInput = {
+  status: AdminOrderStatus;
+  note?: string | null;
+};

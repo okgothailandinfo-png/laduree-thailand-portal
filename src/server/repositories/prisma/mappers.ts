@@ -7,9 +7,12 @@ import type {
   HomepageSection as PrismaHomepageSection,
   Media as PrismaMedia,
   Order as PrismaOrder,
+  OrderHistory as PrismaOrderHistory,
   OrderItem as PrismaOrderItem,
+  OrderStatus as PrismaOrderStatus,
   PaymentMethod as PrismaPaymentMethod,
   PaymentRecord as PrismaPaymentRecord,
+  PaymentStatus as PrismaPaymentStatus,
   PickupSlot as PrismaPickupSlot,
   Product as PrismaProduct,
   ProductImage as PrismaProductImage,
@@ -26,8 +29,10 @@ import type {
 import type { Media } from "@/src/server/models/media";
 import type {
   Order,
+  OrderHistoryEntry,
   OrderItem,
   OrderPayment,
+  OrderStatus,
 } from "@/src/server/models/order";
 import type { PickupAvailability, PickupTimeSlot } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
@@ -238,6 +243,12 @@ export function toDomainPaymentMethod(
   return METHOD_TO_DOMAIN[method];
 }
 
+export function paymentMethodLabel(
+  method: CreateOrderPaymentDto["method"],
+): string {
+  return METHOD_LABELS[method];
+}
+
 function parseModifiers(value: unknown): OrderItem["modifiers"] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
@@ -267,6 +278,90 @@ function toDomainPayment(
   };
 }
 
+export function toDomainOrderStatus(status: PrismaOrderStatus): OrderStatus {
+  switch (status) {
+    case "PENDING":
+      return "pending";
+    case "CONFIRMED":
+      return "confirmed";
+    case "PREPARING":
+      return "preparing";
+    case "READY_FOR_PICKUP":
+      return "ready_for_pickup";
+    case "COMPLETED":
+      return "completed";
+    case "CANCELLED":
+      return "cancelled";
+    case "PLACED":
+      return "mock_placed";
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
+}
+
+export function toPrismaOrderStatus(status: OrderStatus): PrismaOrderStatus {
+  switch (status) {
+    case "pending":
+      return "PENDING";
+    case "confirmed":
+      return "CONFIRMED";
+    case "preparing":
+      return "PREPARING";
+    case "ready_for_pickup":
+      return "READY_FOR_PICKUP";
+    case "completed":
+      return "COMPLETED";
+    case "cancelled":
+      return "CANCELLED";
+    case "mock_placed":
+      return "PLACED";
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
+}
+
+export function toAdminPaymentStatus(
+  payment: PrismaPaymentRecord | null | undefined,
+): "pending" | "mock_accepted" | "failed" | "none" {
+  if (!payment) return "none";
+  return toDomainPaymentRecordStatus(payment.status);
+}
+
+export function toDomainPaymentRecordStatus(
+  status: PrismaPaymentStatus,
+): "pending" | "mock_accepted" | "failed" {
+  switch (status) {
+    case "PENDING":
+      return "pending";
+    case "MOCK_ACCEPTED":
+      return "mock_accepted";
+    case "FAILED":
+      return "failed";
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
+}
+
+export function toDomainOrderHistory(
+  row: PrismaOrderHistory,
+): OrderHistoryEntry {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    fromStatus: row.fromStatus ? toDomainOrderStatus(row.fromStatus) : null,
+    toStatus: toDomainOrderStatus(row.toStatus),
+    note: row.note,
+    changedBy: row.changedBy,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 export type PrismaOrderWithRelations = PrismaOrder & {
   customer: PrismaCustomer;
   boutique: PrismaBoutique;
@@ -277,18 +372,10 @@ export type PrismaOrderWithRelations = PrismaOrder & {
 
 export function toDomainOrder(row: PrismaOrderWithRelations): Order {
   const payment = toDomainPayment(row.payment);
-  const status =
-    row.status === "PENDING"
-      ? "pending"
-      : row.status === "CONFIRMED"
-        ? "confirmed"
-        : row.status === "CANCELLED"
-          ? "cancelled"
-          : "mock_placed";
   return {
     id: row.id,
     orderNumber: row.orderNumber,
-    status,
+    status: toDomainOrderStatus(row.status),
     currency: "THB",
     createdAt: row.createdAt.toISOString(),
     totalMinor: row.totalMinor,

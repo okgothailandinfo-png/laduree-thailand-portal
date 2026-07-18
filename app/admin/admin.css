@@ -779,3 +779,133 @@
   gap: 8px;
   font-size: 0.9rem;
 }
+
+.admin-link {
+  color: var(--admin-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  text-decoration: underline;
+}
+
+.admin-muted-text {
+  color: var(--admin-text-muted);
+  font-size: 0.85rem;
+}
+
+.admin-input,
+.admin-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.admin-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.admin-filter__label {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-badge--ready {
+  color: #1d5a7a;
+  background: #e6f4fa;
+  border-color: #c5e4f2;
+}
+
+.admin-order-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 900px) {
+  .admin-order-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.admin-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.admin-panel__title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.admin-dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-dl dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+}
+
+.admin-dl dd {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.admin-dl--totals {
+  margin-top: 12px;
+  max-width: 280px;
+}
+
+.admin-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.admin-order-notes {
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+}
+
+.admin-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-timeline__item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-timeline__item:last-child {
+  border-bottom: none;
+}
+
+.admin-timeline__meta {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+  margin-bottom: 4px;
+}
+
