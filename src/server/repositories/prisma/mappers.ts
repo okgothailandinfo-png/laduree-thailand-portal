@@ -33,6 +33,13 @@ export function toDomainMedia(row: PrismaMedia): Media {
     altText: row.altText,
     title: row.title,
     isActive: row.isActive,
+    originalFileName: row.originalFileName,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    width: row.width,
+    height: row.height,
+    storageProvider: row.storageProvider,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

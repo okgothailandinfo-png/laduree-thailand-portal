@@ -60,6 +60,13 @@ export class PrismaMediaRepository implements MediaRepository {
         altText: input.altText ?? null,
         title: input.title ?? null,
         isActive: input.isActive,
+        originalFileName: input.originalFileName ?? null,
+        fileName: input.fileName ?? null,
+        mimeType: input.mimeType ?? null,
+        sizeBytes: input.sizeBytes ?? null,
+        width: input.width ?? null,
+        height: input.height ?? null,
+        storageProvider: input.storageProvider ?? null,
       },
     });
     return toDomainMedia(row);

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AdminApiError,
   createAdminMedia,
   deleteAdminMedia,
   fetchAdminMedia,
+  uploadAdminMedia,
 } from "@/lib/api/admin-catalog";
 import type {
   AdminCreateMediaInput,
@@ -26,7 +27,13 @@ const emptyForm = (): AdminCreateMediaInput => ({
   isActive: true,
 });
 
+const ACCEPT_TYPES = "image/jpeg,image/png,image/webp";
+
+type Mode = "list" | "create" | "upload";
+
 export default function AdminMediaClient() {
+  const fileInputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<AdminMediaDto[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -37,10 +44,15 @@ export default function AdminMediaClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"list" | "create">("list");
+  const [mode, setMode] = useState<Mode>("list");
   const [form, setForm] = useState<AdminCreateMediaInput>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadAltText, setUploadAltText] = useState("");
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
@@ -75,6 +87,40 @@ export default function AdminMediaClient() {
     return () => window.clearTimeout(timer);
   }, [loadMedia]);
 
+  function clearUploadPreview() {
+    setUploadPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  }
+
+  function resetUploadForm() {
+    clearUploadPreview();
+    setUploadFile(null);
+    setUploadTitle("");
+    setUploadAltText("");
+    setFormError(null);
+    setDragActive(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function selectUploadFile(file: File | null) {
+    setFormError(null);
+    clearUploadPreview();
+    if (!file) {
+      setUploadFile(null);
+      return;
+    }
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setUploadFile(null);
+      setFormError("Only JPEG, PNG, and WebP images are allowed.");
+      return;
+    }
+    setUploadFile(file);
+    setUploadPreviewUrl(URL.createObjectURL(file));
+  }
+
   async function copyUrl(url: string) {
     try {
       await navigator.clipboard.writeText(url);
@@ -97,6 +143,33 @@ export default function AdminMediaClient() {
     } catch (err) {
       setFormError(
         err instanceof AdminApiError ? err.message : "Unable to save media.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitUpload() {
+    if (!uploadFile) {
+      setFormError("Choose an image file to upload.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    setSuccess(null);
+    try {
+      await uploadAdminMedia({
+        file: uploadFile,
+        title: uploadTitle,
+        altText: uploadAltText,
+      });
+      setSuccess("Media uploaded.");
+      resetUploadForm();
+      setMode("list");
+      await loadMedia();
+    } catch (err) {
+      setFormError(
+        err instanceof AdminApiError ? err.message : "Unable to upload media.",
       );
     } finally {
       setSaving(false);
@@ -187,8 +260,8 @@ export default function AdminMediaClient() {
     return (
       <>
         <AdminPageHeader
-          title="Add media"
-          description="URL-based media only. Binary upload is not available in this sprint."
+          title="Add media by URL"
+          description="Register an existing image URL. Use Upload for binary files."
         />
         {formError ? (
           <div className="admin-alert admin-alert--error" role="alert">
@@ -249,11 +322,123 @@ export default function AdminMediaClient() {
     );
   }
 
+  if (mode === "upload") {
+    return (
+      <>
+        <AdminPageHeader
+          title="Upload media"
+          description="JPEG, PNG, and WebP only. Maximum size is configured server-side (default 10 MB)."
+        />
+        {formError ? (
+          <div className="admin-alert admin-alert--error" role="alert">
+            {formError}{" "}
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              disabled={saving}
+              onClick={() => void submitUpload()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+        <AdminForm
+          disabled={saving}
+          submitLabel={saving ? "Uploading…" : "Upload"}
+          secondaryLabel="Cancel"
+          onSecondary={() => {
+            resetUploadForm();
+            setMode("list");
+          }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitUpload();
+          }}
+        >
+          <AdminFormField label="Image file" htmlFor={fileInputId}>
+            <div
+              className={`admin-upload-dropzone${dragActive ? " admin-upload-dropzone--active" : ""}`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDragActive(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setDragActive(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragActive(false);
+                const file = event.dataTransfer.files?.[0] ?? null;
+                selectUploadFile(file);
+              }}
+            >
+              <p className="admin-upload-dropzone__text">
+                Drag and drop an image here, or choose a file.
+              </p>
+              <input
+                ref={fileInputRef}
+                id={fileInputId}
+                className="admin-form__input"
+                type="file"
+                accept={ACCEPT_TYPES}
+                disabled={saving}
+                onChange={(event) => {
+                  selectUploadFile(event.target.files?.[0] ?? null);
+                }}
+              />
+            </div>
+          </AdminFormField>
+
+          {uploadPreviewUrl && uploadFile ? (
+            <div className="admin-upload-preview">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={uploadPreviewUrl}
+                alt="Upload preview"
+                className="admin-upload-preview__image"
+              />
+              <div className="admin-upload-preview__meta">
+                <div>{uploadFile.name}</div>
+                <div>
+                  {(uploadFile.size / 1024).toFixed(1)} KB · {uploadFile.type}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <AdminFormField label="Title" htmlFor="upload-title">
+            <input
+              id="upload-title"
+              className="admin-form__input"
+              value={uploadTitle}
+              disabled={saving}
+              onChange={(e) => setUploadTitle(e.target.value)}
+            />
+          </AdminFormField>
+          <AdminFormField label="Alt text" htmlFor="upload-alt">
+            <input
+              id="upload-alt"
+              className="admin-form__input"
+              value={uploadAltText}
+              disabled={saving}
+              onChange={(e) => setUploadAltText(e.target.value)}
+            />
+          </AdminFormField>
+        </AdminForm>
+      </>
+    );
+  }
+
   return (
     <>
       <AdminPageHeader
         title="Media"
-        description="Manage URL-based media assets for products."
+        description="Manage media assets for products. Upload images or register URLs."
       />
       {success ? (
         <div className="admin-alert admin-alert--success" role="status">
@@ -299,12 +484,22 @@ export default function AdminMediaClient() {
           type="button"
           className="admin-btn admin-btn--primary"
           onClick={() => {
+            resetUploadForm();
+            setMode("upload");
+          }}
+        >
+          Upload
+        </button>
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary"
+          onClick={() => {
             setForm(emptyForm());
             setFormError(null);
             setMode("create");
           }}
         >
-          Add
+          Add URL
         </button>
       </div>
 

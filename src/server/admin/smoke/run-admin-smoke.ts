@@ -21,6 +21,8 @@ import { AdminMediaService } from "@/src/server/admin/media.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
 import { getDataSource } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
+import { createStorageProvider } from "@/src/server/storage/factory";
+import { StorageService } from "@/src/server/storage/storage-service";
 import { AppError } from "@/src/server/utils/errors";
 
 type CheckResult = { name: string; ok: boolean; detail?: string };
@@ -135,7 +137,10 @@ async function runPrismaCrud(results: CheckResult[]): Promise<void> {
     repos.products,
     repos.categories,
   );
-  const adminMedia = new AdminMediaService(repos.media);
+  const adminMedia = new AdminMediaService(
+    repos.media,
+    new StorageService(createStorageProvider()),
+  );
 
   const stamp = Date.now().toString(36);
 

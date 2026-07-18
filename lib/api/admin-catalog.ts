@@ -6,6 +6,7 @@ import type {
   AdminCreateProductInput,
   AdminMediaDto,
   AdminMediaListResult,
+  AdminMediaUploadResult,
   AdminProductDetailDto,
   AdminProductListResult,
   AdminUpdateCategoryInput,
@@ -35,18 +36,7 @@ export class AdminApiError extends Error {
   }
 }
 
-async function adminFetch<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    credentials: "same-origin",
-  });
+async function parseAdminResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as ApiSuccess<T> | ApiFailure;
   if (!response.ok || !payload.success) {
     const error = !payload.success
@@ -59,6 +49,34 @@ async function adminFetch<T>(
     });
   }
   return payload.data;
+}
+
+async function adminFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    credentials: "same-origin",
+  });
+  return parseAdminResponse<T>(response);
+}
+
+/** Multipart upload — do not set Content-Type (browser sets boundary). */
+async function adminFormFetch<T>(
+  path: string,
+  formData: FormData,
+): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    body: formData,
+    credentials: "same-origin",
+  });
+  return parseAdminResponse<T>(response);
 }
 
 export function fetchAdminProducts(params: {
@@ -183,6 +201,20 @@ export function createAdminMedia(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function uploadAdminMedia(input: {
+  file: File;
+  title?: string;
+  altText?: string;
+  folder?: string;
+}): Promise<AdminMediaUploadResult> {
+  const formData = new FormData();
+  formData.append("file", input.file);
+  if (input.title?.trim()) formData.append("title", input.title.trim());
+  if (input.altText?.trim()) formData.append("altText", input.altText.trim());
+  if (input.folder?.trim()) formData.append("folder", input.folder.trim());
+  return adminFormFetch("/api/admin/media/upload", formData);
 }
 
 export function deleteAdminMedia(id: string): Promise<{ deleted: boolean }> {
