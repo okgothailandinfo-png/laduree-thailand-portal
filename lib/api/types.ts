@@ -60,6 +60,39 @@ export type Boutique = {
   lastOrderTime: string;
 };
 
+/** Public homepage API contract (GET /api/homepage). */
+export type HomepageBanner = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string;
+  mobileImageUrl: string | null;
+  altText: string | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  sortOrder: number;
+};
+
+export type HomepageSection = {
+  key: string;
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  sortOrder: number;
+};
+
+export type HomepageContentItem = {
+  key: string;
+  value: string;
+  contentType: "plain_text" | "multiline_text" | "url" | "boolean";
+};
+
+export type HomepagePayload = {
+  banners: HomepageBanner[];
+  sections: HomepageSection[];
+  content: HomepageContentItem[];
+};
+
 export type PickupTimeSlot = {
   id: string;
   label: string;

@@ -110,7 +110,15 @@ export class PrismaMediaRepository implements MediaRepository {
   async remove(id: string): Promise<void> {
     const existing = await prisma.media.findUnique({
       where: { id },
-      include: { _count: { select: { productImages: true } } },
+      include: {
+        _count: {
+          select: {
+            productImages: true,
+            bannerDesktopImages: true,
+            bannerMobileImages: true,
+          },
+        },
+      },
     });
     if (!existing) {
       throw new AppError("NOT_FOUND", `Media not found: ${id}`);
@@ -122,10 +130,27 @@ export class PrismaMediaRepository implements MediaRepository {
         { details: { productImageCount: existing._count.productImages } },
       );
     }
+    const bannerLinkCount =
+      existing._count.bannerDesktopImages + existing._count.bannerMobileImages;
+    if (bannerLinkCount > 0) {
+      throw new AppError(
+        "CONFLICT",
+        "Cannot delete media that is linked to homepage banners.",
+        { details: { bannerLinkCount } },
+      );
+    }
     await prisma.media.delete({ where: { id } });
   }
 
   async countProductLinks(mediaId: string): Promise<number> {
     return prisma.productImage.count({ where: { mediaId } });
+  }
+
+  async countBannerLinks(mediaId: string): Promise<number> {
+    const [desktop, mobile] = await prisma.$transaction([
+      prisma.homepageBanner.count({ where: { imageMediaId: mediaId } }),
+      prisma.homepageBanner.count({ where: { mobileImageMediaId: mediaId } }),
+    ]);
+    return desktop + mobile;
   }
 }
