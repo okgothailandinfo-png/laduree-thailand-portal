@@ -25,10 +25,6 @@ function createDraftOrderNumber() {
   return `DRAFT-${Date.now().toString(36).toUpperCase()}`;
 }
 
-function unitPriceMinorFromProduct(priceMinor: number | null): number {
-  return priceMinor ?? 0;
-}
-
 function minorToMajor(minor: number): number {
   return minor / 100;
 }
@@ -122,6 +118,22 @@ export class DefaultCheckoutService {
       );
     }
 
+    // Re-check live availability so stale/capacity-exhausted slots are rejected.
+    const availability = await this.pickup.getAvailability({
+      boutiqueId: boutique.id,
+      dateKey: slot.dateKey,
+    });
+    const availableSlot = availability?.slots.find(
+      (item) => item.id === slot.id,
+    );
+    if (!availableSlot) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.pickupSlotId is not available for the selected boutique/date.",
+        { details: { field: "pickup.pickupSlotId" } },
+      );
+    }
+
     const items: Order["items"] = [];
     let totalMinor = 0;
     let itemCount = 0;
@@ -151,7 +163,25 @@ export class DefaultCheckoutService {
         });
       }
 
-      const unitPriceMinor = unitPriceMinorFromProduct(product.priceMinor);
+      if (
+        product.priceMinor === null ||
+        !Number.isFinite(product.priceMinor) ||
+        product.priceMinor < 0
+      ) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Price unavailable for one or more products.",
+          {
+            details: {
+              field: "cart.items",
+              code: "PRICE_UNAVAILABLE",
+              productId: product.id,
+            },
+          },
+        );
+      }
+
+      const unitPriceMinor = product.priceMinor;
       totalMinor += unitPriceMinor * line.quantity;
       itemCount += line.quantity;
 

@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
-import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
+import { cartLineConfigKey } from "@/lib/cart/cart-line";
+import {
+  getExactSelectionGroups,
+  validateExactSelectionModifiers,
+} from "@/lib/product/exact-selection";
 import type { Cart, CartItem } from "@/src/server/models/cart";
+import type { Product } from "@/src/server/models/product";
 import type {
   CartRepository,
   ProductRepository,
@@ -61,6 +66,19 @@ function parseModifiers(
   });
 }
 
+function catalogPriceFields(product: Product | null): {
+  unitPriceMinor: number | null;
+  productAvailable: boolean;
+} {
+  if (!product) {
+    return { unitPriceMinor: null, productAvailable: false };
+  }
+  return {
+    unitPriceMinor: product.priceMinor,
+    productAvailable: product.available && product.isActive,
+  };
+}
+
 export class DefaultCartService implements CartService {
   constructor(
     private readonly carts: CartRepository,
@@ -85,8 +103,12 @@ export class DefaultCartService implements CartService {
   }
 
   async getCart(cartId?: string): Promise<CartDto> {
-    const cart = await this.resolveCart(cartId);
-    return toCartDto(cart);
+    const cart = cloneCart(await this.resolveCart(cartId));
+    const refreshed = await this.refreshCatalogFields(cart);
+    if (refreshed.changed) {
+      await this.carts.save(refreshed.cart);
+    }
+    return toCartDto(refreshed.cart);
   }
 
   async addItem(
@@ -95,7 +117,7 @@ export class DefaultCartService implements CartService {
   ): Promise<CartDto> {
     const cart = cloneCart(await this.resolveCart(cartId));
     const product = await this.products.findById(input.productId);
-    if (!product || !product.available) {
+    if (!product || !product.available || !product.isActive) {
       throw new AppError(
         "VALIDATION_ERROR",
         `Product unavailable: ${input.productId}`,
@@ -119,17 +141,64 @@ export class DefaultCartService implements CartService {
       });
     }
 
-    const item: CartItem = {
-      id: randomUUID(),
+    const exactGroups = getExactSelectionGroups(product.modifierGroups);
+    const exactSelectionQuantity =
+      exactGroups[0]?.exactSelectionQuantity ?? null;
+    const incomingKey = cartLineConfigKey({
       productId: product.id,
-      name: product.title,
-      imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
-      quantity: input.quantity,
       modifiers,
       note: input.note,
-    };
+    });
 
-    cart.items.push(item);
+    const existingIndex = cart.items.findIndex(
+      (item) =>
+        cartLineConfigKey({
+          productId: item.productId,
+          modifiers: item.modifiers,
+          note: item.note,
+        }) === incomingKey,
+    );
+
+    if (existingIndex >= 0) {
+      // Fixed-size exact-selection boxes must stay quantity 1 per line.
+      // Identical configs therefore remain separate cart lines (one box each).
+      if (typeof exactSelectionQuantity === "number") {
+        const item: CartItem = {
+          id: randomUUID(),
+          productId: product.id,
+          name: product.title,
+          imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
+          quantity: 1,
+          modifiers,
+          note: input.note,
+          exactSelectionQuantity,
+          ...catalogPriceFields(product),
+        };
+        cart.items.push(item);
+      } else {
+        const existing = cart.items[existingIndex];
+        cart.items[existingIndex] = {
+          ...existing,
+          quantity: existing.quantity + input.quantity,
+          ...catalogPriceFields(product),
+          exactSelectionQuantity,
+        };
+      }
+    } else {
+      const item: CartItem = {
+        id: randomUUID(),
+        productId: product.id,
+        name: product.title,
+        imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
+        quantity: input.quantity,
+        modifiers,
+        note: input.note,
+        exactSelectionQuantity,
+        ...catalogPriceFields(product),
+      };
+      cart.items.push(item);
+    }
+
     const saved = await this.carts.save(cart);
     return toCartDto(saved);
   }
@@ -146,9 +215,23 @@ export class DefaultCartService implements CartService {
       throw new AppError("NOT_FOUND", `Cart item not found: ${id}`);
     }
 
+    const current = cart.items[index];
+    if (
+      typeof current.exactSelectionQuantity === "number" &&
+      input.quantity !== 1
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Fixed-size box products must be added with quantity 1. Adjust flavour selections instead.",
+        { details: { field: "quantity", productId: current.productId } },
+      );
+    }
+
+    const product = await this.products.findById(current.productId);
     cart.items[index] = {
-      ...cart.items[index],
+      ...current,
       quantity: input.quantity,
+      ...catalogPriceFields(product),
     };
     const saved = await this.carts.save(cart);
     return toCartDto(saved);
@@ -175,6 +258,49 @@ export class DefaultCartService implements CartService {
     cart.items = [];
     const saved = await this.carts.save(cart);
     return toCartDto(saved);
+  }
+
+  /** Refresh trusted catalog price/availability onto cart lines. */
+  private async refreshCatalogFields(
+    cart: Cart,
+  ): Promise<{ cart: Cart; changed: boolean }> {
+    let changed = false;
+    const items: CartItem[] = [];
+
+    for (const item of cart.items) {
+      const product = await this.products.findById(item.productId);
+      const catalog = catalogPriceFields(product);
+      const exactSelectionQuantity = product
+        ? (getExactSelectionGroups(product.modifierGroups)[0]
+            ?.exactSelectionQuantity ??
+          item.exactSelectionQuantity ??
+          null)
+        : (item.exactSelectionQuantity ?? null);
+
+      const next: CartItem = {
+        ...item,
+        name: product?.title ?? item.name,
+        imageSrc:
+          product?.imagePlaceholder ||
+          item.imageSrc ||
+          "/product-placeholder.svg",
+        unitPriceMinor: catalog.unitPriceMinor,
+        productAvailable: catalog.productAvailable,
+        exactSelectionQuantity,
+      };
+
+      if (
+        next.unitPriceMinor !== item.unitPriceMinor ||
+        next.productAvailable !== item.productAvailable ||
+        next.exactSelectionQuantity !== item.exactSelectionQuantity ||
+        next.name !== item.name
+      ) {
+        changed = true;
+      }
+      items.push(next);
+    }
+
+    return { cart: { ...cart, items }, changed };
   }
 
   private async resolveCart(cartId?: string): Promise<Cart> {

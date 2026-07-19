@@ -13,6 +13,15 @@ import { ApiClientError } from "@/lib/api/client";
 import { fetchBoutiques } from "@/lib/api/catalog";
 import { fetchPickupAvailability } from "@/lib/api/pickup";
 import type { Boutique, PickupTimeSlot } from "@/lib/api/types";
+import { hasValidConfirmedPickupIds } from "../cart/checkout-eligibility";
+import {
+  isAbortError,
+  PICKUP_MESSAGES,
+  readPersistedConfirmed,
+  reconcileDraftDate,
+  reconcileDraftTimeSlot,
+  writePersistedConfirmed,
+} from "./pickup-availability";
 import { getCandidateDateKeys } from "./pickup-dates";
 
 export type PickupDraft = {
@@ -45,6 +54,7 @@ type PickupContextValue = {
   confirmed: ConfirmedPickup | null;
   isPickupComplete: boolean;
   resetSelection: () => void;
+  clearConfirmedSlot: (message?: string) => void;
   boutiques: Boutique[];
   boutiquesStatus: "loading" | "success" | "error" | "empty";
   boutiquesError: string | null;
@@ -70,8 +80,18 @@ const emptyDraft: PickupDraft = {
 };
 
 function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiClientError) return error.message;
-  if (error instanceof Error) return error.message;
+  if (error instanceof ApiClientError) {
+    // Prefer a stable customer-facing availability message over internal codes.
+    if (
+      error.code === "BAD_RESPONSE" ||
+      error.status >= 500 ||
+      error.message.toLowerCase().includes("availability")
+    ) {
+      return fallback;
+    }
+    return error.message || fallback;
+  }
+  if (error instanceof Error) return error.message || fallback;
   return fallback;
 }
 
@@ -79,7 +99,9 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<PickupStep>("service");
   const [draft, setDraft] = useState<PickupDraft>(emptyDraft);
-  const [confirmed, setConfirmed] = useState<ConfirmedPickup | null>(null);
+  const [confirmed, setConfirmed] = useState<ConfirmedPickup | null>(() =>
+    readPersistedConfirmed(),
+  );
   const [validationError, setValidationError] = useState<string | null>(null);
   const [boutiques, setBoutiques] = useState<Boutique[]>([]);
   const [boutiquesStatus, setBoutiquesStatus] = useState<
@@ -107,6 +129,20 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     setSlotsError(null);
   }, []);
 
+  const persistConfirmed = useCallback((value: ConfirmedPickup | null) => {
+    setConfirmed(value);
+    writePersistedConfirmed(value);
+  }, []);
+
+  const clearConfirmedSlot = useCallback(
+    (message?: string) => {
+      persistConfirmed(null);
+      setDraft((prev) => ({ ...prev, dateKey: null, timeSlotId: null }));
+      if (message) setValidationError(message);
+    },
+    [persistConfirmed],
+  );
+
   const reloadBoutiques = useCallback(() => {
     setBoutiquesStatus("loading");
     setBoutiquesError(null);
@@ -114,14 +150,32 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const reloadDates = useCallback(() => {
-    if (!draft.boutiqueId) return;
+    if (!draft.boutiqueId) {
+      setDatesStatus("idle");
+      setDatesError(null);
+      setAvailableDateKeys([]);
+      setValidationError(PICKUP_MESSAGES.missingBoutique);
+      return;
+    }
     setDatesStatus("loading");
     setDatesError(null);
     setDatesReloadToken((value) => value + 1);
   }, [draft.boutiqueId]);
 
   const reloadSlots = useCallback(() => {
-    if (!draft.boutiqueId || !draft.dateKey) return;
+    if (!draft.boutiqueId) {
+      setSlotsStatus("idle");
+      setSlotsError(null);
+      setTimeSlots([]);
+      setValidationError(PICKUP_MESSAGES.missingBoutique);
+      return;
+    }
+    if (!draft.dateKey) {
+      setSlotsStatus("idle");
+      setSlotsError(null);
+      setTimeSlots([]);
+      return;
+    }
     setSlotsStatus("loading");
     setSlotsError(null);
     setSlotsReloadToken((value) => value + 1);
@@ -135,10 +189,21 @@ export function PickupProvider({ children }: { children: ReactNode }) {
         if (controller.signal.aborted) return;
         setBoutiques(rows);
         setBoutiquesStatus(rows.length === 0 ? "empty" : "success");
+        setConfirmed((prev) => {
+          if (!prev) return prev;
+          const boutique = rows.find((item) => item.id === prev.boutique.id);
+          if (!boutique) {
+            writePersistedConfirmed(null);
+            return null;
+          }
+          if (boutique === prev.boutique) return prev;
+          const next = { ...prev, boutique };
+          writePersistedConfirmed(next);
+          return next;
+        });
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (controller.signal.aborted || isAbortError(error)) return;
         setBoutiques([]);
         setBoutiquesError(errorMessage(error, "Unable to load boutiques."));
         setBoutiquesStatus("error");
@@ -150,6 +215,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   // Probe candidate dates via the availability API for the selected boutique.
   useEffect(() => {
     const boutiqueId = draft.boutiqueId;
+    // Missing boutique: do not fetch (handlers keep status idle / show gate message).
     if (!boutiqueId) return;
 
     const controller = new AbortController();
@@ -171,16 +237,25 @@ export function PickupProvider({ children }: { children: ReactNode }) {
           .map((row) => row.dateKey);
         setAvailableDateKeys(keys);
         setDatesStatus(keys.length === 0 ? "empty" : "success");
+
+        let clearedDate = false;
         setDraft((prev) => {
-          if (!prev.dateKey || keys.includes(prev.dateKey)) return prev;
+          const reconciled = reconcileDraftDate(prev.dateKey, keys);
+          if (!reconciled.cleared) return prev;
+          clearedDate = true;
           return { ...prev, dateKey: null, timeSlotId: null };
         });
+        if (clearedDate) {
+          setValidationError(PICKUP_MESSAGES.staleDate);
+          setTimeSlots([]);
+          setSlotsStatus("idle");
+          setSlotsError(null);
+        }
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (controller.signal.aborted || isAbortError(error)) return;
         setAvailableDateKeys([]);
-        setDatesError(errorMessage(error, "Unable to load pickup dates."));
+        setDatesError(errorMessage(error, PICKUP_MESSAGES.datesFailed));
         setDatesStatus("error");
       });
 
@@ -191,6 +266,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const boutiqueId = draft.boutiqueId;
     const dateKey = draft.dateKey;
+    // Slots load only after boutique + date are selected.
     if (!boutiqueId || !dateKey) return;
 
     const controller = new AbortController();
@@ -204,17 +280,22 @@ export function PickupProvider({ children }: { children: ReactNode }) {
         const slots = availability.slots;
         setTimeSlots(slots);
         setSlotsStatus(slots.length === 0 ? "empty" : "success");
+
+        let clearedSlot = false;
         setDraft((prev) => {
-          if (!prev.timeSlotId) return prev;
-          if (slots.some((slot) => slot.id === prev.timeSlotId)) return prev;
+          const reconciled = reconcileDraftTimeSlot(prev.timeSlotId, slots);
+          if (!reconciled.cleared) return prev;
+          clearedSlot = true;
           return { ...prev, timeSlotId: null };
         });
+        if (clearedSlot) {
+          setValidationError(PICKUP_MESSAGES.staleSlot);
+        }
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (controller.signal.aborted || isAbortError(error)) return;
         setTimeSlots([]);
-        setSlotsError(errorMessage(error, "Unable to load time slots."));
+        setSlotsError(errorMessage(error, PICKUP_MESSAGES.slotsFailed));
         setSlotsStatus("error");
       });
 
@@ -236,6 +317,10 @@ export function PickupProvider({ children }: { children: ReactNode }) {
         setTimeSlots([]);
         setSlotsStatus("loading");
         setSlotsError(null);
+        // Reopening with the same boutique/date must still refetch.
+        // Without bumping tokens, effects skip and the UI stays on Loading….
+        setDatesReloadToken((value) => value + 1);
+        setSlotsReloadToken((value) => value + 1);
         setStep(opts?.step ?? "datetime");
       } else {
         setDraft(emptyDraft);
@@ -294,7 +379,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
 
   const confirmSelection = useCallback(() => {
     if (!draft.boutiqueId) {
-      setValidationError("Please select an outlet to continue.");
+      setValidationError(PICKUP_MESSAGES.missingBoutique);
       setStep("boutique");
       return false;
     }
@@ -319,7 +404,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    setConfirmed({
+    persistConfirmed({
       boutique,
       dateKey: draft.dateKey,
       timeSlot,
@@ -327,15 +412,15 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     setValidationError(null);
     setIsOpen(false);
     return true;
-  }, [boutiques, draft, timeSlots]);
+  }, [boutiques, draft, persistConfirmed, timeSlots]);
 
   const resetSelection = useCallback(() => {
-    setConfirmed(null);
+    persistConfirmed(null);
     setDraft(emptyDraft);
     clearAvailability();
     setValidationError(null);
     setStep("service");
-  }, [clearAvailability]);
+  }, [clearAvailability, persistConfirmed]);
 
   const value = useMemo<PickupContextValue>(
     () => ({
@@ -352,8 +437,16 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       clearValidationError,
       confirmSelection,
       confirmed,
-      isPickupComplete: confirmed !== null,
+      isPickupComplete: Boolean(
+        confirmed &&
+          hasValidConfirmedPickupIds({
+            boutiqueId: confirmed.boutique.id,
+            dateKey: confirmed.dateKey,
+            timeSlotId: confirmed.timeSlot.id,
+          }),
+      ),
       resetSelection,
+      clearConfirmedSlot,
       boutiques,
       boutiquesStatus,
       boutiquesError,
@@ -381,6 +474,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       confirmSelection,
       confirmed,
       resetSelection,
+      clearConfirmedSlot,
       boutiques,
       boutiquesStatus,
       boutiquesError,

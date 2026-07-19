@@ -5,11 +5,18 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
+  min-height: 0;
   background: var(--color-white, #fff);
   font-family: var(--main-font-family, var(--font-lora), Georgia, serif);
 }
 
-.cart-panel .content-cart {
+.cart-panel--items-only {
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.cart-panel .content-cart,
+.cart-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
@@ -17,8 +24,13 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.cart-panel--items-only .content-cart {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
 .cart-panel #box-content-cart {
-  min-height: 225px;
+  min-height: 0;
   padding-bottom: 8px;
 }
 
@@ -50,7 +62,7 @@
 
 .cart-panel .order-list {
   margin: 0;
-  padding: 0 7px 50px;
+  padding: 0 7px 16px;
   list-style: none;
 }
 
@@ -122,6 +134,10 @@
   word-break: break-word;
 }
 
+.cart-panel .item .cart-line-invalid {
+  color: #a94442;
+}
+
 .cart-panel .item .action-block {
   display: flex;
   align-items: center;
@@ -150,6 +166,11 @@
 .cart-panel .cart-qty-group .btn-number.minus {
   color: var(--main-color, #84754e);
   background: #fff;
+}
+
+.cart-panel .cart-qty-group .btn-number:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .cart-panel .cart-qty-group {
@@ -201,19 +222,32 @@
   border: 1px solid #ebccd1;
 }
 
+/* Checkout footer — never inside the item scroller */
+.cart-checkout-footer,
+.cart-footer,
 .cart-panel #info-total-cart {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  height: auto;
+  min-height: min-content;
   border-top: 1px solid #e6e6e6;
   background: #fff;
+  z-index: 2;
+  overflow: visible;
 }
 
+.cart-checkout-footer .summary-price-list,
 .cart-panel .summary-price-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   margin: 0;
-  padding: 12px 15px;
+  padding: 10px 12px 0;
 }
 
+.cart-checkout-footer .summary-price-item,
 .cart-panel .summary-price-item {
   display: flex;
   align-items: center;
@@ -222,21 +256,35 @@
   font-size: 13px;
 }
 
+.cart-checkout-footer .summary-price-item.total-row,
 .cart-panel .summary-price-item.total-row {
   font-size: 14px;
   font-weight: 700;
 }
 
+.cart-checkout-footer #content-cart-checkout,
 .cart-panel #content-cart-checkout {
-  padding: 12px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
+.cart-checkout-footer #checkoutArea4Click,
+.cart-panel #checkoutArea4Click {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: visible;
+}
+
+.cart-checkout-footer #btnCheckOut,
 .cart-panel #btnCheckOut {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: var(--checkout-height, 46px);
   height: var(--checkout-height, 46px);
   padding: 0 18px;
   color: #fff;
@@ -248,23 +296,29 @@
   border: 0;
   border-radius: var(--radius-control, 12px);
   cursor: pointer;
+  visibility: visible;
+  opacity: 1;
+  flex-shrink: 0;
 }
 
+.cart-checkout-footer #btnCheckOut:disabled,
 .cart-panel #btnCheckOut:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
+.cart-checkout-footer .cart-pickup-gate,
 .cart-panel .cart-pickup-gate {
-  margin: 0 0 10px;
-  padding: 10px 12px;
+  margin: 0;
+  padding: 8px 10px;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: #a94442;
   background: #f2dede;
   border: 1px solid #ebccd1;
 }
 
+.cart-checkout-footer .cart-pickup-gate-link,
 .cart-panel .cart-pickup-gate-link {
   padding: 0;
   color: var(--main-color, #84754e);
@@ -277,15 +331,7 @@
   cursor: pointer;
 }
 
-.cart-drawer-fulfillment {
-  flex: 0 0 auto;
-  border-bottom: 1px solid #e6e6e6;
-}
-
-.cart-drawer-fulfillment .tab-service-main {
-  margin: 0;
-}
-
+.cart-checkout-footer .checkout-all-content,
 .cart-panel .checkout-all-content {
   display: flex;
   align-items: center;
@@ -294,16 +340,32 @@
   gap: 8px;
 }
 
+.cart-drawer-pickup,
+.cart-block-pickup {
+  flex: 0 0 auto;
+  border-bottom: 1px solid #e6e6e6;
+  background: #fff;
+}
+
+.cart-drawer-pickup .tab-service-main,
+.cart-block-pickup .tab-service-main {
+  margin: 0;
+}
+
 /* Mobile drawer overlay */
 .cart-drawer-root {
   position: fixed;
   inset: 0;
   z-index: 80;
   display: none;
+  overflow: hidden;
 }
 
 .cart-drawer-root.is-open {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  /* No justify-content: flex-end — that contributed to footer clipping. */
+  align-items: stretch;
 }
 
 .cart-drawer-backdrop {
@@ -315,27 +377,45 @@
   cursor: pointer;
 }
 
+/*
+ * Outer sheet: viewport-capped height.
+ * Grid rows: header/pickup/footer = natural (auto), items = 1fr (scroll).
+ * Grid auto-rows size footer from real content — avoids flex min-content collapse
+ * that was clipping Proceed to Checkout below the sheet.
+ */
 .cart-drawer-sheet {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  height: min(92vh, 760px);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: auto;
+  flex: 0 0 auto;
+  height: min(92dvh, 100%);
+  max-height: 92dvh;
   background: #fff;
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
 
+@supports not (height: 100dvh) {
+  .cart-drawer-sheet {
+    height: min(92vh, 100%);
+    max-height: 92vh;
+  }
+}
+
 .cart-drawer-sheet .cart-drawer-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid #e6e6e6;
+  background: #fff;
 }
 
 .cart-drawer-sheet .cart-drawer-header h2 {
@@ -356,8 +436,127 @@
   cursor: pointer;
 }
 
-.cart-drawer-sheet .cart-panel {
+.cart-drawer-pickup {
+  flex: 0 0 auto;
+  min-height: min-content;
+}
+
+/* Only cart lines scroll — 1fr row shrinks before the footer is clipped */
+.cart-drawer-body {
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+}
+
+.cart-drawer-footer {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+  height: auto;
+  min-height: min-content;
+  /* Keep CTA fully above the sheet edge + iOS home indicator. */
+  padding: 0 0 max(20px, env(safe-area-inset-bottom, 0px));
+  background: #fff;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
+  overflow: visible;
+}
+
+.cart-drawer-footer .cart-checkout-footer {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: auto;
+  min-height: min-content;
+  border-top: 0;
+}
+
+.cart-drawer-footer #content-cart-price,
+.cart-drawer-footer #content-cart-checkout {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  height: auto;
+  min-height: min-content;
+  box-sizing: border-box;
+}
+
+.cart-drawer-footer #content-cart-checkout {
+  /* Safe-area handled by .cart-drawer-footer — avoid double bottom padding. */
+  padding-bottom: 12px;
+}
+
+.cart-drawer-footer #checkoutArea4Click,
+.cart-drawer-footer #btnCheckOut {
+  flex-shrink: 0;
+  min-height: min-content;
+}
+
+/*
+ * Desktop cart rail — same contract as the drawer:
+ * pickup/footer = natural height; items = flex 1 1 0 (scroll).
+ * Definite height so the item region can shrink without collapsing to ~0.
+ */
+.cart-block.cart-block--split {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: min(760px, calc(100dvh - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
+  overflow: hidden;
+  background: var(--color-white, #fff);
+  border-radius: 20px 0 0 20px;
+}
+
+@supports not (height: 100dvh) {
+  .cart-block.cart-block--split {
+    height: min(760px, calc(100vh - 32px));
+    max-height: min(760px, calc(100vh - 32px));
+  }
+}
+
+.cart-block-pickup {
+  flex: 0 0 auto;
+  min-height: min-content;
+}
+
+.cart-block-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cart-block-footer {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: auto;
+  min-height: min-content;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  background: #fff;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
+  overflow: visible;
+}
+
+.cart-block-footer .cart-checkout-footer {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: auto;
+  min-height: min-content;
+}
+
+.cart-block-footer #content-cart-price,
+.cart-block-footer #content-cart-checkout {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: min-content;
 }
 
 @media (min-width: 992px) {
@@ -365,13 +564,15 @@
     display: none !important;
   }
 
-  .cart-panel.desktop-cart-panel #box-content-cart {
-    max-height: 420px;
+  /* Let sticky cart rail travel the full content column height. */
+  .sidebar {
+    align-self: stretch;
   }
 }
 
 @media (max-width: 991px) {
-  .sidebar .desktop-cart-panel {
+  .sidebar .desktop-cart-panel,
+  .sidebar .cart-block--split {
     display: none;
   }
 }

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { submitCheckout } from "@/lib/api/checkout";
 import { ApiClientError } from "@/lib/api/client";
+import { fetchPickupAvailability } from "@/lib/api/pickup";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useCart } from "../cart/CartContext";
 import { usePickup } from "../pickup/PickupContext";
+import { PICKUP_MESSAGES, slotsContainId } from "../pickup/pickup-availability";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import { useCheckout } from "./CheckoutContext";
 import "./checkout.css";
@@ -34,8 +36,12 @@ function errorMessage(error: unknown, fallback: string): string {
 export default function CheckoutPageClient() {
   const router = useRouter();
   const { items, itemCount } = useCart();
-  const { confirmed: pickup, isPickupComplete, openPickupSelection } =
-    usePickup();
+  const {
+    confirmed: pickup,
+    isPickupComplete,
+    openPickupSelection,
+    clearConfirmedSlot,
+  } = usePickup();
   const { info, setField, errors, confirmCheckoutInfo } = useCheckout();
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "loading" | "error"
@@ -55,6 +61,18 @@ export default function CheckoutPageClient() {
     setSubmitError(null);
 
     try {
+      // Client-side revalidation — cart remains intact on stale slot rejection.
+      const availability = await fetchPickupAvailability({
+        boutiqueId: pickup.boutique.id,
+        dateKey: pickup.dateKey,
+      });
+      if (!slotsContainId(availability.slots, pickup.timeSlot.id)) {
+        clearConfirmedSlot(PICKUP_MESSAGES.checkoutStaleSlot);
+        setSubmitStatus("error");
+        setSubmitError(PICKUP_MESSAGES.checkoutStaleSlot);
+        return;
+      }
+
       const result = await submitCheckout({
         customer: {
           firstName,
@@ -71,9 +89,20 @@ export default function CheckoutPageClient() {
       router.push(`/payment?orderId=${encodeURIComponent(result.orderId)}`);
     } catch (error: unknown) {
       setSubmitStatus("error");
-      setSubmitError(
-        errorMessage(error, "Unable to create draft order. Please try again."),
+      const message = errorMessage(
+        error,
+        "Unable to create draft order. Please try again.",
       );
+      if (
+        error instanceof ApiClientError &&
+        (error.code === "NOT_FOUND" || error.code === "VALIDATION_ERROR") &&
+        /pickup|slot|availability/i.test(error.message)
+      ) {
+        clearConfirmedSlot(PICKUP_MESSAGES.checkoutStaleSlot);
+        setSubmitError(PICKUP_MESSAGES.checkoutStaleSlot);
+        return;
+      }
+      setSubmitError(message);
     }
   }
 
