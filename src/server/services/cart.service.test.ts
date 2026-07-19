@@ -216,4 +216,72 @@ describe("DefaultCartService ordering parity", () => {
         error instanceof AppError && error.code === "VALIDATION_ERROR",
     );
   });
+
+  it("rejects add when catalog price is unavailable", async () => {
+    const service = createService(
+      makeProduct({ priceThb: null, priceMinor: null }),
+    );
+    await assert.rejects(
+      () =>
+        service.addItem(undefined, {
+          productId: "prod-napoleon-iii-macaron-8pcs",
+          quantity: 1,
+          modifiers: completeModifiers,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.code === "VALIDATION_ERROR" &&
+        error.message.includes("Price unavailable"),
+    );
+  });
+
+  it("does not alter subtotal when optional unpriced add-on is omitted", async () => {
+    const service = createService(
+      makeProduct({
+        modifierGroups: [
+          {
+            id: "choice-of-macarons",
+            title: "Choice of Macarons:",
+            requiredText: "Please select 8",
+            type: "quantity",
+            exactSelectionQuantity: 8,
+            required: true,
+            options: ["Rose", "Chocolate"],
+          },
+          {
+            id: "pickup-acknowledgement",
+            title:
+              "[CONTENT PENDING APPROVAL] Product handling acknowledgement (Pickup)",
+            requiredText: "Please select 1",
+            type: "radio",
+            required: true,
+            isAcknowledgement: true,
+            options: [ACK],
+          },
+          {
+            id: "unpriced-addon",
+            title: "Optional add-on",
+            requiredText: null,
+            type: "radio",
+            required: false,
+            options: ["Unpriced Ribbon"],
+            optionDetails: [
+              {
+                label: "Unpriced Ribbon",
+                priceMinor: null,
+                isActive: true,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const cart = await service.addItem(undefined, {
+      productId: "prod-napoleon-iii-macaron-8pcs",
+      quantity: 1,
+      modifiers: completeModifiers,
+    });
+    assert.equal(cart.subtotalThb, 990);
+    assert.equal(cart.items[0]?.unitPriceMinor, 99000);
+  });
 });

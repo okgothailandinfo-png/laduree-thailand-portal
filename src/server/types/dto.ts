@@ -163,6 +163,8 @@ export type OrderDto = {
     | "cancelled"
     | "mock_placed";
   currency: "THB";
+  /** Server-trusted order total in THB major units (never client-submitted). */
+  totalThb: number;
   createdAt: string;
   items: Array<{
     productId: string;
@@ -196,12 +198,16 @@ export type CheckoutCustomerRequestDto = {
 
 export type CheckoutPickupRequestDto = {
   boutiqueId: string;
+  /** Asia/Bangkok calendar date YYYY-MM-DD — authoritative for order pickup date. */
+  dateKey: string;
   pickupSlotId: string;
 };
 
 export type CheckoutRequestDto = {
   customer: CheckoutCustomerRequestDto;
   pickup: CheckoutPickupRequestDto;
+  /** Must be true; server rejects missing/false acknowledgements. */
+  termsAccepted: boolean;
 };
 
 export type CheckoutResponseDto = {

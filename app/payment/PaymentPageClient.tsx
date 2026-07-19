@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { ApiClientError } from "@/lib/api/client";
+import { formatPriceThb } from "@/lib/api/catalog";
+import { fetchOrderById } from "@/lib/api/orders";
 import { createPayment } from "@/lib/api/payment";
 import CatalogStatus from "../catalog/CatalogStatus";
+import { useAsyncResource } from "../catalog/useAsyncResource";
+import { CHECKOUT_BLOCKING_MESSAGES } from "../cart/checkout-eligibility";
 import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
 import {
@@ -63,6 +67,17 @@ export default function PaymentPageClient({
   >("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const orderQuery = useAsyncResource(
+    (signal) => {
+      if (!orderId) return Promise.resolve(null);
+      return fetchOrderById(orderId, { signal });
+    },
+    {
+      deps: [orderId],
+      isEmpty: (data) => data === null,
+    },
+  );
+
   const isEmpty = items.length === 0;
   const canPay =
     !isEmpty &&
@@ -73,6 +88,12 @@ export default function PaymentPageClient({
   const isSubmitting = submitStatus === "loading";
 
   const customer = useMemo(() => checkout, [checkout]);
+
+  const order = orderId ? orderQuery.data : null;
+  const trustedTotalLabel =
+    order && typeof order.totalThb === "number" && Number.isFinite(order.totalThb)
+      ? formatPriceThb(order.totalThb)
+      : "฿ —";
 
   function setCardField<K extends keyof CardDraft>(key: K, value: string) {
     setCard((current) => ({ ...current, [key]: value }));
@@ -160,7 +181,7 @@ export default function PaymentPageClient({
 
         {isEmpty ? (
           <div className="payment-gate" role="alert">
-            Your cart is empty.Add at least 1 item to checkout!{" "}
+            {CHECKOUT_BLOCKING_MESSAGES.emptyCart}{" "}
             <Link href="/">Home</Link>
           </div>
         ) : null}
@@ -222,6 +243,26 @@ export default function PaymentPageClient({
                   </li>
                 ))}
               </ul>
+              {orderId &&
+              (orderQuery.status === "loading" ||
+                orderQuery.status === "error") ? (
+                <div className="payment-order-status">
+                  <CatalogStatus
+                    status={
+                      orderQuery.status === "loading" ? "loading" : "error"
+                    }
+                    errorMessage={
+                      orderQuery.errorMessage ??
+                      "Unable to load order totals. Please try again."
+                    }
+                    onRetry={
+                      orderQuery.status === "error"
+                        ? orderQuery.reload
+                        : undefined
+                    }
+                  />
+                </div>
+              ) : null}
               <div className="payment-totals">
                 <div className="payment-totals__row">
                   <span>Item(s) Total</span>
@@ -229,7 +270,9 @@ export default function PaymentPageClient({
                 </div>
                 <div className="payment-totals__row">
                   <span>Subtotal</span>
-                  <span>฿ —</span>
+                  <span data-testid="payment-trusted-subtotal">
+                    {trustedTotalLabel}
+                  </span>
                 </div>
                 <div className="payment-totals__row">
                   <span>Tax</span>
@@ -237,7 +280,9 @@ export default function PaymentPageClient({
                 </div>
                 <div className="payment-totals__row total">
                   <span>Total</span>
-                  <span>฿ —</span>
+                  <span data-testid="payment-trusted-total">
+                    {trustedTotalLabel}
+                  </span>
                 </div>
               </div>
             </section>

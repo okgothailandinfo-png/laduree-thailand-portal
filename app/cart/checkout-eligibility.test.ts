@@ -128,6 +128,19 @@ describe("cart checkout CTA eligibility", () => {
     assert.equal(result.diagnostics.checkoutEligible, true);
   });
 
+  it("disables the CTA when pickup slot is stale and keeps cart CTA visible", () => {
+    const result = getCheckoutEligibility({
+      items: [completeBoxItem],
+      confirmed: validConfirmed,
+      cartStatus: "success",
+      pickupSlotAvailable: false,
+    });
+    assert.equal(result.ctaVisible, true);
+    assert.equal(result.canCheckout, false);
+    assert.equal(result.reason, CHECKOUT_BLOCKING_MESSAGES.stalePickupSlot);
+    assert.equal(result.diagnostics.pickupSlotAvailable, false);
+  });
+
   it("allows outer box quantity greater than 1 when flavour selection is complete", () => {
     const result = getCheckoutEligibility({
       items: [{ ...completeBoxItem, quantity: 2 }],

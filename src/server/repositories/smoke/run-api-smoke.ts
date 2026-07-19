@@ -251,6 +251,7 @@ async function run(): Promise<void> {
       typeof created.orderNumber === "string" &&
       created.status === "mock_placed" &&
       isPlainObject(created.payment) &&
+      typeof created.totalThb === "number" &&
       !("totalMinor" in created);
 
     results.push({

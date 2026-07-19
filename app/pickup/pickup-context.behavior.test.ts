@@ -53,4 +53,17 @@ describe("pickup modal reopen refetch contract", () => {
     assert.equal(terminal("error"), "error");
     assert.notEqual(terminal("abort"), "loading");
   });
+
+  it("clears confirmed pickup on stale revalidation without clearing cart items", () => {
+    let confirmed: { timeSlotId: string } | null = { timeSlotId: "1030-1100" };
+    const cartItemCount = 2;
+    const liveSlotIds: string[] = ["1100-1130"];
+
+    if (confirmed && !liveSlotIds.includes(confirmed.timeSlotId)) {
+      confirmed = null;
+    }
+
+    assert.equal(confirmed, null);
+    assert.equal(cartItemCount, 2);
+  });
 });

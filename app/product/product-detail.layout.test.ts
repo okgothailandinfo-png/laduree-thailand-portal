@@ -31,3 +31,16 @@ describe("cart footer remains visible with multiple lines", () => {
     assert.match(css, /\.cart-drawer-body\s*\{[^}]*overflow-y:\s*auto/s);
   });
 });
+
+describe("product detail invalid price blocks ADD", () => {
+  it("gates ADD on priceAvailable and uses disabled attribute", () => {
+    const source = readFileSync(
+      path.join(process.cwd(), "app/product/[slug]/ProductDetailClient.tsx"),
+      "utf8",
+    );
+    assert.match(source, /const priceAvailable =/);
+    assert.match(source, /!priceAvailable/);
+    assert.match(source, /disabled=\{addDisabled\}/);
+    assert.match(source, /configuredUnitPriceMinor === null/);
+  });
+});
