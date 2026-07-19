@@ -19,7 +19,8 @@ export default function CartCheckoutFooter({
 }: CartCheckoutFooterProps) {
   const router = useRouter();
   const { items, itemCount, subtotalThb, status, closeDrawer } = useCart();
-  const { confirmed, openPickupSelection } = usePickup();
+  const { confirmed, confirmedSlotAvailable, openPickupSelection } =
+    usePickup();
 
   const eligibility = getCheckoutEligibility({
     items: items.map((item) => ({
@@ -37,6 +38,7 @@ export default function CartCheckoutFooter({
         }
       : null,
     cartStatus: status,
+    pickupSlotAvailable: confirmedSlotAvailable,
   });
 
   useEffect(() => {

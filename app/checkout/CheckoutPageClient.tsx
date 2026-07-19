@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { submitCheckout } from "@/lib/api/checkout";
 import { ApiClientError } from "@/lib/api/client";
 import { fetchPickupAvailability } from "@/lib/api/pickup";
 import CatalogStatus from "../catalog/CatalogStatus";
+import { CHECKOUT_BLOCKING_MESSAGES } from "../cart/checkout-eligibility";
 import { useCart } from "../cart/CartContext";
 import { usePickup } from "../pickup/PickupContext";
 import { PICKUP_MESSAGES, slotsContainId } from "../pickup/pickup-availability";
@@ -47,6 +48,7 @@ export default function CheckoutPageClient() {
     "idle" | "loading" | "error"
   >("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const isEmpty = items.length === 0;
   const canProceedToForm = !isEmpty && isPickupComplete;
@@ -59,6 +61,13 @@ export default function CheckoutPageClient() {
     const { firstName, lastName } = splitCustomerName(info.customerName);
     setSubmitStatus("loading");
     setSubmitError(null);
+
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
 
     try {
       // Client-side revalidation — cart remains intact on stale slot rejection.
@@ -73,18 +82,24 @@ export default function CheckoutPageClient() {
         return;
       }
 
-      const result = await submitCheckout({
-        customer: {
-          firstName,
-          lastName,
-          email: info.email.trim(),
-          phone: info.mobileNumber.trim(),
+      const result = await submitCheckout(
+        {
+          customer: {
+            firstName,
+            lastName,
+            email: info.email.trim(),
+            phone: info.mobileNumber.trim(),
+          },
+          pickup: {
+            boutiqueId: pickup.boutique.id,
+            dateKey: pickup.dateKey,
+            pickupSlotId: pickup.timeSlot.id,
+          },
+          termsAccepted: info.termsAccepted === true,
         },
-        pickup: {
-          boutiqueId: pickup.boutique.id,
-          pickupSlotId: pickup.timeSlot.id,
-        },
-      });
+        { idempotencyKey: idempotencyKeyRef.current },
+      );
+      idempotencyKeyRef.current = null;
       setSubmitStatus("idle");
       router.push(`/payment?orderId=${encodeURIComponent(result.orderId)}`);
     } catch (error: unknown) {
@@ -125,7 +140,7 @@ export default function CheckoutPageClient() {
 
         {isEmpty ? (
           <div className="checkout-gate" role="alert">
-            Your cart is empty.Add at least 1 item to checkout!{" "}
+            {CHECKOUT_BLOCKING_MESSAGES.emptyCart}{" "}
             <Link href="/">Home</Link>
           </div>
         ) : null}

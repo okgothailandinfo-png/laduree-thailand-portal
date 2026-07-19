@@ -182,6 +182,14 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   function handleAddToCart() {
     if (!product) return;
 
+    if (
+      product.priceThb === null ||
+      configuredUnitPriceMinor === null ||
+      Number.isNaN(product.priceThb)
+    ) {
+      return;
+    }
+
     if (!allExactSelectionsComplete) {
       const incomplete = exactGroups.find(
         (group) =>
@@ -273,7 +281,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   }
 
   const priceLabel = formatPriceThb(product.priceThb);
-  const addDisabled = !allExactSelectionsComplete || !requiredComplete;
+  const priceAvailable =
+    product.priceThb !== null &&
+    !Number.isNaN(product.priceThb) &&
+    configuredUnitPriceMinor !== null;
+  const addDisabled =
+    !allExactSelectionsComplete || !requiredComplete || !priceAvailable;
 
   return (
     <div className="product-detail-page modal-product-detail">
@@ -684,6 +697,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   id="btn-AddToCart"
                   className={`btn${addDisabled ? " is-disabled" : ""}`}
                   type="button"
+                  disabled={addDisabled}
                   aria-disabled={addDisabled}
                   onClick={handleAddToCart}
                 >

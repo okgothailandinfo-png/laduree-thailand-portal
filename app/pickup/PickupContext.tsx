@@ -20,6 +20,7 @@ import {
   readPersistedConfirmed,
   reconcileDraftDate,
   reconcileDraftTimeSlot,
+  slotsContainId,
   writePersistedConfirmed,
 } from "./pickup-availability";
 import { getCandidateDateKeys } from "./pickup-dates";
@@ -53,6 +54,8 @@ type PickupContextValue = {
   confirmSelection: () => boolean;
   confirmed: ConfirmedPickup | null;
   isPickupComplete: boolean;
+  /** False when live availability no longer includes the confirmed slot. */
+  confirmedSlotAvailable: boolean;
   resetSelection: () => void;
   clearConfirmedSlot: (message?: string) => void;
   boutiques: Boutique[];
@@ -102,6 +105,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   const [confirmed, setConfirmed] = useState<ConfirmedPickup | null>(() =>
     readPersistedConfirmed(),
   );
+  const [confirmedSlotAvailable, setConfirmedSlotAvailable] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [boutiques, setBoutiques] = useState<Boutique[]>([]);
   const [boutiquesStatus, setBoutiquesStatus] = useState<
@@ -132,11 +136,13 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   const persistConfirmed = useCallback((value: ConfirmedPickup | null) => {
     setConfirmed(value);
     writePersistedConfirmed(value);
+    if (value) setConfirmedSlotAvailable(true);
   }, []);
 
   const clearConfirmedSlot = useCallback(
     (message?: string) => {
       persistConfirmed(null);
+      setConfirmedSlotAvailable(true);
       setDraft((prev) => ({ ...prev, dateKey: null, timeSlotId: null }));
       if (message) setValidationError(message);
     },
@@ -211,6 +217,49 @@ export function PickupProvider({ children }: { children: ReactNode }) {
 
     return () => controller.abort();
   }, [boutiquesReloadToken]);
+
+  // Revalidate a persisted confirmed slot so the cart CTA cannot proceed on stale times.
+  // Cart items are never cleared — only the pickup confirmation is rejected.
+  useEffect(() => {
+    if (!confirmed) return;
+
+    const boutiqueId = confirmed.boutique.id;
+    const dateKey = confirmed.dateKey;
+    const timeSlotId = confirmed.timeSlot.id;
+    const controller = new AbortController();
+
+    fetchPickupAvailability(
+      { boutiqueId, dateKey },
+      { signal: controller.signal },
+    )
+      .then((availability) => {
+        if (controller.signal.aborted) return;
+        // Ignore stale responses if the user confirmed a different slot meanwhile.
+        const latest = readPersistedConfirmed();
+        if (
+          !latest ||
+          latest.boutique.id !== boutiqueId ||
+          latest.dateKey !== dateKey ||
+          latest.timeSlot.id !== timeSlotId
+        ) {
+          return;
+        }
+        if (!slotsContainId(availability.slots, timeSlotId)) {
+          clearConfirmedSlot(PICKUP_MESSAGES.staleSlot);
+          return;
+        }
+        setConfirmedSlotAvailable(true);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || isAbortError(error)) return;
+        // Network failures must not clear a valid selection; checkout rechecks.
+        setConfirmedSlotAvailable(true);
+      });
+
+    return () => controller.abort();
+    // confirmed identity is intentionally keyed by boutique/date/slot ids.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid refetch on boutique object identity churn
+  }, [confirmed?.boutique.id, confirmed?.dateKey, confirmed?.timeSlot.id, clearConfirmedSlot]);
 
   // Probe candidate dates via the availability API for the selected boutique.
   useEffect(() => {
@@ -439,12 +488,14 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       confirmed,
       isPickupComplete: Boolean(
         confirmed &&
+          confirmedSlotAvailable &&
           hasValidConfirmedPickupIds({
             boutiqueId: confirmed.boutique.id,
             dateKey: confirmed.dateKey,
             timeSlotId: confirmed.timeSlot.id,
           }),
       ),
+      confirmedSlotAvailable,
       resetSelection,
       clearConfirmedSlot,
       boutiques,
@@ -473,6 +524,7 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       clearValidationError,
       confirmSelection,
       confirmed,
+      confirmedSlotAvailable,
       resetSelection,
       clearConfirmedSlot,
       boutiques,

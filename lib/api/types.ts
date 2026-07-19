@@ -175,8 +175,10 @@ export type CheckoutRequest = {
   };
   pickup: {
     boutiqueId: string;
+    dateKey: string;
     pickupSlotId: string;
   };
+  termsAccepted: boolean;
 };
 
 export type CheckoutResponse = {
@@ -199,6 +201,8 @@ export type OrderDetail = {
     | "cancelled"
     | "mock_placed";
   currency: "THB";
+  /** Server-trusted order total in THB major units. */
+  totalThb: number;
   createdAt: string;
   items: Array<{
     productId: string;

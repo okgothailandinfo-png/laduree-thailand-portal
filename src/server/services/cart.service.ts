@@ -173,6 +173,21 @@ export class DefaultCartService implements CartService {
     const modifiers = input.modifiers ?? [];
     assertProductConfiguration(product, modifiers, input.quantity);
 
+    const catalog = catalogPriceFields(product, modifiers);
+    if (catalog.unitPriceMinor === null) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Price unavailable for one or more products.",
+        {
+          details: {
+            field: "productId",
+            code: "PRICE_UNAVAILABLE",
+            productId: product.id,
+          },
+        },
+      );
+    }
+
     const exactGroups = getExactSelectionGroups(product.modifierGroups);
     const exactSelectionQuantity =
       exactGroups[0]?.exactSelectionQuantity ?? null;
@@ -198,7 +213,7 @@ export class DefaultCartService implements CartService {
       cart.items[existingIndex] = {
         ...existing,
         quantity: existing.quantity + input.quantity,
-        ...catalogPriceFields(product, modifiers),
+        ...catalog,
         exactSelectionQuantity,
       };
     } else {
@@ -211,7 +226,7 @@ export class DefaultCartService implements CartService {
         modifiers,
         note: input.note,
         exactSelectionQuantity,
-        ...catalogPriceFields(product, modifiers),
+        ...catalog,
       };
       cart.items.push(item);
     }

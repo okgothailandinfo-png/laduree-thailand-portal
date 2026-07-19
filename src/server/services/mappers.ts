@@ -83,6 +83,7 @@ export function toOrderDto(order: Order): OrderDto {
     orderNumber: order.orderNumber,
     status: order.status,
     currency: order.currency,
+    totalThb: order.totalMinor / 100,
     createdAt: order.createdAt,
     items: order.items.map((item) => ({
       productId: item.productId,

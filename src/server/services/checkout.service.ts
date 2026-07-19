@@ -17,6 +17,7 @@ import type {
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
 import {
+  isDateKey,
   isValidEmail,
   isValidPhone,
   requireObject,
@@ -58,6 +59,23 @@ export class DefaultCheckoutService {
       });
     }
 
+    const dateKey = requireString(pickupRaw.dateKey, "pickup.dateKey");
+    if (!isDateKey(dateKey)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.dateKey must be YYYY-MM-DD.",
+        { details: { field: "pickup.dateKey" } },
+      );
+    }
+
+    if (body.termsAccepted !== true) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Terms and conditions must be accepted.",
+        { details: { field: "termsAccepted" } },
+      );
+    }
+
     return {
       customer: {
         firstName: requireString(customerRaw.firstName, "customer.firstName"),
@@ -67,11 +85,13 @@ export class DefaultCheckoutService {
       },
       pickup: {
         boutiqueId: requireString(pickupRaw.boutiqueId, "pickup.boutiqueId"),
+        dateKey,
         pickupSlotId: requireString(
           pickupRaw.pickupSlotId,
           "pickup.pickupSlotId",
         ),
       },
+      termsAccepted: true,
     };
   }
 
@@ -119,11 +139,19 @@ export class DefaultCheckoutService {
         { details: { field: "pickup.pickupSlotId" } },
       );
     }
+    // Prisma rows bind slots to a calendar date; mock templates leave dateKey empty.
+    if (slot.dateKey && slot.dateKey !== input.pickup.dateKey) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.dateKey does not match the selected pickup slot.",
+        { details: { field: "pickup.dateKey" } },
+      );
+    }
 
-    // Re-check live availability so stale/capacity-exhausted slots are rejected.
+    // Re-check live availability using the client-confirmed dateKey (authoritative).
     const availability = await this.pickup.getAvailability({
       boutiqueId: boutique.id,
-      dateKey: slot.dateKey,
+      dateKey: input.pickup.dateKey,
     });
     const availableSlot = availability?.slots.find(
       (item) => item.id === slot.id,
@@ -223,7 +251,7 @@ export class DefaultCheckoutService {
       createdAt: new Date().toISOString(),
       items,
       totalMinor,
-      termsAccepted: true,
+      termsAccepted: input.termsAccepted,
       customer: {
         customerName,
         mobileNumber: input.customer.phone,
@@ -233,9 +261,9 @@ export class DefaultCheckoutService {
         boutiqueId: boutique.id,
         boutiqueName: boutique.name,
         address: boutique.address,
-        dateKey: slot.dateKey,
+        dateKey: input.pickup.dateKey,
         timeSlotId: slot.id,
-        timeSlotLabel: slot.label,
+        timeSlotLabel: availableSlot.label || slot.label,
       },
     };
 
