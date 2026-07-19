@@ -279,6 +279,7 @@ export type AdminUpdateHomepageContentInput =
 /** Admin order management */
 
 export type AdminOrderStatus =
+  | "new"
   | "pending"
   | "confirmed"
   | "preparing"
@@ -346,10 +347,16 @@ export type AdminOrderItemDto = {
 
 export type AdminOrderHistoryDto = {
   id: string;
+  /** Resulting status after the change (Sprint 18B timeline field). */
+  status: AdminOrderStatus;
   fromStatus: AdminOrderStatus | null;
   toStatus: AdminOrderStatus;
-  note: string | null;
+  /** ISO timestamp of the change (Sprint 18B timeline field). */
+  changedAt: string;
   changedBy: string | null;
+  /** Operational notes (Sprint 18B timeline field). */
+  notes: string | null;
+  note: string | null;
   createdAt: string;
 };
 
@@ -398,4 +405,16 @@ export type AdminOrderDetailDto = {
 export type AdminUpdateOrderStatusInput = {
   status: AdminOrderStatus;
   note?: string | null;
+  /**
+   * When provided, must match the current order status (after NEW/PENDING aliasing).
+   * Prevents duplicate / stale concurrent updates.
+   */
+  expectedStatus?: AdminOrderStatus;
+};
+
+export type AdminUpdateOrderPaymentInput = {
+  status: Exclude<AdminPaymentStatus, "none">;
+  note?: string | null;
+  /** When provided, must match current payment status — prevents duplicate updates. */
+  expectedStatus?: Exclude<AdminPaymentStatus, "none">;
 };

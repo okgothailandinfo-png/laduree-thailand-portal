@@ -3,6 +3,7 @@ import type {
   AdminOrderListResult,
   AdminOrderStatus,
   AdminPaymentStatus,
+  AdminUpdateOrderPaymentInput,
   AdminUpdateOrderStatusInput,
 } from "@/src/server/admin/dto";
 import { AdminApiError } from "@/lib/api/admin-catalog";
@@ -85,6 +86,16 @@ export async function updateAdminOrderStatus(
   input: AdminUpdateOrderStatusInput,
 ): Promise<AdminOrderDetailDto> {
   return adminFetch<AdminOrderDetailDto>(`/api/admin/orders/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminOrderPayment(
+  id: string,
+  input: AdminUpdateOrderPaymentInput,
+): Promise<AdminOrderDetailDto> {
+  return adminFetch<AdminOrderDetailDto>(`/api/admin/orders/${id}/payment`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });

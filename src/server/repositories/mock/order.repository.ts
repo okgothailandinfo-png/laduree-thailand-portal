@@ -3,6 +3,7 @@ import type { Order, OrderStatus } from "@/src/server/models/order";
 import type {
   AdminOrderDetailRecord,
   AdminOrderListPage,
+  OrderPaymentUpdateOptions,
   OrderRepository,
   OrderStatusUpdateOptions,
 } from "@/src/server/repositories/interfaces";
@@ -47,6 +48,17 @@ export class MockOrderRepository implements OrderRepository {
     ordersById.set(id, next);
     ordersByNumber.set(next.orderNumber, next);
     return next;
+  }
+
+  async updatePaymentStatus(
+    orderId: string,
+    status: "pending" | "mock_accepted" | "failed",
+    options?: OrderPaymentUpdateOptions,
+  ): Promise<AdminOrderDetailRecord> {
+    void orderId;
+    void status;
+    void options;
+    rejectAdmin();
   }
 
   async adminList(query: AdminOrderListQuery): Promise<AdminOrderListPage> {

@@ -9,6 +9,12 @@ export type OrderStatus =
   | "cancelled"
   | "mock_placed";
 
+/**
+ * Admin fulfillment workflow label for the initial state.
+ * Storefront/checkout persist PENDING; admin surfaces it as "new".
+ */
+export type AdminWorkflowOrderStatus = "new" | Exclude<OrderStatus, "pending">;
+
 export type OrderItem = {
   productId: string;
   name: string;

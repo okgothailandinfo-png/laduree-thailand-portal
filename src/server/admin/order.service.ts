@@ -5,6 +5,8 @@ import type {
   AdminOrderListQuery,
   AdminOrderListResult,
   AdminOrderStatus,
+  AdminPaymentStatus,
+  AdminUpdateOrderPaymentInput,
   AdminUpdateOrderStatusInput,
 } from "@/src/server/admin/dto";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
@@ -12,7 +14,9 @@ import type { Boutique } from "@/src/server/models/boutique";
 import type { Order, OrderStatus } from "@/src/server/models/order";
 import {
   assertValidStatusTransition,
+  fromAdminWorkflowStatus,
   getAllowedNextStatuses,
+  toAdminWorkflowStatus,
 } from "@/src/server/orders/status-transitions";
 import type {
   AdminOrderDetailRecord,
@@ -30,6 +34,7 @@ import {
 } from "@/src/server/utils/validation";
 
 const ORDER_STATUSES: readonly AdminOrderStatus[] = [
+  "new",
   "pending",
   "confirmed",
   "preparing",
@@ -40,6 +45,15 @@ const ORDER_STATUSES: readonly AdminOrderStatus[] = [
 ] as const;
 
 const PAYMENT_STATUSES = ["pending", "mock_accepted", "failed"] as const;
+
+const PAYMENT_TRANSITIONS: Record<
+  Exclude<AdminPaymentStatus, "none">,
+  readonly Exclude<AdminPaymentStatus, "none">[]
+> = {
+  pending: ["mock_accepted", "failed"],
+  failed: ["pending", "mock_accepted"],
+  mock_accepted: ["failed"],
+};
 
 function minorToThb(minor: number): number {
   return minor / 100;
@@ -86,6 +100,33 @@ function parseOrderStatus(value: unknown, field: string): AdminOrderStatus {
   return status as AdminOrderStatus;
 }
 
+function parsePaymentStatus(
+  value: unknown,
+  field: string,
+): Exclude<AdminPaymentStatus, "none"> {
+  const status = requireString(value, field);
+  if (!(PAYMENT_STATUSES as readonly string[]).includes(status)) {
+    throw new AppError("VALIDATION_ERROR", `Invalid ${field}.`, {
+      details: { field, allowed: PAYMENT_STATUSES },
+    });
+  }
+  return status as Exclude<AdminPaymentStatus, "none">;
+}
+
+function adminStatus(status: OrderStatus): AdminOrderStatus {
+  return toAdminWorkflowStatus(status) as AdminOrderStatus;
+}
+
+function statusesMatch(
+  current: OrderStatus,
+  expected: AdminOrderStatus,
+): boolean {
+  const normalizedCurrent = adminStatus(current);
+  const normalizedExpected =
+    expected === "pending" ? "new" : expected;
+  return normalizedCurrent === normalizedExpected || current === expected;
+}
+
 function toListItem(row: AdminOrderListRow): AdminOrderListItemDto {
   const { order } = row;
   return {
@@ -103,7 +144,7 @@ function toListItem(row: AdminOrderListRow): AdminOrderListItemDto {
     totalMinor: order.totalMinor,
     totalThb: minorToThb(order.totalMinor),
     paymentStatus: row.paymentStatus,
-    orderStatus: order.status,
+    orderStatus: adminStatus(order.status),
     createdAt: order.createdAt,
   };
 }
@@ -128,12 +169,18 @@ function toDetail(record: AdminOrderDetailRecord): AdminOrderDetailDto {
   const { order } = record;
   const items = order.items.map(toItemDto);
   const subtotalMinor = items.reduce((sum, item) => sum + item.lineTotalMinor, 0);
+  const workflowStatus = adminStatus(order.status);
+  const allowed = getAllowedNextStatuses(order.status).map((status) =>
+    adminStatus(status),
+  );
+  // Deduplicate after NEW/PENDING aliasing.
+  const allowedNextStatuses = [...new Set(allowed)];
 
   return {
     id: order.id,
     orderNumber: order.orderNumber,
-    orderStatus: order.status,
-    allowedNextStatuses: [...getAllowedNextStatuses(order.status)],
+    orderStatus: workflowStatus,
+    allowedNextStatuses,
     paymentStatus: record.paymentStatus,
     paymentMethod: order.payment?.method ?? null,
     paymentMethodLabel: order.payment
@@ -169,14 +216,20 @@ function toDetail(record: AdminOrderDetailRecord): AdminOrderDetailDto {
     currency: "THB",
     createdAt: order.createdAt,
     updatedAt: record.updatedAt,
-    history: record.history.map((entry) => ({
-      id: entry.id,
-      fromStatus: entry.fromStatus,
-      toStatus: entry.toStatus,
-      note: entry.note,
-      changedBy: entry.changedBy,
-      createdAt: entry.createdAt,
-    })),
+    history: record.history.map((entry) => {
+      const status = adminStatus(entry.toStatus);
+      return {
+        id: entry.id,
+        status,
+        fromStatus: entry.fromStatus ? adminStatus(entry.fromStatus) : null,
+        toStatus: status,
+        changedAt: entry.createdAt,
+        changedBy: entry.changedBy,
+        notes: entry.note,
+        note: entry.note,
+        createdAt: entry.createdAt,
+      };
+    }),
   };
 }
 
@@ -209,12 +262,7 @@ export class AdminOrderService {
 
     let paymentStatus: AdminOrderListQuery["paymentStatus"];
     if (paymentRaw && paymentRaw !== "all") {
-      if (!(PAYMENT_STATUSES as readonly string[]).includes(paymentRaw)) {
-        throw new AppError("VALIDATION_ERROR", "Invalid paymentStatus.", {
-          details: { field: "paymentStatus", allowed: PAYMENT_STATUSES },
-        });
-      }
-      paymentStatus = paymentRaw as AdminOrderListQuery["paymentStatus"];
+      paymentStatus = parsePaymentStatus(paymentRaw, "paymentStatus");
     }
 
     return {
@@ -231,9 +279,27 @@ export class AdminOrderService {
 
   parseUpdateStatusBody(body: unknown): AdminUpdateOrderStatusInput {
     const raw = requireObject(body, "body");
+    const expectedRaw = raw.expectedStatus;
     return {
       status: parseOrderStatus(raw.status, "status"),
       note: optionalString(raw.note, "note") ?? null,
+      expectedStatus:
+        expectedRaw === undefined || expectedRaw === null || expectedRaw === ""
+          ? undefined
+          : parseOrderStatus(expectedRaw, "expectedStatus"),
+    };
+  }
+
+  parseUpdatePaymentBody(body: unknown): AdminUpdateOrderPaymentInput {
+    const raw = requireObject(body, "body");
+    const expectedRaw = raw.expectedStatus;
+    return {
+      status: parsePaymentStatus(raw.status, "status"),
+      note: optionalString(raw.note, "note") ?? null,
+      expectedStatus:
+        expectedRaw === undefined || expectedRaw === null || expectedRaw === ""
+          ? undefined
+          : parsePaymentStatus(expectedRaw, "expectedStatus"),
     };
   }
 
@@ -277,46 +343,64 @@ export class AdminOrderService {
     }
 
     const from = existing.order.status;
-    const to = input.status as OrderStatus;
+    const to = fromAdminWorkflowStatus(input.status);
+
+    if (
+      input.expectedStatus &&
+      !statusesMatch(from, input.expectedStatus)
+    ) {
+      logger.warn("Duplicate or stale order status update rejected", {
+        orderId: id,
+        orderNumber: existing.order.orderNumber,
+        current: from,
+        expected: input.expectedStatus,
+      });
+      throw new AppError(
+        "CONFLICT",
+        "Order status has changed. Refresh and try again.",
+        {
+          details: {
+            current: adminStatus(from),
+            expected: input.expectedStatus,
+          },
+        },
+      );
+    }
 
     if (from !== to && !getAllowedNextStatuses(from).includes(to)) {
       logger.warn("Invalid order status transition rejected", {
         orderId: id,
         orderNumber: existing.order.orderNumber,
-        from,
-        to,
+        from: adminStatus(from),
+        to: adminStatus(to),
       });
       assertValidStatusTransition(from, to);
     }
-
-    // Payment consistency: do not confirm unpaid drafts via admin without payment.
-    // CONFIRMED after payment is allowed; PENDING→CONFIRMED is operationally allowed
-    // for admin (e.g. paid offline) — payment status remains independent.
 
     const updated = await this.orders.updateStatus(id, to, {
       note: input.note,
       changedBy: "mock-admin",
     });
 
-    if (from !== to) {
+    if (adminStatus(from) !== adminStatus(to)) {
       if (to === "cancelled") {
         logger.info("Order cancelled", {
           orderId: updated.id,
           orderNumber: updated.orderNumber,
-          from,
+          from: adminStatus(from),
         });
       } else if (to === "completed") {
         logger.info("Order completed", {
           orderId: updated.id,
           orderNumber: updated.orderNumber,
-          from,
+          from: adminStatus(from),
         });
       } else {
         logger.info("Order status changed", {
           orderId: updated.id,
           orderNumber: updated.orderNumber,
-          from,
-          to,
+          from: adminStatus(from),
+          to: adminStatus(to),
         });
       }
     }
@@ -326,5 +410,74 @@ export class AdminOrderService {
       throw new AppError("NOT_FOUND", `Order not found: ${id}`);
     }
     return toDetail(detail);
+  }
+
+  async updatePayment(
+    id: string,
+    input: AdminUpdateOrderPaymentInput,
+  ): Promise<AdminOrderDetailDto> {
+    requirePrismaDataSource();
+
+    const existing = await this.orders.adminFindById(id);
+    if (!existing) {
+      throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+    }
+
+    if (existing.paymentStatus === "none") {
+      throw new AppError(
+        "CONFLICT",
+        "Order has no payment record to update.",
+        { details: { orderId: id } },
+      );
+    }
+
+    const from = existing.paymentStatus;
+    const to = input.status;
+
+    if (input.expectedStatus && from !== input.expectedStatus) {
+      logger.warn("Duplicate or stale payment status update rejected", {
+        orderId: id,
+        orderNumber: existing.order.orderNumber,
+        current: from,
+        expected: input.expectedStatus,
+      });
+      throw new AppError(
+        "CONFLICT",
+        "Payment status has changed. Refresh and try again.",
+        { details: { current: from, expected: input.expectedStatus } },
+      );
+    }
+
+    if (from !== to) {
+      const allowed = PAYMENT_TRANSITIONS[from] ?? [];
+      if (!allowed.includes(to)) {
+        logger.warn("Invalid payment status transition rejected", {
+          orderId: id,
+          from,
+          to,
+        });
+        throw new AppError(
+          "CONFLICT",
+          `Invalid payment status transition: ${from} → ${to}.`,
+          { details: { from, to, allowed: [...allowed] } },
+        );
+      }
+    }
+
+    const record = await this.orders.updatePaymentStatus(id, to, {
+      note: input.note,
+      changedBy: "mock-admin",
+    });
+
+    if (from !== to) {
+      logger.info("Order payment status changed", {
+        orderId: id,
+        orderNumber: existing.order.orderNumber,
+        from,
+        to,
+      });
+    }
+
+    return toDetail(record);
   }
 }
