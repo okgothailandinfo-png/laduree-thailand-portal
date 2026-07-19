@@ -7,6 +7,7 @@ import { AdminMediaService } from "@/src/server/admin/media.service";
 import { AdminOrderService } from "@/src/server/admin/order.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
 import { PaymentService } from "@/src/server/payment/payment-service";
+import { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
@@ -49,12 +50,18 @@ export const checkoutService = new DefaultCheckoutService(
   repositories.pickup,
   repositories.orders,
 );
+export const pickupVerificationService = new PickupVerificationService(
+  repositories.pickupVerifications,
+  repositories.orders,
+);
 export const paymentService = new PaymentService(
   repositories.orders,
   repositories.payments,
   repositories.webhookEvents,
   env.mockPaymentWebhookSecret,
   env.mockPaymentWebhookToleranceSeconds,
+  undefined,
+  pickupVerificationService,
 );
 export const adminProductService = new AdminProductService(
   repositories.products,
@@ -79,6 +86,7 @@ export const adminHomepageService = new AdminHomepageService(
 export const adminOrderService = new AdminOrderService(
   repositories.orders,
   repositories.boutiques,
+  pickupVerificationService,
 );
 export const homepageService = new DefaultHomepageService(
   repositories.homepageBanners,

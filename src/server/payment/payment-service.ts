@@ -21,6 +21,7 @@ import {
   type MockPaymentWebhookEventType,
 } from "@/src/server/payment/webhook/types";
 import { verifyWebhookSignature } from "@/src/server/payment/webhook/verify";
+import type { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import type { OrderRepository } from "@/src/server/repositories/interfaces";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
@@ -52,6 +53,7 @@ export class PaymentService {
     private readonly webhookSecret: string,
     private readonly webhookToleranceSeconds: number,
     provider?: PaymentProvider,
+    private readonly pickupVerifications?: PickupVerificationService,
   ) {
     this.provider = provider ?? createPaymentProvider(payments, "mock");
   }
@@ -278,6 +280,18 @@ export class PaymentService {
       orderStatus: updated.status,
       paymentStatus,
     });
+
+    if (updated.status === "confirmed" && this.pickupVerifications) {
+      try {
+        await this.pickupVerifications.ensureForOrder(updated.id);
+      } catch (error) {
+        logger.error("Failed to ensure pickup verification after confirm", {
+          orderId: updated.id,
+          message: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    }
+
     return toApiOrderStatus(updated.status);
   }
 }

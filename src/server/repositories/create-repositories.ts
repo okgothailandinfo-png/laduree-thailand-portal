@@ -10,6 +10,7 @@ import { MockMediaRepository } from "@/src/server/repositories/mock/media.reposi
 import { MockOrderRepository } from "@/src/server/repositories/mock/order.repository";
 import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
 import { MockPickupRepository } from "@/src/server/repositories/mock/pickup.repository";
+import { MockPickupVerificationRepository } from "@/src/server/repositories/mock/pickup-verification.repository";
 import { MockProductRepository } from "@/src/server/repositories/mock/product.repository";
 import { MockWebhookEventRepository } from "@/src/server/repositories/mock/webhook-event.repository";
 import { PrismaBoutiqueRepository } from "@/src/server/repositories/prisma/boutique.repository";
@@ -20,6 +21,7 @@ import { PrismaHomepageSectionRepository } from "@/src/server/repositories/prism
 import { PrismaMediaRepository } from "@/src/server/repositories/prisma/media.repository";
 import { PrismaOrderRepository } from "@/src/server/repositories/prisma/order.repository";
 import { PrismaPickupRepository } from "@/src/server/repositories/prisma/pickup.repository";
+import { PrismaPickupVerificationRepository } from "@/src/server/repositories/prisma/pickup-verification.repository";
 import { PrismaProductRepository } from "@/src/server/repositories/prisma/product.repository";
 import { logger } from "@/src/server/utils/logger";
 
@@ -34,6 +36,7 @@ function createMockRepositories(): RepositoryBundle {
     boutiques: new MockBoutiqueRepository(),
     pickup: new MockPickupRepository(),
     orders: new MockOrderRepository(),
+    pickupVerifications: new MockPickupVerificationRepository(),
     // Cart / gateway payments / webhook idempotency — in-memory until persistent models exist.
     carts: new MockCartRepository(),
     payments: new MockPaymentRepository(),
@@ -53,6 +56,7 @@ function createPrismaRepositories(): RepositoryBundle {
     boutiques: new PrismaBoutiqueRepository(),
     pickup: new PrismaPickupRepository(),
     orders: new PrismaOrderRepository(),
+    pickupVerifications: new PrismaPickupVerificationRepository(),
     // Intentionally in-memory until dedicated Prisma models exist:
     // - Cart has no Prisma model yet
     // - Gateway PaymentRepository is separate from checkout PaymentRecord
