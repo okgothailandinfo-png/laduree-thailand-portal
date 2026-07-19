@@ -32,6 +32,12 @@ export type CartItem = {
   quantity: number;
   modifiers: CartModifier[];
   note?: string;
+  exactSelectionQuantity?: number | null;
+  unitPriceThb: number | null;
+  unitPriceMinor: number | null;
+  lineTotalThb: number | null;
+  priceAvailable: boolean;
+  productAvailable: boolean;
 };
 
 type AddCartItemInput = {
@@ -48,6 +54,8 @@ export type CartStatus = "loading" | "success" | "error" | "empty";
 type CartContextValue = {
   items: CartItem[];
   itemCount: number;
+  subtotalThb: number | null;
+  pricesAvailable: boolean;
   status: CartStatus;
   errorMessage: string | null;
   reloadCart: () => void;
@@ -78,6 +86,12 @@ function toCartItems(items: ApiCartItem[]): CartItem[] {
     quantity: item.quantity,
     modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
     note: item.note,
+    exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+    unitPriceThb: item.unitPriceThb ?? null,
+    unitPriceMinor: item.unitPriceMinor ?? null,
+    lineTotalThb: item.lineTotalThb ?? null,
+    priceAvailable: item.priceAvailable === true,
+    productAvailable: item.productAvailable !== false,
   }));
 }
 
@@ -89,6 +103,8 @@ function errorMessage(error: unknown, fallback: string): string {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [subtotalThb, setSubtotalThb] = useState<number | null>(null);
+  const [pricesAvailable, setPricesAvailable] = useState(false);
   const [status, setStatus] = useState<CartStatus>("loading");
   const [errorMessageState, setErrorMessageState] = useState<string | null>(
     null,
@@ -96,11 +112,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [reloadToken, setReloadToken] = useState(0);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const applyItems = useCallback((next: CartItem[]) => {
-    setItems(next);
-    setStatus(next.length === 0 ? "empty" : "success");
-    setErrorMessageState(null);
-  }, []);
+  const applyCart = useCallback(
+    (nextItems: CartItem[], nextSubtotal: number | null, nextPrices: boolean) => {
+      setItems(nextItems);
+      setSubtotalThb(nextSubtotal);
+      setPricesAvailable(nextPrices);
+      setStatus(nextItems.length === 0 ? "empty" : "success");
+      setErrorMessageState(null);
+    },
+    [],
+  );
+
+  const applyFromApi = useCallback(
+    (cart: {
+      items: ApiCartItem[];
+      subtotalThb: number | null;
+      pricesAvailable: boolean;
+    }) => {
+      applyCart(
+        toCartItems(cart.items),
+        cart.subtotalThb,
+        cart.pricesAvailable === true,
+      );
+    },
+    [applyCart],
+  );
 
   const reloadCart = useCallback(() => {
     setStatus("loading");
@@ -114,22 +150,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     fetchCart({ signal: controller.signal })
       .then((cart) => {
         if (controller.signal.aborted) return;
-        applyItems(toCartItems(cart.items));
+        applyFromApi(cart);
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
         setItems([]);
+        setSubtotalThb(null);
+        setPricesAvailable(false);
         setErrorMessageState(errorMessage(error, "Unable to load cart."));
         setStatus("error");
       });
 
     return () => controller.abort();
-  }, [reloadToken, applyItems]);
+  }, [reloadToken, applyFromApi]);
 
   const addItem = useCallback(
     async (input: AddCartItemInput) => {
       const previous = items;
+      const previousSubtotal = subtotalThb;
+      const previousPrices = pricesAvailable;
       const optimisticId = `optimistic-${Date.now()}`;
       const optimisticItem: CartItem = {
         id: optimisticId,
@@ -139,9 +179,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity: clampQty(input.quantity),
         modifiers: input.modifiers ?? [],
         note: input.note,
+        unitPriceThb: null,
+        unitPriceMinor: null,
+        lineTotalThb: null,
+        priceAvailable: false,
+        productAvailable: true,
       };
 
-      applyItems([...previous, optimisticItem]);
+      applyCart([...previous, optimisticItem], null, false);
       if (typeof window !== "undefined" && window.innerWidth < 992) {
         setIsDrawerOpen(true);
       }
@@ -153,9 +198,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           modifiers: input.modifiers,
           note: input.note,
         });
-        applyItems(toCartItems(cart.items));
+        applyFromApi(cart);
       } catch (error: unknown) {
-        applyItems(previous);
+        applyCart(previous, previousSubtotal, previousPrices);
         setErrorMessageState(
           errorMessage(
             error,
@@ -166,65 +211,75 @@ export function CartProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [applyItems, items],
+    [applyCart, applyFromApi, items, pricesAvailable, subtotalThb],
   );
 
   const updateQuantity = useCallback(
     async (id: string, quantity: number) => {
       const nextQty = clampQty(quantity);
       const previous = items;
+      const previousSubtotal = subtotalThb;
+      const previousPrices = pricesAvailable;
       const optimistic = previous.map((item) =>
         item.id === id ? { ...item, quantity: nextQty } : item,
       );
-      applyItems(optimistic);
+      applyCart(optimistic, null, previousPrices);
 
       try {
         const cart = await updateCartItem(id, { quantity: nextQty });
-        applyItems(toCartItems(cart.items));
+        applyFromApi(cart);
       } catch (error: unknown) {
-        applyItems(previous);
+        applyCart(previous, previousSubtotal, previousPrices);
         setErrorMessageState(
           errorMessage(error, "Unable to update cart item."),
         );
         setStatus(previous.length === 0 ? "empty" : "success");
       }
     },
-    [applyItems, items],
+    [applyCart, applyFromApi, items, pricesAvailable, subtotalThb],
   );
 
   const removeItem = useCallback(
     async (id: string) => {
       const previous = items;
+      const previousSubtotal = subtotalThb;
+      const previousPrices = pricesAvailable;
       const optimistic = previous.filter((item) => item.id !== id);
-      applyItems(optimistic);
+      applyCart(
+        optimistic,
+        optimistic.length === 0 ? null : previousSubtotal,
+        optimistic.length === 0 ? false : previousPrices,
+      );
 
       try {
         const cart = await removeCartItem(id);
-        applyItems(toCartItems(cart.items));
+        applyFromApi(cart);
       } catch (error: unknown) {
-        applyItems(previous);
+        applyCart(previous, previousSubtotal, previousPrices);
         setErrorMessageState(
           errorMessage(error, "Unable to remove cart item."),
         );
         setStatus(previous.length === 0 ? "empty" : "success");
       }
     },
-    [applyItems, items],
+    [applyCart, applyFromApi, items, pricesAvailable, subtotalThb],
   );
 
   const clearItems = useCallback(async () => {
     const previous = items;
-    applyItems([]);
+    const previousSubtotal = subtotalThb;
+    const previousPrices = pricesAvailable;
+    applyCart([], null, false);
 
     try {
       const cart = await clearCartApi();
-      applyItems(toCartItems(cart.items));
+      applyFromApi(cart);
     } catch (error: unknown) {
-      applyItems(previous);
+      applyCart(previous, previousSubtotal, previousPrices);
       setErrorMessageState(errorMessage(error, "Unable to clear cart."));
       setStatus(previous.length === 0 ? "empty" : "success");
     }
-  }, [applyItems, items]);
+  }, [applyCart, applyFromApi, items, pricesAvailable, subtotalThb]);
 
   const value = useMemo<CartContextValue>(() => {
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -232,6 +287,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return {
       items,
       itemCount,
+      subtotalThb,
+      pricesAvailable,
       status,
       errorMessage: errorMessageState,
       reloadCart,
@@ -246,6 +303,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     };
   }, [
     items,
+    subtotalThb,
+    pricesAvailable,
     status,
     errorMessageState,
     reloadCart,

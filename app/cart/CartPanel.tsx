@@ -1,38 +1,40 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import CatalogStatus from "../catalog/CatalogStatus";
-import { usePickup } from "../pickup/PickupContext";
+import { formatPriceThb } from "@/lib/api/catalog";
 import { useCart } from "./CartContext";
+import CartCheckoutFooter from "./CartCheckoutFooter";
 import "./cart.css";
 
 type CartPanelProps = {
   variant?: "desktop" | "drawer";
+  /** When false, only the scrollable line items render (footer is composed outside). */
+  includeFooter?: boolean;
 };
 
-export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
-  const router = useRouter();
+export default function CartPanel({
+  variant = "desktop",
+  includeFooter = true,
+}: CartPanelProps) {
   const {
     items,
-    itemCount,
     status,
     errorMessage,
     reloadCart,
     updateQuantity,
     removeItem,
     clearItems,
-    closeDrawer,
   } = useCart();
-  const { isPickupComplete, openPickupSelection } = usePickup();
 
   const isEmpty = items.length === 0;
-  const canCheckout = !isEmpty && isPickupComplete && status !== "loading";
   const showLoadState =
     status === "loading" || (status === "error" && isEmpty);
 
   return (
     <div
-      className={`cart-panel${variant === "desktop" ? " desktop-cart-panel" : ""}`}
+      className={`cart-panel${variant === "desktop" ? " desktop-cart-panel" : ""}${
+        includeFooter ? "" : " cart-panel--items-only"
+      }`}
     >
       <div className="content-cart" id="content-cart">
         <div id="box-content-cart">
@@ -98,86 +100,112 @@ export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
                     </div>
                   ) : (
                     <ul id="box-cart-item">
-                      {items.map((item) => (
-                        <li key={item.id} className="item">
-                          <div className="inner">
-                            <div className="item-row">
-                              <div className="cart-item-thumb">
-                                <img src={item.imageSrc} alt="" />
-                              </div>
-                              <div className="cart-item-main">
-                                <div className="mycart-title-product order-name">
-                                  {item.name}
+                      {items.map((item) => {
+                        const priceLabel = formatPriceThb(item.unitPriceThb);
+                        const lineInvalid =
+                          !item.priceAvailable || !item.productAvailable;
+                        return (
+                          <li
+                            key={item.id}
+                            className={`item${lineInvalid ? " is-invalid" : ""}`}
+                          >
+                            <div className="inner">
+                              <div className="item-row">
+                                <div className="cart-item-thumb">
+                                  <img src={item.imageSrc} alt="" />
                                 </div>
-                                <div className="order-price">
-                                  <span className="price">฿ —</span>
-                                </div>
-                                {item.modifiers.length > 0 ? (
-                                  <div className="order-modifier">
-                                    {item.modifiers.map((modifier) => (
-                                      <span
-                                        key={`${item.id}-${modifier.label}`}
-                                        className="note-1"
+                                <div className="cart-item-main">
+                                  <div className="mycart-title-product order-name">
+                                    {item.name}
+                                  </div>
+                                  <div className="order-price">
+                                    <span className="price">{priceLabel}</span>
+                                  </div>
+                                  {lineInvalid ? (
+                                    <div
+                                      className="note cart-line-invalid"
+                                      role="status"
+                                    >
+                                      {!item.productAvailable
+                                        ? "This product is unavailable. Remove it to continue."
+                                        : "Price unavailable for this product. Remove and re-add after the catalog price is available."}
+                                    </div>
+                                  ) : null}
+                                  {item.modifiers.length > 0 ? (
+                                    <div className="order-modifier">
+                                      {item.modifiers.map((modifier) => (
+                                        <span
+                                          key={`${item.id}-${modifier.label}`}
+                                          className="note-1"
+                                        >
+                                          {modifier.quantity
+                                            ? `${modifier.quantity}× ${modifier.label}`
+                                            : modifier.label}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                  {item.note ? (
+                                    <div className="note">{item.note}</div>
+                                  ) : null}
+                                  <div className="action-block">
+                                    <div className="cart-qty-group">
+                                      <button
+                                        type="button"
+                                        className="btn-number minus"
+                                        aria-label={`Decrease ${item.name}`}
+                                        disabled={
+                                          typeof item.exactSelectionQuantity ===
+                                          "number"
+                                        }
+                                        onClick={() =>
+                                          void updateQuantity(
+                                            item.id,
+                                            item.quantity - 1,
+                                          )
+                                        }
                                       >
-                                        {modifier.quantity
-                                          ? `${modifier.quantity}× ${modifier.label}`
-                                          : modifier.label}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                {item.note ? (
-                                  <div className="note">{item.note}</div>
-                                ) : null}
-                                <div className="action-block">
-                                  <div className="cart-qty-group">
+                                        −
+                                      </button>
+                                      <input
+                                        type="text"
+                                        className="quantity-item"
+                                        value={String(item.quantity)}
+                                        readOnly
+                                        aria-label={`${item.name} quantity`}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="btn-number plus"
+                                        aria-label={`Increase ${item.name}`}
+                                        disabled={
+                                          typeof item.exactSelectionQuantity ===
+                                          "number"
+                                        }
+                                        onClick={() =>
+                                          void updateQuantity(
+                                            item.id,
+                                            item.quantity + 1,
+                                          )
+                                        }
+                                      >
+                                        +
+                                      </button>
+                                    </div>
                                     <button
                                       type="button"
-                                      className="btn-number minus"
-                                      aria-label={`Decrease ${item.name}`}
-                                      onClick={() =>
-                                        void updateQuantity(
-                                          item.id,
-                                          item.quantity - 1,
-                                        )
-                                      }
-                                    >
-                                      −
-                                    </button>
-                                    <input
-                                      type="text"
-                                      className="quantity-item"
-                                      value={String(item.quantity)}
-                                      readOnly
-                                      aria-label={`${item.name} quantity`}
+                                      className="delete-link"
+                                      aria-label={`Remove ${item.name}`}
+                                      title="Remove item"
+                                      onClick={() => void removeItem(item.id)}
                                     />
-                                    <button
-                                      type="button"
-                                      className="btn-number plus"
-                                      aria-label={`Increase ${item.name}`}
-                                      onClick={() =>
-                                        void updateQuantity(
-                                          item.id,
-                                          item.quantity + 1,
-                                        )
-                                      }
-                                    >
-                                      +
-                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="delete-link"
-                                    aria-label={`Remove ${item.name}`}
-                                    title="Remove item"
-                                    onClick={() => void removeItem(item.id)}
-                                  />
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        </li>
-                      ))}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </>
@@ -187,68 +215,7 @@ export default function CartPanel({ variant = "desktop" }: CartPanelProps) {
         </div>
       </div>
 
-      <div id="info-total-cart">
-        <div className="block-4 total-price-block-1" id="content-cart-price">
-          <div className="summary-price-list">
-            <div className="summary-price-item">
-              <div className="summary-price__title">Subtotal</div>
-              <div className="summary-price__price">฿ —</div>
-            </div>
-            <div className="summary-price-item">
-              <div className="summary-price__title">Item(s) Total</div>
-              <div className="summary-price__price">฿ —</div>
-            </div>
-            <div className="summary-price-item">
-              <div className="summary-price__title">Tax</div>
-              <div className="summary-price__content">฿ —</div>
-            </div>
-            <div className="summary-price-item total-row">
-              <div className="summary-price__title">Total</div>
-              <div className="summary-price__price">฿ —</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="block-4 total-price-block" id="content-cart-checkout">
-          <div className="inner bg-pink" id="checkoutArea4Click">
-            {!isEmpty && !isPickupComplete ? (
-              <div
-                className="note danger_message danger_red_message cart-pickup-gate"
-                role="status"
-              >
-                Select service, date and time before checkout.{" "}
-                <button
-                  type="button"
-                  className="cart-pickup-gate-link"
-                  onClick={() => openPickupSelection({ step: "service" })}
-                >
-                  Select service, date and time
-                </button>
-              </div>
-            ) : null}
-            <button
-              id="btnCheckOut"
-              className="btn btn-checkout"
-              type="button"
-              disabled={!canCheckout}
-              aria-disabled={!canCheckout}
-              onClick={() => {
-                if (!canCheckout) return;
-                if (variant === "drawer") closeDrawer();
-                router.push("/checkout");
-              }}
-            >
-              <div className="checkout-all-content">
-                <span className="checkout-total-amount">฿ —</span>
-                <span id="textCheckOut" className="checkout-text">
-                  Checkout
-                </span>
-                <span className="checkout-total-quantity">{itemCount}</span>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
+      {includeFooter ? <CartCheckoutFooter variant={variant} /> : null}
     </div>
   );
 }

@@ -57,6 +57,7 @@ Do not invent customer-facing copy. Use TODO for information not yet approved.
 
 ## Product Data
 - Thailand product catalogue: TODO
-- Thailand prices: TODO
+- Thailand prices:
+  - « Napoléon III » Macaron - 8pcs: ฿990 (approved)
 - Thailand availability: TODO
 - Allergen information: TODO

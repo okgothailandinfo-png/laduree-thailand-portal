@@ -89,20 +89,47 @@ export function toOrderDto(order: Order): OrderDto {
 }
 
 export function toCartDto(cart: Cart): CartDto {
-  const items = cart.items.map((item) => ({
-    id: item.id,
-    productId: item.productId,
-    name: item.name,
-    imageSrc: item.imageSrc,
-    quantity: item.quantity,
-    modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
-    note: item.note,
-  }));
+  const items = cart.items.map((item) => {
+    const unitPriceMinor = item.unitPriceMinor ?? null;
+    const priceAvailable =
+      typeof unitPriceMinor === "number" &&
+      Number.isFinite(unitPriceMinor) &&
+      unitPriceMinor >= 0;
+    const unitPriceThb = priceAvailable ? unitPriceMinor / 100 : null;
+    const lineTotalThb =
+      priceAvailable && unitPriceThb !== null
+        ? unitPriceThb * item.quantity
+        : null;
+
+    return {
+      id: item.id,
+      productId: item.productId,
+      name: item.name,
+      imageSrc: item.imageSrc,
+      quantity: item.quantity,
+      modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
+      note: item.note,
+      exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+      unitPriceThb,
+      unitPriceMinor,
+      lineTotalThb,
+      priceAvailable,
+      productAvailable: item.productAvailable !== false,
+    };
+  });
+
+  const pricesAvailable =
+    items.length > 0 && items.every((item) => item.priceAvailable);
+  const subtotalThb = pricesAvailable
+    ? items.reduce((sum, item) => sum + (item.lineTotalThb ?? 0), 0)
+    : null;
 
   return {
     id: cart.id,
     currency: cart.currency,
     items,
     itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+    subtotalThb,
+    pricesAvailable,
   };
 }

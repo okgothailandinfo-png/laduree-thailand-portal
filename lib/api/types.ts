@@ -122,6 +122,12 @@ export type CartItem = {
   quantity: number;
   modifiers: CartModifier[];
   note?: string;
+  exactSelectionQuantity?: number | null;
+  unitPriceThb: number | null;
+  unitPriceMinor: number | null;
+  lineTotalThb: number | null;
+  priceAvailable: boolean;
+  productAvailable: boolean;
 };
 
 export type Cart = {
@@ -129,6 +135,8 @@ export type Cart = {
   currency: "THB";
   items: CartItem[];
   itemCount: number;
+  subtotalThb: number | null;
+  pricesAvailable: boolean;
 };
 
 export type AddCartItemRequest = {

@@ -25,10 +25,6 @@ function createDraftOrderNumber() {
   return `DRAFT-${Date.now().toString(36).toUpperCase()}`;
 }
 
-function unitPriceMinorFromProduct(priceMinor: number | null): number {
-  return priceMinor ?? 0;
-}
-
 function minorToMajor(minor: number): number {
   return minor / 100;
 }
@@ -167,7 +163,25 @@ export class DefaultCheckoutService {
         });
       }
 
-      const unitPriceMinor = unitPriceMinorFromProduct(product.priceMinor);
+      if (
+        product.priceMinor === null ||
+        !Number.isFinite(product.priceMinor) ||
+        product.priceMinor < 0
+      ) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Price unavailable for one or more products.",
+          {
+            details: {
+              field: "cart.items",
+              code: "PRICE_UNAVAILABLE",
+              productId: product.id,
+            },
+          },
+        );
+      }
+
+      const unitPriceMinor = product.priceMinor;
       totalMinor += unitPriceMinor * line.quantity;
       itemCount += line.quantity;
 

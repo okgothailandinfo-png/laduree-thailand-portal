@@ -72,6 +72,13 @@ export type CartItemDto = {
   quantity: number;
   modifiers: CartModifierDto[];
   note?: string;
+  exactSelectionQuantity?: number | null;
+  /** Trusted catalog unit price in THB major units. Null until approved. */
+  unitPriceThb: number | null;
+  unitPriceMinor: number | null;
+  lineTotalThb: number | null;
+  priceAvailable: boolean;
+  productAvailable: boolean;
 };
 
 export type CartDto = {
@@ -79,6 +86,8 @@ export type CartDto = {
   currency: "THB";
   items: CartItemDto[];
   itemCount: number;
+  subtotalThb: number | null;
+  pricesAvailable: boolean;
 };
 
 export type AddCartItemRequestDto = {

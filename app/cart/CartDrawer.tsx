@@ -3,9 +3,17 @@
 import { useEffect } from "react";
 import CartFulfillmentStrip from "../pickup/CartFulfillmentStrip";
 import { useCart } from "./CartContext";
+import CartCheckoutFooter from "./CartCheckoutFooter";
 import CartPanel from "./CartPanel";
 import "./cart.css";
 
+/**
+ * Cart drawer layout:
+ * 1. Fixed header
+ * 2. Fixed pickup summary
+ * 3. Scrollable cart item body
+ * 4. Fixed checkout footer (always inside the drawer viewport)
+ */
 export default function CartDrawer() {
   const { isDrawerOpen, closeDrawer, itemCount } = useCart();
 
@@ -46,10 +54,18 @@ export default function CartDrawer() {
             ×
           </button>
         </div>
-        <div className="cart-drawer-fulfillment">
+
+        <div className="cart-drawer-pickup">
           <CartFulfillmentStrip />
         </div>
-        <CartPanel variant="drawer" />
+
+        <div className="cart-drawer-body" data-testid="cart-drawer-scroll">
+          <CartPanel variant="drawer" includeFooter={false} />
+        </div>
+
+        <div className="cart-drawer-footer" data-testid="cart-drawer-footer">
+          <CartCheckoutFooter variant="drawer" />
+        </div>
       </div>
     </div>
   );

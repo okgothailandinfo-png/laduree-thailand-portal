@@ -13,6 +13,7 @@ import { ApiClientError } from "@/lib/api/client";
 import { fetchBoutiques } from "@/lib/api/catalog";
 import { fetchPickupAvailability } from "@/lib/api/pickup";
 import type { Boutique, PickupTimeSlot } from "@/lib/api/types";
+import { hasValidConfirmedPickupIds } from "../cart/checkout-eligibility";
 import {
   isAbortError,
   PICKUP_MESSAGES,
@@ -436,7 +437,14 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       clearValidationError,
       confirmSelection,
       confirmed,
-      isPickupComplete: confirmed !== null,
+      isPickupComplete: Boolean(
+        confirmed &&
+          hasValidConfirmedPickupIds({
+            boutiqueId: confirmed.boutique.id,
+            dateKey: confirmed.dateKey,
+            timeSlotId: confirmed.timeSlot.id,
+          }),
+      ),
       resetSelection,
       clearConfirmedSlot,
       boutiques,

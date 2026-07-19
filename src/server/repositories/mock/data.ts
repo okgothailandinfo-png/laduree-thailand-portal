@@ -40,8 +40,9 @@ export const MOCK_PRODUCTS: Product[] = [
     ],
     storageLabel: "Storage Information:",
     storageText: "Macarons can be stored for up to 4 days in the Chiller.",
-    priceThb: null,
-    priceMinor: null,
+    // Owner-approved Thailand retail price (docs/thailand-content.md).
+    priceThb: 990,
+    priceMinor: 99000,
     currency: "THB",
     imagePlaceholder: "/product-placeholder.svg",
     images: [
