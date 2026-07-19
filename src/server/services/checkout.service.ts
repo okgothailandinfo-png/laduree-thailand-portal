@@ -122,6 +122,22 @@ export class DefaultCheckoutService {
       );
     }
 
+    // Re-check live availability so stale/capacity-exhausted slots are rejected.
+    const availability = await this.pickup.getAvailability({
+      boutiqueId: boutique.id,
+      dateKey: slot.dateKey,
+    });
+    const availableSlot = availability?.slots.find(
+      (item) => item.id === slot.id,
+    );
+    if (!availableSlot) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.pickupSlotId is not available for the selected boutique/date.",
+        { details: { field: "pickup.pickupSlotId" } },
+      );
+    }
+
     const items: Order["items"] = [];
     let totalMinor = 0;
     let itemCount = 0;

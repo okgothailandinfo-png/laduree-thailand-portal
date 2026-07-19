@@ -311,7 +311,8 @@ async function seedBoutiques() {
 }
 
 async function seedPickupSlots(boutiqueIds: string[]) {
-  const dateKeys = bangkokDateKeys(3);
+  // Match storefront candidate window (7 Asia/Bangkok calendar days).
+  const dateKeys = bangkokDateKeys(7);
 
   const templates = [
     {
