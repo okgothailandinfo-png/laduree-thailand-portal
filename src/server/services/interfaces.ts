@@ -6,7 +6,9 @@ import type {
   CheckoutRequestDto,
   CheckoutResponseDto,
   CreateOrderRequestDto,
+  OrderCompletionDto,
   OrderDto,
+  OrderHistoryItemDto,
   PickupAvailabilityDto,
   ProductDetailDto,
   ProductSummaryDto,
@@ -37,6 +39,8 @@ export interface OrderService {
   createOrder(input: CreateOrderRequestDto): Promise<OrderDto>;
   getOrderById(id: string): Promise<OrderDto>;
   getOrderByOrderNumber(orderNumber: string): Promise<OrderDto>;
+  getOrderCompletion(id: string): Promise<OrderCompletionDto>;
+  listOrderHistory(ids: string[]): Promise<OrderHistoryItemDto[]>;
 }
 
 export interface CartService {

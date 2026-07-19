@@ -8,6 +8,7 @@ import type {
   AdminKitchenOrderPage,
   AdminOrderDetailRecord,
   AdminOrderListPage,
+  CustomerOrderCompletionRecord,
   OrderPaymentUpdateOptions,
   OrderRepository,
   OrderStatusUpdateOptions,
@@ -35,6 +36,11 @@ const orderInclude = {
 const orderDetailInclude = {
   ...orderInclude,
   history: { orderBy: { createdAt: "asc" as const } },
+} satisfies Prisma.OrderInclude;
+
+const customerCompletionInclude = {
+  ...orderDetailInclude,
+  pickupVerification: true,
 } satisfies Prisma.OrderInclude;
 
 function bangkokDayBounds(dateKey: string): { start: Date; end: Date } {
@@ -423,4 +429,66 @@ export class PrismaOrderRepository implements OrderRepository {
       history: (row.history ?? []).map(toDomainOrderHistory),
     };
   }
+
+  async findCustomerCompletion(
+    id: string,
+  ): Promise<CustomerOrderCompletionRecord | null> {
+    const row = await prisma.order.findUnique({
+      where: { id },
+      include: customerCompletionInclude,
+    });
+    if (!row) return null;
+    return toCustomerCompletionRecord(row);
+  }
+
+  async findCustomerHistoryByIds(
+    ids: string[],
+  ): Promise<CustomerOrderCompletionRecord[]> {
+    if (ids.length === 0) return [];
+
+    const rows = await prisma.order.findMany({
+      where: { id: { in: ids } },
+      include: customerCompletionInclude,
+    });
+    const byId = new Map(
+      rows.map((row) => [row.id, toCustomerCompletionRecord(row)]),
+    );
+
+    return ids.flatMap((id) => {
+      const record = byId.get(id);
+      return record ? [record] : [];
+    });
+  }
+}
+
+function toCustomerCompletionRecord(row: {
+  customer: PrismaOrderWithRelations["customer"];
+  boutique: PrismaOrderWithRelations["boutique"];
+  pickupSlot: PrismaOrderWithRelations["pickupSlot"];
+  items: PrismaOrderWithRelations["items"];
+  payment: PrismaOrderWithRelations["payment"];
+  history?: Array<Parameters<typeof toDomainOrderHistory>[0]>;
+  pickupVerification?: { verifiedAt: Date | null } | null;
+  id: string;
+  orderNumber: string;
+  status: PrismaOrderWithRelations["status"];
+  totalMinor: number;
+  termsAccepted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  customerId: string;
+  boutiqueId: string;
+  pickupSlotId: string;
+  currency: string;
+  specialRequest: string | null;
+}): CustomerOrderCompletionRecord {
+  const list = toListRow(row as PrismaOrderWithRelations);
+  return {
+    order: list.order,
+    paymentStatus: list.paymentStatus,
+    history: (row.history ?? []).map(toDomainOrderHistory),
+    verifiedAt: row.pickupVerification?.verifiedAt
+      ? row.pickupVerification.verifiedAt.toISOString()
+      : null,
+  };
 }

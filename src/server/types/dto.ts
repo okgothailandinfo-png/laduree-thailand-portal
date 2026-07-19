@@ -184,3 +184,85 @@ export type CheckoutResponseDto = {
   itemCount: number;
   status: "PENDING";
 };
+
+export type OrderCompletionPaymentStatus =
+  | "pending"
+  | "mock_accepted"
+  | "failed"
+  | "none";
+
+export type OrderCompletionReceiptItemDto = {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPriceThb: number;
+  lineTotalThb: number;
+  modifiers: Array<{ label: string; quantity?: number }>;
+};
+
+export type OrderCompletionReceiptDto = {
+  logoUrl: string;
+  orderNumber: string;
+  boutique: {
+    name: string;
+    address: string;
+  };
+  items: OrderCompletionReceiptItemDto[];
+  totalThb: number;
+  currency: "THB";
+  pickupDateKey: string;
+  pickupTimeSlotLabel: string;
+  completedAt: string | null;
+};
+
+export type OrderCompletionTimelineEntryDto = {
+  status: OrderDto["status"];
+  changedAt: string;
+  note: string | null;
+};
+
+/** GET /api/orders/:id/completion */
+export type OrderCompletionDto = {
+  orderId: string;
+  orderNumber: string;
+  status: OrderDto["status"];
+  completedAt: string | null;
+  pickupBoutique: {
+    id: string;
+    name: string;
+    address: string;
+  };
+  pickup: {
+    dateKey: string;
+    timeSlotLabel: string;
+  };
+  paymentStatus: OrderCompletionPaymentStatus;
+  paymentMethodLabel: string | null;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    modifiers: Array<{ label: string; quantity?: number }>;
+    note?: string;
+  }>;
+  totalThb: number;
+  currency: "THB";
+  receipt: OrderCompletionReceiptDto;
+  timeline: OrderCompletionTimelineEntryDto[];
+};
+
+/** GET /api/orders/history — customer browser-tracked order summaries */
+export type OrderHistoryItemDto = {
+  orderId: string;
+  orderNumber: string;
+  status: OrderDto["status"];
+  /** Pickup workflow status (same domain status; surfaced for UX). */
+  pickupStatus: OrderDto["status"];
+  boutiqueName: string;
+  pickupDateKey: string;
+  pickupTimeSlotLabel: string;
+  totalThb: number;
+  currency: "THB";
+  completedAt: string | null;
+  createdAt: string;
+};
