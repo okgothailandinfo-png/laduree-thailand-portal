@@ -63,6 +63,7 @@ export const MOCK_PRODUCTS: Product[] = [
         title: "Choice of Macarons:",
         requiredText: "Please select 8",
         type: "quantity",
+        exactSelectionQuantity: 8,
         options: [
           "Almond",
           "Chocolate",

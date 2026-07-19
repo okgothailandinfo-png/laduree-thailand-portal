@@ -217,7 +217,13 @@ async function run(): Promise<void> {
             {
               productId,
               quantity: 1,
-              modifiers: [{ label: "Placeholder modifier", quantity: 1 }],
+              // Fixed-size box exact selection: flavour quantities must total 8.
+              modifiers: [
+                { label: "Almond", quantity: 2 },
+                { label: "Chocolate", quantity: 2 },
+                { label: "Coffee", quantity: 2 },
+                { label: "Lemon", quantity: 2 },
+              ],
             },
           ],
           customer: {

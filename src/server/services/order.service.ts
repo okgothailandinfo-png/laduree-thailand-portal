@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import type { Order } from "@/src/server/models/order";
 import type {
   BoutiqueRepository,
@@ -230,6 +231,21 @@ export class DefaultOrderService implements OrderService {
           `Product unavailable: ${line.productId}`,
           { details: { field: "items.productId", productId: line.productId } },
         );
+      }
+
+      const exactSelection = validateExactSelectionModifiers(
+        product.modifierGroups,
+        line.modifiers ?? [],
+        line.quantity,
+      );
+      if (!exactSelection.ok) {
+        throw new AppError("VALIDATION_ERROR", exactSelection.message, {
+          details: {
+            field: "items.modifiers",
+            code: exactSelection.code,
+            productId: product.id,
+          },
+        });
       }
 
       const unitPriceMinor = unitPriceMinorFromProduct(product.priceMinor);

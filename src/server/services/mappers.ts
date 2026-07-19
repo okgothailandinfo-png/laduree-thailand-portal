@@ -39,6 +39,7 @@ export function toProductDetailDto(product: Product): ProductDetailDto {
       requiredText: group.requiredText,
       type: group.type,
       options: [...group.options],
+      exactSelectionQuantity: group.exactSelectionQuantity ?? null,
     })),
   };
 }

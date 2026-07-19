@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import type { Cart, CartItem } from "@/src/server/models/cart";
 import type {
   CartRepository,
@@ -102,13 +103,29 @@ export class DefaultCartService implements CartService {
       );
     }
 
+    const modifiers = input.modifiers ?? [];
+    const exactSelection = validateExactSelectionModifiers(
+      product.modifierGroups,
+      modifiers,
+      input.quantity,
+    );
+    if (!exactSelection.ok) {
+      throw new AppError("VALIDATION_ERROR", exactSelection.message, {
+        details: {
+          field: "modifiers",
+          code: exactSelection.code,
+          productId: product.id,
+        },
+      });
+    }
+
     const item: CartItem = {
       id: randomUUID(),
       productId: product.id,
       name: product.title,
       imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
       quantity: input.quantity,
-      modifiers: input.modifiers ?? [],
+      modifiers,
       note: input.note,
     };
 
