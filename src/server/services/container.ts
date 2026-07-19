@@ -4,8 +4,14 @@ import { AdminBannerService } from "@/src/server/admin/banner.service";
 import { AdminCategoryService } from "@/src/server/admin/category.service";
 import { AdminHomepageService } from "@/src/server/admin/homepage.service";
 import { AdminMediaService } from "@/src/server/admin/media.service";
+import { AdminNotificationService } from "@/src/server/admin/notification.service";
 import { AdminOrderService } from "@/src/server/admin/order.service";
 import { AdminProductService } from "@/src/server/admin/product.service";
+import { createNotificationProviders } from "@/src/server/notifications/factory";
+import { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
+import { NotificationQueueService } from "@/src/server/notifications/queue.service";
+import { NotificationSettingsService } from "@/src/server/notifications/settings.service";
+import { DefaultNotificationTemplateService } from "@/src/server/notifications/template.service";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
@@ -21,6 +27,28 @@ import { StorageService } from "@/src/server/storage/storage-service";
 
 const repositories = createRepositories();
 const storageService = new StorageService(createStorageProvider());
+
+const notificationTemplates = new DefaultNotificationTemplateService();
+const notificationProviders = createNotificationProviders({
+  emailProvider: env.notificationEmailProvider,
+  lineProvider: env.notificationLineProvider,
+  mockForceFailure: env.notificationMockForceFailure,
+});
+export const notificationSettingsService = new NotificationSettingsService(
+  repositories.notificationSettings,
+);
+export const notificationQueueService = new NotificationQueueService(
+  repositories.notificationQueue,
+  notificationTemplates,
+  notificationProviders,
+  env.notificationMaxAttempts,
+  env.notificationProcessLimit,
+);
+export const notificationOrchestrator = new NotificationOrchestrator(
+  notificationQueueService,
+  notificationSettingsService,
+  env.notificationBaseUrl,
+);
 
 export const productService = new DefaultProductService(repositories.products);
 export const categoryService = new DefaultCategoryService(
@@ -53,6 +81,7 @@ export const checkoutService = new DefaultCheckoutService(
 export const pickupVerificationService = new PickupVerificationService(
   repositories.pickupVerifications,
   repositories.orders,
+  notificationOrchestrator,
 );
 export const paymentService = new PaymentService(
   repositories.orders,
@@ -62,6 +91,7 @@ export const paymentService = new PaymentService(
   env.mockPaymentWebhookToleranceSeconds,
   undefined,
   pickupVerificationService,
+  notificationOrchestrator,
 );
 export const adminProductService = new AdminProductService(
   repositories.products,
@@ -87,6 +117,11 @@ export const adminOrderService = new AdminOrderService(
   repositories.orders,
   repositories.boutiques,
   pickupVerificationService,
+  notificationOrchestrator,
+);
+export const adminNotificationService = new AdminNotificationService(
+  notificationQueueService,
+  notificationSettingsService,
 );
 export const homepageService = new DefaultHomepageService(
   repositories.homepageBanners,

@@ -16,7 +16,8 @@
     "db:seed": "prisma db seed",
     "smoke:repos": "tsx src/server/repositories/smoke/run-smoke.ts",
     "smoke:api": "tsx src/server/repositories/smoke/run-api-smoke.ts",
-    "smoke:admin": "tsx src/server/admin/smoke/run-admin-smoke.ts"
+    "smoke:admin": "tsx src/server/admin/smoke/run-admin-smoke.ts",
+    "smoke:notifications": "tsx src/server/notifications/smoke/run-notification-smoke.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

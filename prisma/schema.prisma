@@ -269,6 +269,7 @@ model Order {
   payment            PaymentRecord?
   history            OrderHistory[]
   pickupVerification PickupVerification?
+  notificationJobs   NotificationJob[]
 
   @@index([customerId])
   @@index([boutiqueId])
@@ -352,4 +353,91 @@ model PaymentRecord {
   updatedAt   DateTime      @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationChannel {
+  EMAIL
+  LINE
+}
+
+enum NotificationEventType {
+  ORDER_CONFIRMED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  ORDER_PREPARING
+  ORDER_READY_FOR_PICKUP
+  ORDER_CANCELLED
+  PICKUP_COMPLETED
+}
+
+enum NotificationJobStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  SKIPPED
+  DEAD
+}
+
+/// Database-backed notification delivery job (no Redis / external queue).
+model NotificationJob {
+  id             String                @id @default(uuid()) @db.Uuid
+  eventType      NotificationEventType
+  orderId        String?               @db.Uuid
+  channel        NotificationChannel
+  /// Recipient address or LINE user id. Mask in admin list views.
+  recipient      String
+  templateKey    String
+  /// Structured template variables only — never secrets or full provider responses.
+  payloadJson    Json
+  status         NotificationJobStatus @default(PENDING)
+  attemptCount   Int                   @default(0)
+  maxAttempts    Int                   @default(3)
+  scheduledAt    DateTime              @default(now())
+  processedAt    DateTime?
+  lastErrorCode  String?
+  idempotencyKey String                @unique
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  order Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  logs  NotificationLog[]
+
+  @@index([status, scheduledAt])
+  @@index([orderId])
+  @@index([eventType])
+  @@index([channel])
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+/// Safe attempt audit for a notification job. Do not store message bodies.
+model NotificationLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  jobId             String   @db.Uuid
+  provider          String
+  providerMessageId String?
+  status            String
+  errorCode         String?
+  attemptedAt       DateTime
+  createdAt         DateTime @default(now())
+
+  job NotificationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([attemptedAt])
+  @@index([jobId, attemptedAt])
+}
+
+/// Channel / event enablement. key examples: channel.EMAIL, event.ORDER_CONFIRMED.
+model NotificationSetting {
+  id        String              @id @default(uuid()) @db.Uuid
+  key       String              @unique
+  channel   NotificationChannel
+  isEnabled Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([channel])
+  @@index([isEnabled])
 }

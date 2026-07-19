@@ -21,6 +21,7 @@ import {
   type MockPaymentWebhookEventType,
 } from "@/src/server/payment/webhook/types";
 import { verifyWebhookSignature } from "@/src/server/payment/webhook/verify";
+import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
 import type { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import type { OrderRepository } from "@/src/server/repositories/interfaces";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
@@ -54,6 +55,7 @@ export class PaymentService {
     private readonly webhookToleranceSeconds: number,
     provider?: PaymentProvider,
     private readonly pickupVerifications?: PickupVerificationService,
+    private readonly notifications?: NotificationOrchestrator,
   ) {
     this.provider = provider ?? createPaymentProvider(payments, "mock");
   }
@@ -162,6 +164,13 @@ export class PaymentService {
       payment.status,
     );
 
+    if (payment.status === "FAILED" && this.notifications) {
+      const order = await this.orders.findById(payment.orderId);
+      if (order) {
+        await this.notifications.onPaymentFailed(order);
+      }
+    }
+
     return {
       paymentId: payment.paymentId,
       orderId: payment.orderId,
@@ -224,6 +233,13 @@ export class PaymentService {
       payment.orderId,
       payment.status,
     );
+
+    if (payment.status === "FAILED" && this.notifications) {
+      const order = await this.orders.findById(payment.orderId);
+      if (order) {
+        await this.notifications.onPaymentFailed(order);
+      }
+    }
 
     await this.webhookEvents.markProcessed(event.eventId);
     logger.info("Webhook event applied", {
@@ -289,6 +305,14 @@ export class PaymentService {
           orderId: updated.id,
           message: error instanceof Error ? error.message : "unknown",
         });
+      }
+    }
+
+    if (this.notifications) {
+      if (updated.status === "confirmed") {
+        await this.notifications.onOrderConfirmed(updated);
+      } else if (updated.status === "cancelled") {
+        await this.notifications.onOrderCancelled(updated);
       }
     }
 
