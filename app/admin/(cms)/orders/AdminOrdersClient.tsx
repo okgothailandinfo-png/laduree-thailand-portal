@@ -63,7 +63,7 @@ function paymentBadgeClass(status: AdminPaymentStatus): string {
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
-  { value: "pending", label: "Pending" },
+  { value: "new", label: "New" },
   { value: "confirmed", label: "Confirmed" },
   { value: "preparing", label: "Preparing" },
   { value: "ready_for_pickup", label: "Ready for pickup" },

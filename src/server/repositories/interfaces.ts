@@ -99,6 +99,11 @@ export type OrderStatusUpdateOptions = {
   changedBy?: string | null;
 };
 
+export type OrderPaymentUpdateOptions = {
+  note?: string | null;
+  changedBy?: string | null;
+};
+
 export interface ProductRepository {
   /** Storefront: active + available products only. */
   list(): Promise<Product[]>;
@@ -199,6 +204,11 @@ export interface OrderRepository {
     status: OrderStatus,
     options?: OrderStatusUpdateOptions,
   ): Promise<Order>;
+  updatePaymentStatus(
+    orderId: string,
+    status: "pending" | "mock_accepted" | "failed",
+    options?: OrderPaymentUpdateOptions,
+  ): Promise<AdminOrderDetailRecord>;
   adminList(query: AdminOrderListQuery): Promise<AdminOrderListPage>;
   adminFindById(id: string): Promise<AdminOrderDetailRecord | null>;
 }

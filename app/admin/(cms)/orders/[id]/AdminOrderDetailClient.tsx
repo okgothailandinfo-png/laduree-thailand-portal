@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AdminApiError,
   fetchAdminOrder,
+  updateAdminOrderPayment,
   updateAdminOrderStatus,
 } from "@/lib/api/admin-orders";
 import type {
   AdminOrderDetailDto,
   AdminOrderStatus,
+  AdminPaymentStatus,
 } from "@/src/server/admin/dto";
 import AdminEmptyState from "../../../components/AdminEmptyState";
-import AdminForm, { AdminFormField } from "../../../components/AdminForm";
+import { AdminFormField } from "../../../components/AdminForm";
 import AdminPageHeader from "../../../components/AdminPageHeader";
 
 function formatPrice(thb: number): string {
@@ -41,12 +43,34 @@ function statusLabel(status: AdminOrderStatus | null): string {
   return status.replaceAll("_", " ");
 }
 
+function paymentLabel(status: AdminPaymentStatus): string {
+  return status.replaceAll("_", " ");
+}
+
 function orderBadgeClass(status: AdminOrderStatus): string {
   if (status === "completed") return "admin-badge admin-badge--active";
   if (status === "cancelled") return "admin-badge admin-badge--inactive";
   if (status === "ready_for_pickup") return "admin-badge admin-badge--ready";
+  if (status === "new") return "admin-badge admin-badge--new";
   return "admin-badge";
 }
+
+function paymentBadgeClass(status: AdminPaymentStatus): string {
+  if (status === "mock_accepted") return "admin-badge admin-badge--active";
+  if (status === "failed") return "admin-badge admin-badge--inactive";
+  return "admin-badge";
+}
+
+const PAYMENT_NEXT: Record<
+  Exclude<AdminPaymentStatus, "none">,
+  Exclude<AdminPaymentStatus, "none">[]
+> = {
+  pending: ["mock_accepted", "failed"],
+  failed: ["pending", "mock_accepted"],
+  mock_accepted: ["failed"],
+};
+
+type ConfirmKind = "status" | "payment";
 
 export default function AdminOrderDetailClient({
   orderId,
@@ -57,9 +81,16 @@ export default function AdminOrderDetailClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [nextStatus, setNextStatus] = useState("");
-  const [note, setNote] = useState("");
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
+  const [pendingStatus, setPendingStatus] = useState<AdminOrderStatus | null>(
+    null,
+  );
+  const [pendingPayment, setPendingPayment] = useState<Exclude<
+    AdminPaymentStatus,
+    "none"
+  > | null>(null);
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadOrder = useCallback(async () => {
@@ -68,7 +99,6 @@ export default function AdminOrderDetailClient({
     try {
       const data = await fetchAdminOrder(orderId);
       setOrder(data);
-      setNextStatus(data.allowedNextStatuses[0] ?? "");
     } catch (err) {
       setError(
         err instanceof AdminApiError
@@ -87,20 +117,47 @@ export default function AdminOrderDetailClient({
     return () => window.clearTimeout(timer);
   }, [loadOrder]);
 
+  const paymentNextStatuses = useMemo(() => {
+    if (!order || order.paymentStatus === "none") return [];
+    return PAYMENT_NEXT[order.paymentStatus] ?? [];
+  }, [order]);
+
+  function openStatusConfirm(status: AdminOrderStatus) {
+    setPendingStatus(status);
+    setConfirmKind("status");
+    setError(null);
+    setSuccess(null);
+  }
+
+  function openPaymentConfirm(status: Exclude<AdminPaymentStatus, "none">) {
+    setPendingPayment(status);
+    setConfirmKind("payment");
+    setError(null);
+    setSuccess(null);
+  }
+
+  function closeConfirm() {
+    if (saving) return;
+    setConfirmKind(null);
+    setPendingStatus(null);
+    setPendingPayment(null);
+  }
+
   async function submitStatusChange() {
-    if (!order || !nextStatus) return;
+    if (!order || !pendingStatus) return;
     setSaving(true);
     setError(null);
     setSuccess(null);
     try {
       const updated = await updateAdminOrderStatus(order.id, {
-        status: nextStatus as AdminOrderStatus,
-        note: note.trim() || null,
+        status: pendingStatus,
+        note: statusNote.trim() || null,
+        expectedStatus: order.orderStatus,
       });
       setOrder(updated);
-      setNextStatus(updated.allowedNextStatuses[0] ?? "");
-      setNote("");
-      setConfirmOpen(false);
+      setStatusNote("");
+      setConfirmKind(null);
+      setPendingStatus(null);
       setSuccess(`Status updated to ${statusLabel(updated.orderStatus)}.`);
     } catch (err) {
       setError(
@@ -108,7 +165,40 @@ export default function AdminOrderDetailClient({
           ? err.message
           : "Unable to update order status.",
       );
-      setConfirmOpen(false);
+      setConfirmKind(null);
+      setPendingStatus(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitPaymentChange() {
+    if (!order || !pendingPayment) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await updateAdminOrderPayment(order.id, {
+        status: pendingPayment,
+        note: paymentNote.trim() || null,
+        expectedStatus:
+          order.paymentStatus === "none" ? undefined : order.paymentStatus,
+      });
+      setOrder(updated);
+      setPaymentNote("");
+      setConfirmKind(null);
+      setPendingPayment(null);
+      setSuccess(
+        `Payment status updated to ${paymentLabel(updated.paymentStatus)}.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof AdminApiError
+          ? err.message
+          : "Unable to update payment status.",
+      );
+      setConfirmKind(null);
+      setPendingPayment(null);
     } finally {
       setSaving(false);
     }
@@ -154,7 +244,7 @@ export default function AdminOrderDetailClient({
 
       <AdminPageHeader
         title={order.orderNumber}
-        description="Order detail and status management."
+        description="Order detail and fulfillment workflow."
       />
 
       {success ? (
@@ -183,16 +273,8 @@ export default function AdminOrderDetailClient({
             <div>
               <dt>Payment status</dt>
               <dd>
-                <span
-                  className={
-                    order.paymentStatus === "mock_accepted"
-                      ? "admin-badge admin-badge--active"
-                      : order.paymentStatus === "failed"
-                        ? "admin-badge admin-badge--inactive"
-                        : "admin-badge"
-                  }
-                >
-                  {order.paymentStatus.replaceAll("_", " ")}
+                <span className={paymentBadgeClass(order.paymentStatus)}>
+                  {paymentLabel(order.paymentStatus)}
                 </span>
               </dd>
             </div>
@@ -241,7 +323,7 @@ export default function AdminOrderDetailClient({
         </section>
 
         <section className="admin-panel">
-          <h3 className="admin-panel__title">Pickup</h3>
+          <h3 className="admin-panel__title">Pickup location</h3>
           <dl className="admin-dl">
             <div>
               <dt>Boutique</dt>
@@ -266,7 +348,7 @@ export default function AdminOrderDetailClient({
       </div>
 
       <section className="admin-panel">
-        <h3 className="admin-panel__title">Items</h3>
+        <h3 className="admin-panel__title">Ordered products</h3>
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
@@ -329,81 +411,127 @@ export default function AdminOrderDetailClient({
       </section>
 
       <section className="admin-panel">
-        <h3 className="admin-panel__title">Update status</h3>
+        <h3 className="admin-panel__title">Fulfillment actions</h3>
         {order.allowedNextStatuses.length === 0 ? (
           <p className="admin-muted-text">
             No further status transitions are allowed for this order.
           </p>
         ) : (
-          <AdminForm
-            submitLabel={saving ? "Saving…" : "Update status"}
-            disabled={saving || !nextStatus}
-            onSubmit={(event: FormEvent<HTMLFormElement>) => {
-              event.preventDefault();
-              setConfirmOpen(true);
-            }}
-          >
-            <AdminFormField label="Next status" htmlFor="order-next-status">
-              <select
-                id="order-next-status"
-                className="admin-filter__select"
-                value={nextStatus}
-                disabled={saving}
-                onChange={(event) => setNextStatus(event.target.value)}
-                required
-              >
-                {order.allowedNextStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabel(status)}
-                  </option>
-                ))}
-              </select>
-            </AdminFormField>
-            <AdminFormField label="Note (optional)" htmlFor="order-status-note">
+          <>
+            <div className="admin-actions admin-actions--status">
+              {order.allowedNextStatuses.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className={
+                    status === "cancelled"
+                      ? "admin-btn admin-btn--secondary"
+                      : "admin-btn admin-btn--primary"
+                  }
+                  disabled={saving}
+                  onClick={() => openStatusConfirm(status)}
+                >
+                  Mark {statusLabel(status)}
+                </button>
+              ))}
+            </div>
+            <AdminFormField label="Status note (optional)" htmlFor="order-status-note">
               <textarea
                 id="order-status-note"
                 className="admin-textarea"
-                rows={3}
-                value={note}
+                rows={2}
+                value={statusNote}
                 disabled={saving}
-                onChange={(event) => setNote(event.target.value)}
+                onChange={(event) => setStatusNote(event.target.value)}
                 placeholder="Operational note"
               />
             </AdminFormField>
-          </AdminForm>
+          </>
         )}
-
-        {confirmOpen ? (
-          <div className="admin-confirm" role="dialog" aria-modal="true">
-            <p>
-              Change status from{" "}
-              <strong>{statusLabel(order.orderStatus)}</strong> to{" "}
-              <strong>{statusLabel(nextStatus as AdminOrderStatus)}</strong>?
-            </p>
-            <div className="admin-actions">
-              <button
-                type="button"
-                className="admin-btn admin-btn--primary"
-                disabled={saving}
-                onClick={() => void submitStatusChange()}
-              >
-                {saving ? "Saving…" : "Confirm"}
-              </button>
-              <button
-                type="button"
-                className="admin-btn admin-btn--secondary"
-                disabled={saving}
-                onClick={() => setConfirmOpen(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
       </section>
 
       <section className="admin-panel">
-        <h3 className="admin-panel__title">Status timeline</h3>
+        <h3 className="admin-panel__title">Payment</h3>
+        {order.paymentStatus === "none" ? (
+          <p className="admin-muted-text">No payment record on this order.</p>
+        ) : paymentNextStatuses.length === 0 ? (
+          <p className="admin-muted-text">Payment status cannot be changed.</p>
+        ) : (
+          <>
+            <div className="admin-actions">
+              {paymentNextStatuses.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className="admin-btn admin-btn--secondary"
+                  disabled={saving}
+                  onClick={() => openPaymentConfirm(status)}
+                >
+                  Set payment {paymentLabel(status)}
+                </button>
+              ))}
+            </div>
+            <AdminFormField
+              label="Payment note (optional)"
+              htmlFor="order-payment-note"
+            >
+              <textarea
+                id="order-payment-note"
+                className="admin-textarea"
+                rows={2}
+                value={paymentNote}
+                disabled={saving}
+                onChange={(event) => setPaymentNote(event.target.value)}
+                placeholder="Operational note"
+              />
+            </AdminFormField>
+          </>
+        )}
+      </section>
+
+      {confirmKind ? (
+        <div className="admin-confirm" role="dialog" aria-modal="true">
+          {confirmKind === "status" && pendingStatus ? (
+            <p>
+              Change order status from{" "}
+              <strong>{statusLabel(order.orderStatus)}</strong> to{" "}
+              <strong>{statusLabel(pendingStatus)}</strong>?
+            </p>
+          ) : null}
+          {confirmKind === "payment" && pendingPayment ? (
+            <p>
+              Change payment status from{" "}
+              <strong>{paymentLabel(order.paymentStatus)}</strong> to{" "}
+              <strong>{paymentLabel(pendingPayment)}</strong>?
+            </p>
+          ) : null}
+          <div className="admin-actions">
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary"
+              disabled={saving}
+              onClick={() =>
+                void (confirmKind === "status"
+                  ? submitStatusChange()
+                  : submitPaymentChange())
+              }
+            >
+              {saving ? "Saving…" : "Confirm"}
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              disabled={saving}
+              onClick={closeConfirm}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="admin-panel">
+        <h3 className="admin-panel__title">Order status timeline</h3>
         {order.history.length === 0 ? (
           <p className="admin-muted-text">No status history yet.</p>
         ) : (
@@ -411,15 +539,22 @@ export default function AdminOrderDetailClient({
             {order.history.map((entry) => (
               <li key={entry.id} className="admin-timeline__item">
                 <div className="admin-timeline__meta">
-                  {formatDateTime(entry.createdAt)}
+                  {formatDateTime(entry.changedAt)}
                   {entry.changedBy ? ` · ${entry.changedBy}` : ""}
                 </div>
                 <div>
-                  {statusLabel(entry.fromStatus)} →{" "}
-                  <strong>{statusLabel(entry.toStatus)}</strong>
+                  <span className={orderBadgeClass(entry.status)}>
+                    {statusLabel(entry.status)}
+                  </span>
+                  {entry.fromStatus ? (
+                    <span className="admin-muted-text">
+                      {" "}
+                      (from {statusLabel(entry.fromStatus)})
+                    </span>
+                  ) : null}
                 </div>
-                {entry.note ? (
-                  <div className="admin-muted-text">{entry.note}</div>
+                {entry.notes ? (
+                  <div className="admin-muted-text">{entry.notes}</div>
                 ) : null}
               </li>
             ))}

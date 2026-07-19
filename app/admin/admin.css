@@ -823,6 +823,16 @@
   border-color: #c5e4f2;
 }
 
+.admin-badge--new {
+  color: #6a4a12;
+  background: #fff4d6;
+  border-color: #f0e0a8;
+}
+
+.admin-actions--status {
+  margin-bottom: 12px;
+}
+
 .admin-order-grid {
   display: grid;
   gap: 16px;

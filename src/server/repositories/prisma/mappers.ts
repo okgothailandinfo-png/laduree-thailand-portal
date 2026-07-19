@@ -324,6 +324,23 @@ export function toPrismaOrderStatus(status: OrderStatus): PrismaOrderStatus {
   }
 }
 
+export function toPrismaPaymentStatus(
+  status: "pending" | "mock_accepted" | "failed",
+): PrismaPaymentStatus {
+  switch (status) {
+    case "pending":
+      return "PENDING";
+    case "mock_accepted":
+      return "MOCK_ACCEPTED";
+    case "failed":
+      return "FAILED";
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
+}
+
 export function toAdminPaymentStatus(
   payment: PrismaPaymentRecord | null | undefined,
 ): "pending" | "mock_accepted" | "failed" | "none" {

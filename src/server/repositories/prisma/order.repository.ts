@@ -4,6 +4,7 @@ import type { Order, OrderStatus } from "@/src/server/models/order";
 import type {
   AdminOrderDetailRecord,
   AdminOrderListPage,
+  OrderPaymentUpdateOptions,
   OrderRepository,
   OrderStatusUpdateOptions,
 } from "@/src/server/repositories/interfaces";
@@ -13,6 +14,7 @@ import {
   toDomainOrderHistory,
   toPrismaOrderStatus,
   toPrismaPaymentMethod,
+  toPrismaPaymentStatus,
   type PrismaOrderWithRelations,
 } from "@/src/server/repositories/prisma/mappers";
 import { prisma } from "@/src/server/database/prisma";
@@ -59,7 +61,12 @@ function buildAdminWhere(
   }
 
   if (query.status) {
-    where.status = toPrismaOrderStatus(query.status);
+    // Admin "new" is the workflow label for storefront PENDING drafts.
+    if (query.status === "new" || query.status === "pending") {
+      where.status = "PENDING";
+    } else {
+      where.status = toPrismaOrderStatus(query.status);
+    }
   }
 
   if (query.boutiqueId) {
@@ -251,6 +258,57 @@ export class PrismaOrderRepository implements OrderRepository {
         error.code === "P2025"
       ) {
         throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+      }
+      throw error;
+    }
+  }
+
+  async updatePaymentStatus(
+    orderId: string,
+    status: "pending" | "mock_accepted" | "failed",
+    options?: OrderPaymentUpdateOptions,
+  ): Promise<AdminOrderDetailRecord> {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const existing = await tx.order.findUnique({
+          where: { id: orderId },
+          include: orderInclude,
+        });
+        if (!existing) {
+          throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+        }
+        if (!existing.payment) {
+          throw new AppError(
+            "CONFLICT",
+            "Order has no payment record to update.",
+            { details: { orderId } },
+          );
+        }
+
+        const toPrisma = toPrismaPaymentStatus(status);
+        if (existing.payment.status === toPrisma) {
+          return; // idempotent — no duplicate write
+        }
+
+        await tx.paymentRecord.update({
+          where: { orderId },
+          data: { status: toPrisma },
+        });
+        void options;
+      });
+
+      const detail = await this.adminFindById(orderId);
+      if (!detail) {
+        throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+      }
+      return detail;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
       }
       throw error;
     }
