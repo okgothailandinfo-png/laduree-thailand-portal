@@ -1,4 +1,6 @@
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type {
   AdminNotificationDetail,
   AdminNotificationListPage,
@@ -282,6 +284,12 @@ export class AdminNotificationService {
   ): Promise<AdminNotificationSettingDto[]> {
     requirePrismaDataSource();
     const rows = await this.settings.updateMany(updates);
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "settings.change",
+      entityType: "NotificationSetting",
+      metadata: { keys: updates.map((item) => item.key) },
+    });
     return rows.map((row) => toSettingDto(row));
   }
 }

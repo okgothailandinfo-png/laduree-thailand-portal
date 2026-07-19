@@ -32,7 +32,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 async function runStorefrontChecks(results: CheckResult[]): Promise<void> {
-  const categoriesRes = await getCategories();
+  const categoriesRes = await getCategories(new Request("http://localhost:3000/api/categories"));
   const categoriesJson: unknown = await categoriesRes.json();
   results.push({
     name: "storefront GET /api/categories",
@@ -43,7 +43,7 @@ async function runStorefrontChecks(results: CheckResult[]): Promise<void> {
     detail: `status=${categoriesRes.status}`,
   });
 
-  const productsRes = await getProducts();
+  const productsRes = await getProducts(new Request("http://localhost:3000/api/products"));
   const productsJson: unknown = await productsRes.json();
   const productsOk =
     productsRes.status === 200 &&

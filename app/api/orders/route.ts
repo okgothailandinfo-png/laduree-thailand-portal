@@ -15,5 +15,5 @@ export async function POST(request: Request) {
     const input = orderService.parseCreateOrderBody(raw);
     const data = await orderService.createOrder(input);
     return created(data);
-  });
+  }, request);
 }

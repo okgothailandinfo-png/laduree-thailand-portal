@@ -19,5 +19,5 @@ export async function GET(request: Request) {
 
     const data = await pickupService.getAvailability({ boutiqueId, dateKey });
     return ok(data);
-  });
+  }, request);
 }

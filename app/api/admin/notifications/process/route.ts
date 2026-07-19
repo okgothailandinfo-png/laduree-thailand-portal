@@ -1,7 +1,14 @@
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
-import { requireAdminSession } from "@/src/server/admin/auth";
+import { requireAdminWrite } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
+import {
+  assertRateLimit,
+  clientSubjectFromRequest,
+} from "@/src/server/http/rate-limit";
 import { adminNotificationService } from "@/src/server/services/container";
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
+import { logEvent } from "@/src/server/utils/logger";
 
 /**
  * POST /api/admin/notifications/process
@@ -10,7 +17,14 @@ import { adminNotificationService } from "@/src/server/services/container";
  */
 export async function POST(request: Request) {
   return handleApi(async () => {
-    await requireAdminSession();
+    await requireAdminWrite(request);
+    await assertRateLimit({
+      bucket: "notification-process",
+      subject: clientSubjectFromRequest(request),
+      maxAttempts: 20,
+      windowMs: 60_000,
+    });
+
     const { searchParams } = new URL(request.url);
     const queryLimit = searchParams.get("limit");
     let limit: number | undefined;
@@ -29,9 +43,26 @@ export async function POST(request: Request) {
       bodyLimit = adminNotificationService.parseProcessBody(raw).limit;
     }
 
-    const data = await adminNotificationService.processPending(
-      bodyLimit ?? limit,
-    );
-    return ok(data);
-  });
+    try {
+      const data = await adminNotificationService.processPending(
+        bodyLimit ?? limit,
+      );
+      await writeAuditLog({
+        actorId: MOCK_ADMIN_USER.id,
+        action: "notification.process",
+        entityType: "NotificationJob",
+        metadata: {
+          processed: data.processed,
+          sent: data.sent,
+          failed: data.failed,
+        },
+      });
+      return ok(data);
+    } catch (error) {
+      logEvent.notificationProcessingFailed({
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }, request);
 }

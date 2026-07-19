@@ -404,6 +404,8 @@ export class PrismaOrderRepository implements OrderRepository {
         { pickupSlot: { startTime: "asc" } },
         { createdAt: "asc" },
       ],
+      // Operational board cap — avoid unbounded loads in production.
+      take: 200,
     });
 
     return {

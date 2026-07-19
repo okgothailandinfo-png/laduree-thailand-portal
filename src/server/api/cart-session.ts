@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { env } from "@/src/server/config/env";
 
 export const CART_COOKIE_NAME = "laduree_cart_id";
 
@@ -17,6 +18,7 @@ export async function writeCartIdCookie(cartId: string): Promise<void> {
     sameSite: "lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE_SECONDS,
+    secure: env.nodeEnv === "production",
   });
 }
 

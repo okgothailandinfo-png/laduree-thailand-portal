@@ -14,5 +14,5 @@ export async function GET(request: Request) {
     const query = adminOrderService.parseListQuery(searchParams);
     const data = await adminOrderService.list(query);
     return ok(data);
-  });
+  }, request);
 }

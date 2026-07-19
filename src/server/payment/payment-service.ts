@@ -207,7 +207,9 @@ export class PaymentService {
 
     const event = this.parseMockWebhookEvent(params.parsedBody);
 
-    if (await this.webhookEvents.hasProcessed(event.eventId)) {
+    // Claim first for durable idempotency under concurrency.
+    const claimed = await this.webhookEvents.claimEvent(event.eventId);
+    if (!claimed) {
       const payment = await this.provider.getPayment(event.paymentId);
       const order = await this.orders.findById(payment.orderId);
       logger.info("Duplicate webhook event ignored", {
@@ -241,7 +243,6 @@ export class PaymentService {
       }
     }
 
-    await this.webhookEvents.markProcessed(event.eventId);
     logger.info("Webhook event applied", {
       eventId: event.eventId,
       type: event.type,

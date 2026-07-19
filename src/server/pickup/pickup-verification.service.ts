@@ -26,7 +26,8 @@ import {
 } from "@/src/server/pickup/crypto";
 import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
 import type { PickupVerificationRepository } from "@/src/server/pickup/pickup-verification.repository";
-import { checkPickupVerifyRateLimit } from "@/src/server/pickup/rate-limit";
+import { assertRateLimit } from "@/src/server/http/rate-limit";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type {
   AdminOrderDetailRecord,
   OrderRepository,
@@ -276,16 +277,23 @@ export class PickupVerificationService {
     requirePrismaDataSource();
 
     const rateKey = options?.rateLimitKey ?? "admin-pickup-verify";
-    const rate = checkPickupVerifyRateLimit(rateKey);
-    if (!rate.allowed) {
-      logger.warn("Pickup verification rate-limited", {
-        retryAfterMs: rate.retryAfterMs,
+    try {
+      await assertRateLimit({
+        bucket: "pickup-verify",
+        subject: rateKey,
+        maxAttempts: 30,
+        windowMs: 60_000,
       });
-      throw new AppError(
-        "BAD_REQUEST",
-        GENERIC_VERIFY_ERROR,
-        { status: 429 },
-      );
+    } catch (error) {
+      if (error instanceof AppError && error.code === "RATE_LIMITED") {
+        logger.warn("Pickup verification rate-limited", {
+          retryAfterSeconds: error.retryAfterSeconds,
+        });
+        throw new AppError("RATE_LIMITED", GENERIC_VERIFY_ERROR, {
+          retryAfterSeconds: error.retryAfterSeconds,
+        });
+      }
+      throw error;
     }
 
     let record: PickupVerificationRecord | null = null;
@@ -390,6 +398,16 @@ export class PickupVerificationService {
       orderNumber: order.orderNumber,
       orderStatus: order.status,
       allowedAction: allowed,
+    });
+    await writeAuditLog({
+      action: "pickup.verify",
+      entityType: "PickupVerification",
+      entityId: record.id,
+      metadata: {
+        orderId: order.id,
+        orderStatus: order.status,
+        allowedAction: allowed,
+      },
     });
 
     return {
@@ -498,6 +516,12 @@ export class PickupVerificationService {
       if (this.notifications) {
         await this.notifications.onPickupCompleted(result.order);
       }
+      await writeAuditLog({
+        action: "pickup.complete",
+        entityType: "Order",
+        entityId: orderId,
+        metadata: { alreadyCompleted: false },
+      });
     }
 
     return {

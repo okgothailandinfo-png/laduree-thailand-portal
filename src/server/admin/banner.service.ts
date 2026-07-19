@@ -5,7 +5,9 @@ import type {
   AdminCreateBannerInput,
   AdminUpdateBannerInput,
 } from "@/src/server/admin/dto";
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type { HomepageBannerWithMedia } from "@/src/server/models/homepage";
 import type { Media } from "@/src/server/models/media";
 import type {
@@ -268,6 +270,12 @@ export class AdminBannerService {
     await this.validateMediaRefs(input);
     const banner = await this.banners.create(input);
     logger.info("Banner created", { bannerId: banner.id });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "banner.create",
+      entityType: "HomepageBanner",
+      entityId: banner.id,
+    });
     return toDto(banner);
   }
 
@@ -297,6 +305,13 @@ export class AdminBannerService {
       bannerId: banner.id,
       isActive: banner.isActive,
     });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "banner.update",
+      entityType: "HomepageBanner",
+      entityId: banner.id,
+      metadata: { isActive: banner.isActive },
+    });
     return toDto(banner);
   }
 
@@ -308,5 +323,11 @@ export class AdminBannerService {
     }
     await this.banners.remove(id);
     logger.info("Banner deleted", { bannerId: id });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "banner.delete",
+      entityType: "HomepageBanner",
+      entityId: id,
+    });
   }
 }

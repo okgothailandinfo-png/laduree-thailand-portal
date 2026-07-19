@@ -193,11 +193,14 @@ As of Sprint 16C in this agent environment:
 
 ## Remaining production tasks / risks
 
+See also [production-hardening.md](./production-hardening.md) for fail-closed rules and Production Blockers.
+
 - Replace development seed with owner-approved Thailand catalog, prices, boutique ops, and hours
 - Product modifier groups not persisted in Prisma yet
-- Binary image upload not implemented (URL-based images only)
-- Real admin authentication provider not implemented (mock session only)
-- Cart / gateway payment / webhook event persistence still in-memory under `DATA_SOURCE=prisma`
+- Real admin authentication provider not implemented (mock session only — refused in production)
+- Cart / gateway payment persistence still in-memory under `DATA_SOURCE=prisma`
+- Webhook event persistence is now Prisma-backed (`WebhookEvent`); cart/gateway payments remain in-memory
 - Pickup reservation counts not decremented on order create
-- Payment gateway not implemented (mock payment status only)
-- Production must set `DATA_SOURCE` explicitly
+- Payment gateway not implemented (mock payment refused in production)
+- Production must set `DATA_SOURCE=prisma` (mock refused)
+- Cloud storage / real notification providers / Redis rate-limit client still required before go-live

@@ -1,6 +1,6 @@
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
-import { requireAdminSession } from "@/src/server/admin/auth";
+import { requireAdminWrite } from "@/src/server/admin/auth";
 import { pickupVerificationService } from "@/src/server/services/container";
 
 type RouteContext = { params: Promise<{ orderId: string }> };
@@ -12,11 +12,11 @@ type RouteContext = { params: Promise<{ orderId: string }> };
  */
 export async function POST(request: Request, context: RouteContext) {
   return handleApi(async () => {
-    await requireAdminSession();
+    await requireAdminWrite(request);
     const { orderId } = await context.params;
     const body = await request.json();
     const input = pickupVerificationService.parseCompleteBody(body);
     const data = await pickupVerificationService.complete(orderId, input);
     return ok(data);
-  });
+  }, request);
 }

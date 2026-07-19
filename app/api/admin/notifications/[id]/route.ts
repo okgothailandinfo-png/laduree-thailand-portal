@@ -8,11 +8,11 @@ type RouteContext = { params: Promise<{ id: string }> };
 /**
  * GET /api/admin/notifications/[id]
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
     await requireAdminSession();
     const { id } = await context.params;
     const data = await adminNotificationService.getById(id);
     return ok(data);
-  });
+  }, request);
 }

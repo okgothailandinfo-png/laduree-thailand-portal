@@ -6,10 +6,10 @@ type RouteContext = {
   params: Promise<{ slug: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
     const { slug } = await context.params;
     const data = await productService.getProductBySlug(slug);
     return ok(data);
-  });
+  }, request);
 }

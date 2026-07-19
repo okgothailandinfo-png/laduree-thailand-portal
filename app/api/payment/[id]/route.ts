@@ -6,10 +6,10 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
     const { id } = await context.params;
     const data = await paymentService.getPayment(id);
     return ok(data);
-  });
+  }, request);
 }
