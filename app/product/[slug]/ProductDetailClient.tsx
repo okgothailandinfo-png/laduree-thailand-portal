@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import CatalogStatus from "../../catalog/CatalogStatus";
 import { useAsyncResource } from "../../catalog/useAsyncResource";
 import { useCart } from "../../cart/CartContext";
@@ -9,6 +9,15 @@ import {
   fetchProductBySlug,
   formatPriceThb,
 } from "@/lib/api/catalog";
+import type { ProductModifierGroup } from "@/lib/api/types";
+import {
+  formatExactSelectionIncompleteMessage,
+  formatExactSelectionMaximumMessage,
+  formatSelectedOfRequired,
+  getExactSelectionGroups,
+  isExactSelectionGroup,
+  sumExactSelectionFromQtyMap,
+} from "@/lib/product/exact-selection";
 import "../product-detail.css";
 
 function clampQty(value: number) {
@@ -26,6 +35,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     {},
   );
   const [remark, setRemark] = useState("");
+  const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
 
   const productQuery = useAsyncResource(
     (signal) => fetchProductBySlug(slug, { signal }),
@@ -35,15 +45,81 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   const product = productQuery.data;
   const imageCount = 4;
 
-  function changeModifierQty(key: string, delta: number) {
+  const exactGroups = useMemo(
+    () => (product ? getExactSelectionGroups(product.modifierGroups) : []),
+    [product],
+  );
+  const hasExactSelection = exactGroups.length > 0;
+  const effectiveProductQty = hasExactSelection ? 1 : productQty;
+
+  const exactTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const group of exactGroups) {
+      totals[group.id] = sumExactSelectionFromQtyMap(group, modifierQty);
+    }
+    return totals;
+  }, [exactGroups, modifierQty]);
+
+  const allExactSelectionsComplete =
+    exactGroups.length === 0 ||
+    exactGroups.every(
+      (group) =>
+        (exactTotals[group.id] ?? 0) === group.exactSelectionQuantity,
+    );
+
+  function changeModifierQty(
+    group: ProductModifierGroup,
+    optionKey: string,
+    delta: number,
+  ) {
     setModifierQty((current) => {
-      const next = clampQty((current[key] ?? 0) + delta);
-      return { ...current, [key]: next };
+      const currentQty = current[optionKey] ?? 0;
+      if (delta < 0 && currentQty <= 0) return current;
+
+      if (isExactSelectionGroup(group) && delta > 0) {
+        const groupTotal = sumExactSelectionFromQtyMap(group, current);
+        if (groupTotal >= group.exactSelectionQuantity) {
+          setSelectionMessage(
+            formatExactSelectionMaximumMessage(group.exactSelectionQuantity),
+          );
+          return current;
+        }
+      }
+
+      const nextQty = clampQty(currentQty + delta);
+      const next = { ...current, [optionKey]: nextQty };
+
+      if (isExactSelectionGroup(group)) {
+        const nextTotal = sumExactSelectionFromQtyMap(group, next);
+        if (nextTotal < group.exactSelectionQuantity) {
+          setSelectionMessage(null);
+        } else if (nextTotal === group.exactSelectionQuantity) {
+          setSelectionMessage(null);
+        }
+      }
+
+      return next;
     });
   }
 
   function handleAddToCart() {
     if (!product) return;
+
+    if (!allExactSelectionsComplete) {
+      const incomplete = exactGroups.find(
+        (group) =>
+          (exactTotals[group.id] ?? 0) !== group.exactSelectionQuantity,
+      );
+      if (incomplete) {
+        setSelectionMessage(
+          formatExactSelectionIncompleteMessage(
+            incomplete.exactSelectionQuantity,
+          ),
+        );
+      }
+      return;
+    }
+
     const modifiers: { label: string; quantity?: number }[] = [];
 
     for (const group of product.modifierGroups) {
@@ -59,11 +135,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
       }
     }
 
-    addItem({
+    setSelectionMessage(null);
+    void addItem({
       productId: product.id,
       name: product.title,
       imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
-      quantity: productQty,
+      quantity: effectiveProductQty,
       modifiers,
       note: remark.trim() || undefined,
     });
@@ -115,6 +192,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   }
 
   const priceLabel = formatPriceThb(product.priceThb);
+  const addDisabled = hasExactSelection && !allExactSelectionsComplete;
 
   return (
     <div className="product-detail-page modal-product-detail">
@@ -247,113 +325,159 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   id="product-variant-and-modifiers"
                 >
                   <div className="row product-modifier-list-remark">
-                    {product.modifierGroups.map((group) => (
-                      <div
-                        key={group.id}
-                        className="col-xs-12 full-mobile fd-modifiergroup-body fd-productdetailpopup"
-                      >
-                        <div className="form-group">
-                          <div className="row lg-modifiergroup-header lg-productdetailpopup">
-                            <div className="col-xs-10 remove-padding-right">
-                              <strong>{group.title}</strong>
+                    {product.modifierGroups.map((group) => {
+                      const exact = isExactSelectionGroup(group)
+                        ? group.exactSelectionQuantity
+                        : null;
+                      const selectedTotal =
+                        exact !== null ? (exactTotals[group.id] ?? 0) : 0;
+                      const atExactMax =
+                        exact !== null && selectedTotal >= exact;
+
+                      return (
+                        <div
+                          key={group.id}
+                          className="col-xs-12 full-mobile fd-modifiergroup-body fd-productdetailpopup"
+                        >
+                          <div className="form-group">
+                            <div className="row lg-modifiergroup-header lg-productdetailpopup">
+                              <div className="col-xs-10 remove-padding-right">
+                                <strong>{group.title}</strong>
+                              </div>
                             </div>
+
+                            {group.requiredText ? (
+                              <div className="margin-top-5">
+                                <small className="danger_message danger_red_message text-muted danger-message-custom required-modi">
+                                  {group.requiredText}
+                                </small>
+                              </div>
+                            ) : null}
+
+                            {exact !== null ? (
+                              <div className="margin-top-5">
+                                <small
+                                  className="exact-selection-counter text-muted"
+                                  aria-live="polite"
+                                >
+                                  {formatSelectedOfRequired(
+                                    selectedTotal,
+                                    exact,
+                                  )}
+                                </small>
+                              </div>
+                            ) : null}
+
+                            {exact !== null &&
+                            selectionMessage &&
+                            group.id === exactGroups[0]?.id ? (
+                              <div className="margin-top-5">
+                                <small
+                                  className="danger_message danger_red_message text-muted danger-message-custom exact-selection-message"
+                                  role="alert"
+                                >
+                                  {selectionMessage}
+                                </small>
+                              </div>
+                            ) : null}
+
+                            <table className="table-product-detail">
+                              <tbody>
+                                {group.options.map((option) => {
+                                  const optionKey = `${group.id}:${option}`;
+                                  const optionQty = modifierQty[optionKey] ?? 0;
+                                  return (
+                                    <tr key={optionKey}>
+                                      <td className="modifier-title">
+                                        <div className="title-line-height">
+                                          {option}
+                                        </div>
+                                      </td>
+                                      <td className="modifier-price text-left">
+                                        <span className="title-line-height">
+                                          ฿ —
+                                        </span>
+                                      </td>
+                                      <td className="modifier-quantity-input-group text-right theme-radio-color">
+                                        {group.type === "radio" ? (
+                                          <div className="radio">
+                                            <input
+                                              type="radio"
+                                              name={group.id}
+                                              checked={
+                                                radioSelection[group.id] ===
+                                                option
+                                              }
+                                              onChange={() =>
+                                                setRadioSelection((current) => ({
+                                                  ...current,
+                                                  [group.id]: option,
+                                                }))
+                                              }
+                                              aria-label={option}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="input-group">
+                                            <span className="input-group-btn">
+                                              <button
+                                                className="btn minus button-input-group"
+                                                type="button"
+                                                aria-label={`Decrease ${option}`}
+                                                disabled={optionQty <= 0}
+                                                onClick={() =>
+                                                  changeModifierQty(
+                                                    group,
+                                                    optionKey,
+                                                    -1,
+                                                  )
+                                                }
+                                              >
+                                                <i
+                                                  className="fa fa-minus"
+                                                  aria-hidden="true"
+                                                />
+                                              </button>
+                                            </span>
+                                            <input
+                                              type="text"
+                                              className="text-center quantity-input-text modifier-input"
+                                              value={String(optionQty)}
+                                              readOnly
+                                              aria-label={`${option} quantity`}
+                                            />
+                                            <span className="input-group-btn">
+                                              <button
+                                                className="btn plus button-input-group"
+                                                type="button"
+                                                aria-label={`Increase ${option}`}
+                                                disabled={atExactMax}
+                                                onClick={() =>
+                                                  changeModifierQty(
+                                                    group,
+                                                    optionKey,
+                                                    1,
+                                                  )
+                                                }
+                                              >
+                                                <i
+                                                  className="fa fa-plus"
+                                                  aria-hidden="true"
+                                                />
+                                              </button>
+                                            </span>
+                                          </div>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
-
-                          {group.requiredText ? (
-                            <div className="margin-top-5">
-                              <small className="danger_message danger_red_message text-muted danger-message-custom required-modi">
-                                {group.requiredText}
-                              </small>
-                            </div>
-                          ) : null}
-
-                          <table className="table-product-detail">
-                            <tbody>
-                              {group.options.map((option) => {
-                                const optionKey = `${group.id}:${option}`;
-                                return (
-                                  <tr key={optionKey}>
-                                    <td className="modifier-title">
-                                      <div className="title-line-height">
-                                        {option}
-                                      </div>
-                                    </td>
-                                    <td className="modifier-price text-left">
-                                      <span className="title-line-height">
-                                        ฿ —
-                                      </span>
-                                    </td>
-                                    <td className="modifier-quantity-input-group text-right theme-radio-color">
-                                      {group.type === "radio" ? (
-                                        <div className="radio">
-                                          <input
-                                            type="radio"
-                                            name={group.id}
-                                            checked={
-                                              radioSelection[group.id] ===
-                                              option
-                                            }
-                                            onChange={() =>
-                                              setRadioSelection((current) => ({
-                                                ...current,
-                                                [group.id]: option,
-                                              }))
-                                            }
-                                            aria-label={option}
-                                          />
-                                        </div>
-                                      ) : (
-                                        <div className="input-group">
-                                          <span className="input-group-btn">
-                                            <button
-                                              className="btn minus button-input-group"
-                                              type="button"
-                                              aria-label={`Decrease ${option}`}
-                                              onClick={() =>
-                                                changeModifierQty(optionKey, -1)
-                                              }
-                                            >
-                                              <i
-                                                className="fa fa-minus"
-                                                aria-hidden="true"
-                                              />
-                                            </button>
-                                          </span>
-                                          <input
-                                            type="text"
-                                            className="text-center quantity-input-text modifier-input"
-                                            value={String(
-                                              modifierQty[optionKey] ?? 0,
-                                            )}
-                                            readOnly
-                                            aria-label={`${option} quantity`}
-                                          />
-                                          <span className="input-group-btn">
-                                            <button
-                                              className="btn plus button-input-group"
-                                              type="button"
-                                              aria-label={`Increase ${option}`}
-                                              onClick={() =>
-                                                changeModifierQty(optionKey, 1)
-                                              }
-                                            >
-                                              <i
-                                                className="fa fa-plus"
-                                                aria-hidden="true"
-                                              />
-                                            </button>
-                                          </span>
-                                        </div>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     <div className="col-xs-12">
                       <textarea
@@ -384,6 +508,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     className="btn minus quantity-input-group"
                     type="button"
                     aria-label="Decrease quantity"
+                    disabled={hasExactSelection || effectiveProductQty <= 1}
                     onClick={() =>
                       setProductQty((current) =>
                         Math.max(1, clampQty(current - 1)),
@@ -398,7 +523,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   size={9}
                   maxLength={3}
                   min={0}
-                  value={String(productQty)}
+                  value={String(effectiveProductQty)}
                   className="form-control text-center quantity-input-text quantity-input-group"
                   id="product-quantity"
                   readOnly
@@ -409,6 +534,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     className="btn plus quantity-input-group"
                     type="button"
                     aria-label="Increase quantity"
+                    disabled={hasExactSelection}
                     onClick={() =>
                       setProductQty((current) => clampQty(current + 1))
                     }
@@ -425,8 +551,9 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
               <div className="input-group-btn text-right">
                 <button
                   id="btn-AddToCart"
-                  className="btn"
+                  className={`btn${addDisabled ? " is-disabled" : ""}`}
                   type="button"
+                  aria-disabled={addDisabled}
                   onClick={handleAddToCart}
                 >
                   ADD

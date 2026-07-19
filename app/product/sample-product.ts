@@ -18,6 +18,7 @@ export const SAMPLE_PRODUCT = {
       title: "Choice of Macarons:",
       requiredText: "Please select 8",
       type: "quantity" as const,
+      exactSelectionQuantity: 8,
       options: [
         "Almond",
         "Chocolate",

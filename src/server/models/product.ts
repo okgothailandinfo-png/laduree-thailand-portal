@@ -13,6 +13,11 @@ export type ProductModifierGroup = {
   requiredText: string | null;
   type: "quantity" | "radio";
   options: string[];
+  /**
+   * For quantity groups on fixed-size boxes (e.g. 6/8/12/18 pcs).
+   * Selected option quantities must total exactly this value.
+   */
+  exactSelectionQuantity?: number | null;
 };
 
 export type Product = {

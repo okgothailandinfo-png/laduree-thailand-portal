@@ -25,6 +25,8 @@ export type ProductModifierGroupDto = {
   requiredText: string | null;
   type: "quantity" | "radio";
   options: string[];
+  /** Fixed-size box exact selection (e.g. 8). Null/undefined = no exact rule. */
+  exactSelectionQuantity?: number | null;
 };
 
 export type CategoryDto = {

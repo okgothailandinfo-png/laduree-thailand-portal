@@ -251,11 +251,27 @@
 }
 
 .product-detail-page .danger_red_message,
-.product-detail-page .required-modi {
+.product-detail-page .required-modi,
+.product-detail-page .exact-selection-message {
   display: block;
   margin: 0 0 8px;
   color: #a94442;
   font-size: 12px;
+}
+
+.product-detail-page .exact-selection-counter {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.product-detail-page .button-input-group:disabled,
+.product-detail-page .quantity-input-group:disabled,
+.product-detail-page #btn-AddToCart.is-disabled,
+.product-detail-page #btn-AddToCart:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .product-detail-page .table-product-detail {
