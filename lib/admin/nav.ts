@@ -10,6 +10,7 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
   { href: "/admin/media", label: "Media" },
   { href: "/admin/boutiques", label: "Boutiques" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/kitchen", label: "Kitchen" },
   { href: "/admin/banners", label: "Banners" },
   { href: "/admin/homepage", label: "Homepage" },
   { href: "/admin/settings", label: "Settings" },

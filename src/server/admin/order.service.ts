@@ -1,4 +1,7 @@
 import type {
+  AdminKitchenOrderDto,
+  AdminKitchenOrderListQuery,
+  AdminKitchenOrderListResult,
   AdminOrderDetailDto,
   AdminOrderItemDto,
   AdminOrderListItemDto,
@@ -19,6 +22,7 @@ import {
   toAdminWorkflowStatus,
 } from "@/src/server/orders/status-transitions";
 import type {
+  AdminKitchenOrderRow,
   AdminOrderDetailRecord,
   AdminOrderListRow,
   BoutiqueRepository,
@@ -147,6 +151,48 @@ function toListItem(row: AdminOrderListRow): AdminOrderListItemDto {
     orderStatus: adminStatus(order.status),
     createdAt: order.createdAt,
   };
+}
+
+function productSummary(items: Order["items"]): string {
+  return items
+    .map((item) => `${item.quantity}× ${item.name}`)
+    .join(", ");
+}
+
+function toKitchenItem(row: AdminKitchenOrderRow): AdminKitchenOrderDto {
+  const { order } = row;
+  const workflowStatus = adminStatus(order.status);
+  const allowed = getAllowedNextStatuses(order.status).map((status) =>
+    adminStatus(status),
+  );
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    customerName: order.customer.customerName,
+    boutiqueId: order.pickup.boutiqueId,
+    boutiqueName: order.pickup.boutiqueName,
+    pickupDate: order.pickup.dateKey,
+    pickupTime: order.pickup.timeSlotLabel || row.pickupStartTime,
+    itemCount: row.itemCount,
+    productSummary: productSummary(order.items),
+    customerNote: order.customer.specialRequest?.trim()
+      ? order.customer.specialRequest.trim()
+      : null,
+    orderStatus: workflowStatus,
+    paymentStatus: row.paymentStatus,
+    allowedNextStatuses: [...new Set(allowed)],
+    createdAt: order.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function bangkokTodayDateKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function toItemDto(item: Order["items"][number]): AdminOrderItemDto {
@@ -314,6 +360,38 @@ export class AdminOrderService {
       pageSize: query.pageSize,
       total: page.total,
       totalPages,
+    };
+  }
+
+  parseKitchenQuery(searchParams: URLSearchParams): AdminKitchenOrderListQuery {
+    const date =
+      parseOptionalDateKey(searchParams.get("date"), "date") ??
+      bangkokTodayDateKey();
+    const search = searchParams.get("search")?.trim() || undefined;
+    const boutiqueId = searchParams.get("boutiqueId")?.trim() || undefined;
+    const statusRaw = searchParams.get("status");
+
+    let status: AdminOrderStatus | undefined;
+    if (statusRaw && statusRaw !== "all") {
+      status = parseOrderStatus(statusRaw, "status");
+    }
+
+    return {
+      date,
+      boutiqueId,
+      status,
+      search,
+    };
+  }
+
+  async listKitchen(
+    query: AdminKitchenOrderListQuery,
+  ): Promise<AdminKitchenOrderListResult> {
+    requirePrismaDataSource();
+    const page = await this.orders.adminKitchenList(query);
+    return {
+      date: query.date,
+      items: page.items.map(toKitchenItem),
     };
   }
 

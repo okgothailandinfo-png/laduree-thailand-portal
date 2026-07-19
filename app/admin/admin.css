@@ -919,3 +919,244 @@
   margin-bottom: 4px;
 }
 
+.admin-badge--preparing {
+  color: #6b3d12;
+  background: #fff0e0;
+  border-color: #f0d0a8;
+}
+
+/* Kitchen / preparation board */
+
+.admin-kitchen-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.admin-kitchen-toolbar .admin-toolbar {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-kitchen-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-kitchen-toolbar__meta {
+  font-size: 0.85rem;
+}
+
+.admin-kitchen-date {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-kitchen-date__input {
+  min-width: 160px;
+  width: auto;
+}
+
+.admin-kitchen-board {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .admin-kitchen-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .admin-kitchen-board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.admin-kitchen-column {
+  min-height: 200px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  overflow: hidden;
+}
+
+.admin-kitchen-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--admin-border);
+  background: #f7f5f0;
+}
+
+.admin-kitchen-column--new_confirmed .admin-kitchen-column__header {
+  border-top: 3px solid #c9a227;
+}
+
+.admin-kitchen-column--preparing .admin-kitchen-column__header {
+  border-top: 3px solid #c47a2c;
+}
+
+.admin-kitchen-column--ready .admin-kitchen-column__header {
+  border-top: 3px solid #2a7a9b;
+}
+
+.admin-kitchen-column--completed .admin-kitchen-column__header {
+  border-top: 3px solid #4a7a3a;
+}
+
+.admin-kitchen-column__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.admin-kitchen-column__count {
+  min-width: 28px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--admin-text);
+  background: #fff;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+}
+
+.admin-kitchen-column__body {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  max-height: min(70vh, 900px);
+  overflow: auto;
+}
+
+.admin-kitchen-column__empty {
+  margin: 0;
+  padding: 16px 8px;
+  font-size: 0.9rem;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+
+.admin-kitchen-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.admin-kitchen-card--updating {
+  opacity: 0.7;
+}
+
+.admin-kitchen-card__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-kitchen-card__order {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--admin-accent);
+  text-decoration: none;
+}
+
+.admin-kitchen-card__order:hover {
+  text-decoration: underline;
+}
+
+.admin-kitchen-card__pickup {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.admin-kitchen-card__customer {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.admin-kitchen-card__boutique {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-kitchen-card__items {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.admin-kitchen-card__item-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+}
+
+.admin-kitchen-card__summary {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.admin-kitchen-card__note {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  background: #fff8e8;
+  border-left: 3px solid #c9a227;
+}
+
+.admin-kitchen-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-kitchen-card__elapsed {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.admin-kitchen-card__actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.admin-kitchen-card__action {
+  min-height: 48px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+@media (max-width: 899px) {
+  .admin-kitchen-board {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-kitchen-column__body {
+    max-height: none;
+  }
+
+  .admin-kitchen-card__action {
+    min-height: 52px;
+  }
+}
+
