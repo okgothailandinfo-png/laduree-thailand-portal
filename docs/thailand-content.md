@@ -60,4 +60,19 @@ Do not invent customer-facing copy. Use TODO for information not yet approved.
 - Thailand prices:
   - « Napoléon III » Macaron - 8pcs: ฿990 (approved)
 - Thailand availability: TODO
-- Allergen information: TODO
+- Allergen information: TODO (storefront currently uses Singapore referral wording pending Thailand approval)
+
+## Product Detail / Ordering Content Pending Approval
+- Pickup handling acknowledgement title (mock currently marked `[CONTENT PENDING APPROVAL]`)
+- Pickup handling acknowledgement option text (must remain Pickup-appropriate; do not use delivery wording)
+- Gifting Ribbon Bow Thailand retail price
+- Ice pack / packing option Thailand retail prices
+- Optional gift packaging options beyond ribbon / ice packs
+- Tax-inclusive alert wording confirmation for Thailand
+- Thai translations for exact-selection messages:
+  - `product.exactSelection.pleaseSelect` → EN “Please select {n}”
+  - `product.exactSelection.pleaseSelectNMore` → EN “Please select {n} more”
+  - `product.exactSelection.nOfNSelected` → EN “{n} of {n} selected”
+  - `product.exactSelection.maximumSelected`
+  - `product.exactSelection.incompleteBeforeAdd`
+  - `product.modifier.optional` / `product.modifier.pleaseSelectN` / `product.modifier.acknowledgementRequired`

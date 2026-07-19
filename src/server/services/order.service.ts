@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
+import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
+import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import type { Order } from "@/src/server/models/order";
 import type {
   BoutiqueRepository,
@@ -51,10 +53,6 @@ const PAYMENT_METHODS = new Set<CreateOrderPaymentDto["method"]>([
 
 function createOrderNumber() {
   return `MOCK-${Date.now().toString(36).toUpperCase()}`;
-}
-
-function unitPriceMinorFromProduct(priceMinor: number | null): number {
-  return priceMinor ?? 0;
 }
 
 export class DefaultOrderService implements OrderService {
@@ -233,9 +231,10 @@ export class DefaultOrderService implements OrderService {
         );
       }
 
+      const modifiers = line.modifiers ?? [];
       const exactSelection = validateExactSelectionModifiers(
         product.modifierGroups,
-        line.modifiers ?? [],
+        modifiers,
         line.quantity,
       );
       if (!exactSelection.ok) {
@@ -248,7 +247,39 @@ export class DefaultOrderService implements OrderService {
         });
       }
 
-      const unitPriceMinor = unitPriceMinorFromProduct(product.priceMinor);
+      const requiredModifiers = validateRequiredModifierGroups(
+        product.modifierGroups,
+        modifiers,
+      );
+      if (!requiredModifiers.ok) {
+        throw new AppError("VALIDATION_ERROR", requiredModifiers.message, {
+          details: {
+            field: "items.modifiers",
+            code: requiredModifiers.code,
+            groupId: requiredModifiers.groupId,
+            productId: product.id,
+          },
+        });
+      }
+
+      const unitPriceMinor = computeConfiguredUnitPriceMinor(
+        product.priceMinor,
+        product.modifierGroups,
+        modifiers,
+      );
+      if (unitPriceMinor === null) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Price unavailable for one or more products.",
+          {
+            details: {
+              field: "items",
+              code: "PRICE_UNAVAILABLE",
+              productId: product.id,
+            },
+          },
+        );
+      }
       totalMinor += unitPriceMinor * line.quantity;
 
       items.push({

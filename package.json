@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts",
+    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/product/*.test.ts lib/product/*.test.ts src/server/services/cart.service.test.ts",
     "prisma:format": "prisma format",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",

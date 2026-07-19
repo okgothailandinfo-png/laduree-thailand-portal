@@ -81,7 +81,8 @@ function hasIncompleteExactSelection(items: CheckoutEligibilityItem[]): boolean 
   for (const item of items) {
     const required = item.exactSelectionQuantity;
     if (typeof required !== "number" || required <= 0) continue;
-    if (item.quantity !== 1) return true;
+    // Outer box quantity is independent of flavour total (qty N = N identical boxes).
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) return true;
     const total = sumExactSelectionQuantity(
       {
         id: "exact",

@@ -154,10 +154,7 @@ export default function CartPanel({
                                         type="button"
                                         className="btn-number minus"
                                         aria-label={`Decrease ${item.name}`}
-                                        disabled={
-                                          typeof item.exactSelectionQuantity ===
-                                          "number"
-                                        }
+                                        disabled={item.quantity <= 1}
                                         onClick={() =>
                                           void updateQuantity(
                                             item.id,
@@ -178,10 +175,7 @@ export default function CartPanel({
                                         type="button"
                                         className="btn-number plus"
                                         aria-label={`Increase ${item.name}`}
-                                        disabled={
-                                          typeof item.exactSelectionQuantity ===
-                                          "number"
-                                        }
+                                        disabled={item.quantity >= 999}
                                         onClick={() =>
                                           void updateQuantity(
                                             item.id,

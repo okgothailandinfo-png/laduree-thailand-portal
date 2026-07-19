@@ -1,5 +1,7 @@
 import { randomUUID } from "crypto";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
+import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
+import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import type {
   BoutiqueRepository,
   CartRepository,
@@ -163,11 +165,27 @@ export class DefaultCheckoutService {
         });
       }
 
-      if (
-        product.priceMinor === null ||
-        !Number.isFinite(product.priceMinor) ||
-        product.priceMinor < 0
-      ) {
+      const requiredModifiers = validateRequiredModifierGroups(
+        product.modifierGroups,
+        line.modifiers,
+      );
+      if (!requiredModifiers.ok) {
+        throw new AppError("VALIDATION_ERROR", requiredModifiers.message, {
+          details: {
+            field: "cart.items",
+            code: requiredModifiers.code,
+            groupId: requiredModifiers.groupId,
+            productId: product.id,
+          },
+        });
+      }
+
+      const unitPriceMinor = computeConfiguredUnitPriceMinor(
+        product.priceMinor,
+        product.modifierGroups,
+        line.modifiers,
+      );
+      if (unitPriceMinor === null) {
         throw new AppError(
           "VALIDATION_ERROR",
           "Price unavailable for one or more products.",
@@ -181,7 +199,6 @@ export class DefaultCheckoutService {
         );
       }
 
-      const unitPriceMinor = product.priceMinor;
       totalMinor += unitPriceMinor * line.quantity;
       itemCount += line.quantity;
 

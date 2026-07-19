@@ -128,6 +128,17 @@ describe("cart checkout CTA eligibility", () => {
     assert.equal(result.diagnostics.checkoutEligible, true);
   });
 
+  it("allows outer box quantity greater than 1 when flavour selection is complete", () => {
+    const result = getCheckoutEligibility({
+      items: [{ ...completeBoxItem, quantity: 2 }],
+      confirmed: validConfirmed,
+      cartStatus: "success",
+    });
+    assert.equal(result.canCheckout, true);
+    assert.equal(result.diagnostics.exactSelectionComplete, true);
+    assert.equal(result.ctaVisible, true);
+  });
+
   it("requires confirmed pickup state to contain boutiqueId, dateKey, and timeSlotId", () => {
     assert.equal(hasValidConfirmedPickupIds(validConfirmed), true);
     assert.equal(
@@ -190,7 +201,7 @@ describe("cart line merge identity", () => {
         { label: "Rose", quantity: 8 },
         {
           label:
-            "[Incidental damage might occur during delivery] I acknowledge & agree to proceed with my order.",
+            "[CONTENT PENDING APPROVAL] I acknowledge & agree to proceed with my pickup order.",
         },
       ],
     });
@@ -200,7 +211,7 @@ describe("cart line merge identity", () => {
         { label: "Rose", quantity: 8 },
         {
           label:
-            "[Incidental damage might occur during delivery] I acknowledge & agree to proceed with my order.",
+            "[CONTENT PENDING APPROVAL] I acknowledge & agree to proceed with my pickup order.",
         },
         { label: "1 x Gifting Ribbon Bow (M)" },
       ],
