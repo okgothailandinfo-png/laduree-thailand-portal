@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AdminForm, { AdminFormField } from "../../components/AdminForm";
 import AdminPageHeader from "../../components/AdminPageHeader";
 
@@ -6,8 +7,13 @@ export default function AdminSettingsPage() {
     <>
       <AdminPageHeader
         title="Settings"
-        description="Admin CMS settings. Not connected to persistence yet."
+        description="Admin CMS settings."
       />
+      <p className="admin-muted-text" style={{ marginBottom: "1rem" }}>
+        <Link href="/admin/settings/notifications" className="admin-link">
+          Notification settings
+        </Link>
+      </p>
       <AdminForm disabled>
         <AdminFormField label="Site name" htmlFor="settings-site-name">
           <input

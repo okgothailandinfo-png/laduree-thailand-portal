@@ -37,6 +37,10 @@ import type {
   PickupSlotRecord,
 } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
+import type {
+  NotificationQueueRepository,
+  NotificationSettingRepository,
+} from "@/src/server/notifications/interfaces";
 import type { PickupVerificationRepository } from "@/src/server/pickup/pickup-verification.repository";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
@@ -262,4 +266,6 @@ export type RepositoryBundle = {
   carts: CartRepository;
   payments: PaymentRepository;
   webhookEvents: WebhookEventRepository;
+  notificationQueue: NotificationQueueRepository;
+  notificationSettings: NotificationSettingRepository;
 };

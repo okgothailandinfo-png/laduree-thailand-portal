@@ -13,6 +13,10 @@ import { MockPickupRepository } from "@/src/server/repositories/mock/pickup.repo
 import { MockPickupVerificationRepository } from "@/src/server/repositories/mock/pickup-verification.repository";
 import { MockProductRepository } from "@/src/server/repositories/mock/product.repository";
 import { MockWebhookEventRepository } from "@/src/server/repositories/mock/webhook-event.repository";
+import {
+  MockNotificationQueueRepository,
+  MockNotificationSettingRepository,
+} from "@/src/server/repositories/mock/notification.repository";
 import { PrismaBoutiqueRepository } from "@/src/server/repositories/prisma/boutique.repository";
 import { PrismaCategoryRepository } from "@/src/server/repositories/prisma/category.repository";
 import { PrismaHomepageBannerRepository } from "@/src/server/repositories/prisma/homepage-banner.repository";
@@ -23,6 +27,10 @@ import { PrismaOrderRepository } from "@/src/server/repositories/prisma/order.re
 import { PrismaPickupRepository } from "@/src/server/repositories/prisma/pickup.repository";
 import { PrismaPickupVerificationRepository } from "@/src/server/repositories/prisma/pickup-verification.repository";
 import { PrismaProductRepository } from "@/src/server/repositories/prisma/product.repository";
+import {
+  PrismaNotificationQueueRepository,
+  PrismaNotificationSettingRepository,
+} from "@/src/server/repositories/prisma/notification.repository";
 import { logger } from "@/src/server/utils/logger";
 
 function createMockRepositories(): RepositoryBundle {
@@ -41,6 +49,8 @@ function createMockRepositories(): RepositoryBundle {
     carts: new MockCartRepository(),
     payments: new MockPaymentRepository(),
     webhookEvents: new MockWebhookEventRepository(),
+    notificationQueue: new MockNotificationQueueRepository(),
+    notificationSettings: new MockNotificationSettingRepository(),
   };
 }
 
@@ -57,6 +67,8 @@ function createPrismaRepositories(): RepositoryBundle {
     pickup: new PrismaPickupRepository(),
     orders: new PrismaOrderRepository(),
     pickupVerifications: new PrismaPickupVerificationRepository(),
+    notificationQueue: new PrismaNotificationQueueRepository(),
+    notificationSettings: new PrismaNotificationSettingRepository(),
     // Intentionally in-memory until dedicated Prisma models exist:
     // - Cart has no Prisma model yet
     // - Gateway PaymentRepository is separate from checkout PaymentRecord

@@ -24,6 +24,7 @@ import {
   normalizePickupCode,
   safeEqualHash,
 } from "@/src/server/pickup/crypto";
+import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
 import type { PickupVerificationRepository } from "@/src/server/pickup/pickup-verification.repository";
 import { checkPickupVerifyRateLimit } from "@/src/server/pickup/rate-limit";
 import type {
@@ -123,6 +124,7 @@ export class PickupVerificationService {
   constructor(
     private readonly verifications: PickupVerificationRepository,
     private readonly orders: OrderRepository,
+    private readonly notifications?: NotificationOrchestrator,
   ) {}
 
   /**
@@ -493,6 +495,9 @@ export class PickupVerificationService {
         orderId,
         orderNumber: result.order.orderNumber,
       });
+      if (this.notifications) {
+        await this.notifications.onPickupCompleted(result.order);
+      }
     }
 
     return {

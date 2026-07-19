@@ -21,6 +21,7 @@ import {
   getAllowedNextStatuses,
   toAdminWorkflowStatus,
 } from "@/src/server/orders/status-transitions";
+import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
 import type { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import type {
   AdminKitchenOrderRow,
@@ -285,6 +286,7 @@ export class AdminOrderService {
     private readonly orders: OrderRepository,
     private readonly boutiques: BoutiqueRepository,
     private readonly pickupVerifications?: PickupVerificationService,
+    private readonly notifications?: NotificationOrchestrator,
   ) {}
 
   parseListQuery(searchParams: URLSearchParams): AdminOrderListQuery {
@@ -470,6 +472,19 @@ export class AdminOrderService {
           orderId: updated.id,
           message: error instanceof Error ? error.message : "unknown",
         });
+      }
+    }
+
+    if (adminStatus(from) !== adminStatus(to) && this.notifications) {
+      if (to === "preparing") {
+        await this.notifications.onOrderPreparing(updated);
+      } else if (to === "ready_for_pickup") {
+        await this.notifications.onOrderReadyForPickup(updated);
+      } else if (to === "cancelled") {
+        await this.notifications.onOrderCancelled(updated);
+      } else if (to === "confirmed") {
+        // Prefer payment SUCCESS path for ORDER_CONFIRMED; admin confirm is a fallback.
+        await this.notifications.onOrderConfirmed(updated);
       }
     }
 

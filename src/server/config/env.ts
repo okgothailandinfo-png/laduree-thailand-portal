@@ -14,6 +14,12 @@ export type ServerEnv = {
   paymentProvider: "mock";
   mockPaymentWebhookSecret: string;
   mockPaymentWebhookToleranceSeconds: number;
+  notificationEmailProvider: "mock";
+  notificationLineProvider: "mock";
+  notificationMaxAttempts: number;
+  notificationProcessLimit: number;
+  notificationBaseUrl: string;
+  notificationMockForceFailure: boolean;
 };
 
 function resolveNodeEnv(value: string | undefined): ServerEnv["nodeEnv"] {
@@ -59,6 +65,30 @@ function resolveWebhookTolerance(value: string | undefined): number {
     );
   }
   return parsed;
+}
+
+function resolveMockNotificationProvider(
+  value: string | undefined,
+  name: string,
+): "mock" {
+  const raw = value?.trim().toLowerCase();
+  if (!raw || raw === "mock") return "mock";
+  throw new Error(
+    `Invalid ${name}="${raw}". Only "mock" is supported in this sprint.`,
+  );
+}
+
+function resolvePositiveInt(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+): number {
+  if (!value?.trim()) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive number.`);
+  }
+  return Math.floor(parsed);
 }
 
 /**
@@ -120,6 +150,29 @@ export const env: ServerEnv = {
   mockPaymentWebhookToleranceSeconds: resolveWebhookTolerance(
     process.env.MOCK_PAYMENT_WEBHOOK_TOLERANCE_SECONDS,
   ),
+  notificationEmailProvider: resolveMockNotificationProvider(
+    process.env.NOTIFICATION_EMAIL_PROVIDER,
+    "NOTIFICATION_EMAIL_PROVIDER",
+  ),
+  notificationLineProvider: resolveMockNotificationProvider(
+    process.env.NOTIFICATION_LINE_PROVIDER,
+    "NOTIFICATION_LINE_PROVIDER",
+  ),
+  notificationMaxAttempts: resolvePositiveInt(
+    process.env.NOTIFICATION_MAX_ATTEMPTS,
+    3,
+    "NOTIFICATION_MAX_ATTEMPTS",
+  ),
+  notificationProcessLimit: resolvePositiveInt(
+    process.env.NOTIFICATION_PROCESS_LIMIT,
+    20,
+    "NOTIFICATION_PROCESS_LIMIT",
+  ),
+  notificationBaseUrl:
+    process.env.NOTIFICATION_BASE_URL?.trim() || "http://localhost:3000",
+  notificationMockForceFailure:
+    process.env.NOTIFICATION_MOCK_FORCE_FAILURE?.trim().toLowerCase() ===
+    "true",
 };
 
 export function getDataSource(): DataSource {
