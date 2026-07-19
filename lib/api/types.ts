@@ -36,18 +36,34 @@ export type ProductSummary = {
   available: boolean;
 };
 
+export type ProductModifierOptionDetail = {
+  label: string;
+  priceMinor?: number | null;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
 export type ProductModifierGroup = {
   id: string;
   title: string;
   requiredText: string | null;
   type: "quantity" | "radio";
   options: string[];
+  optionDetails?: ProductModifierOptionDetail[];
   /** Fixed-size box exact selection (e.g. 8). Null/undefined = no exact rule. */
   exactSelectionQuantity?: number | null;
+  required?: boolean;
+  minSelection?: number | null;
+  maxSelection?: number | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  isAcknowledgement?: boolean;
 };
 
 export type ProductDetail = ProductSummary & {
   description: string[];
+  allergenLabel: string;
+  allergenText: string;
   storageLabel: string;
   storageText: string;
   modifierGroups: ProductModifierGroup[];

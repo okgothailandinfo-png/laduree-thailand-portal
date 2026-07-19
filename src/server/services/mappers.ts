@@ -31,6 +31,8 @@ export function toProductDetailDto(product: Product): ProductDetailDto {
   return {
     ...toProductSummaryDto(product),
     description: [...product.description],
+    allergenLabel: product.allergenLabel,
+    allergenText: product.allergenText,
     storageLabel: product.storageLabel,
     storageText: product.storageText,
     modifierGroups: product.modifierGroups.map((group) => ({
@@ -39,7 +41,14 @@ export function toProductDetailDto(product: Product): ProductDetailDto {
       requiredText: group.requiredText,
       type: group.type,
       options: [...group.options],
+      optionDetails: group.optionDetails?.map((detail) => ({ ...detail })),
       exactSelectionQuantity: group.exactSelectionQuantity ?? null,
+      required: group.required,
+      minSelection: group.minSelection ?? null,
+      maxSelection: group.maxSelection ?? null,
+      sortOrder: group.sortOrder,
+      isActive: group.isActive,
+      isAcknowledgement: group.isAcknowledgement,
     })),
   };
 }

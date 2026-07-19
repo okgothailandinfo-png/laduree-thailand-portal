@@ -82,12 +82,15 @@
   font-size: 18px;
   font-weight: 700;
   line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .product-detail-page .modal-body {
   max-width: 1170px;
   margin: 0 auto;
-  padding: 15px 15px 100px;
+  /* Keep modifier choices clear of the sticky ADD bar + mobile safe-area. */
+  padding: 15px 15px calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
 .product-detail-page .bodyproductdetail {
@@ -382,6 +385,7 @@
   z-index: 30;
   margin: 0;
   padding: 10px 15px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   background: #fff;
   border: 0;
   border-top: 1px solid #e5e5e5;
@@ -506,6 +510,17 @@
   }
 
   .product-detail-page .modal-body {
-    padding-bottom: 110px;
+    padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+.product-detail-page #btn-AddToCart.is-disabled,
+.product-detail-page #btn-AddToCart[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.product-detail-page .modifier-title .title-line-height {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

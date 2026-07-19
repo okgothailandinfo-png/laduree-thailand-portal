@@ -36,8 +36,10 @@ export const MOCK_PRODUCTS: Product[] = [
     categoryId: "cat-macaron-gift-boxes",
     description: [
       "Discover an assortment of 8 iconic Ladurée macarons, offering a delightful journey through timeless flavors. A delicate and sophisticated gift, perfect for sharing or indulging in a moment of pure sweetness.",
-      "Kindly refer to the Allergens page (located at the bottom of the site) for more product information.",
     ],
+    allergenLabel: "Allergen Information:",
+    allergenText:
+      "Kindly refer to the Allergens page (located at the bottom of the site) for more product information.",
     storageLabel: "Storage Information:",
     storageText: "Macarons can be stored for up to 4 days in the Chiller.",
     // Owner-approved Thailand retail price (docs/thailand-content.md).
@@ -65,6 +67,11 @@ export const MOCK_PRODUCTS: Product[] = [
         requiredText: "Please select 8",
         type: "quantity",
         exactSelectionQuantity: 8,
+        required: true,
+        minSelection: 8,
+        maxSelection: 8,
+        sortOrder: 1,
+        isActive: true,
         options: [
           "Almond",
           "Chocolate",
@@ -85,12 +92,19 @@ export const MOCK_PRODUCTS: Product[] = [
         ],
       },
       {
-        id: "incidental-damage",
-        title: "Incidental damage might occur during delivery",
+        id: "pickup-acknowledgement",
+        title:
+          "[CONTENT PENDING APPROVAL] Product handling acknowledgement (Pickup)",
         requiredText: "Please select 1",
         type: "radio",
+        required: true,
+        minSelection: 1,
+        maxSelection: 1,
+        isAcknowledgement: true,
+        sortOrder: 2,
+        isActive: true,
         options: [
-          "[Incidental damage might occur during delivery] I acknowledge & agree to proceed with my order.",
+          "[CONTENT PENDING APPROVAL] I acknowledge & agree to proceed with my pickup order.",
         ],
       },
       {
@@ -98,14 +112,45 @@ export const MOCK_PRODUCTS: Product[] = [
         title: "Add a Gifting Ribbon Bow:",
         requiredText: null,
         type: "radio",
+        required: false,
+        maxSelection: 1,
+        sortOrder: 3,
+        isActive: true,
+        // No approved Thailand add-on price — UI shows ฿ — and does not affect subtotal.
         options: ["1 x Gifting Ribbon Bow (M)"],
+        optionDetails: [
+          {
+            label: "1 x Gifting Ribbon Bow (M)",
+            priceMinor: null,
+            sortOrder: 1,
+            isActive: true,
+          },
+        ],
       },
       {
         id: "packing-options",
         title: "Upgrade Packing Options:",
         requiredText: null,
         type: "quantity",
+        required: false,
+        maxSelection: 1,
+        sortOrder: 4,
+        isActive: true,
         options: ["+2 Ice Packs (+2 hrs)", "+5 Ice Packs (+4 hrs)"],
+        optionDetails: [
+          {
+            label: "+2 Ice Packs (+2 hrs)",
+            priceMinor: null,
+            sortOrder: 1,
+            isActive: true,
+          },
+          {
+            label: "+5 Ice Packs (+4 hrs)",
+            priceMinor: null,
+            sortOrder: 2,
+            isActive: true,
+          },
+        ],
       },
     ],
   },

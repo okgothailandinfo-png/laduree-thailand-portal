@@ -167,6 +167,9 @@ export function toDomainProduct(
     title: row.title,
     categoryId: row.categoryId,
     description: [...row.description],
+    // Allergen / modifier groups are not persisted in the current Prisma schema.
+    allergenLabel: "",
+    allergenText: "",
     storageLabel: row.storageLabel ?? "",
     storageText: row.storageText ?? "",
     priceMinor,
@@ -177,7 +180,6 @@ export function toDomainProduct(
     isActive: row.isActive,
     available: row.available,
     sortOrder: row.sortOrder,
-    // Modifier groups are not persisted in the current Prisma schema.
     modifierGroups: [],
   };
 }

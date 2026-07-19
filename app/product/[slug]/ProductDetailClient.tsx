@@ -13,17 +13,50 @@ import type { ProductModifierGroup } from "@/lib/api/types";
 import {
   formatExactSelectionIncompleteMessage,
   formatExactSelectionMaximumMessage,
-  formatSelectedOfRequired,
+  formatExactSelectionProgress,
   getExactSelectionGroups,
   isExactSelectionGroup,
   sumExactSelectionFromQtyMap,
 } from "@/lib/product/exact-selection";
+import {
+  computeConfiguredUnitPriceMinor,
+  formatOptionPriceLabel,
+  getOptionPriceMinor,
+} from "@/lib/product/modifier-pricing";
+import {
+  areRequiredModifierGroupsComplete,
+  formatOptionalHint,
+  getMaxSelection,
+  isRequiredModifierGroup,
+  validateRequiredModifierGroups,
+} from "@/lib/product/modifier-requirements";
 import "../product-detail.css";
 
 function clampQty(value: number) {
   if (Number.isNaN(value) || value < 0) return 0;
   if (value > 999) return 999;
   return value;
+}
+
+function buildModifiersFromSelection(
+  groups: ProductModifierGroup[],
+  radioSelection: Record<string, string>,
+  modifierQty: Record<string, number>,
+): { label: string; quantity?: number }[] {
+  const modifiers: { label: string; quantity?: number }[] = [];
+  for (const group of groups) {
+    if (group.isActive === false) continue;
+    if (group.type === "radio") {
+      const selected = radioSelection[group.id];
+      if (selected) modifiers.push({ label: selected });
+      continue;
+    }
+    for (const option of group.options) {
+      const quantity = modifierQty[`${group.id}:${option}`] ?? 0;
+      if (quantity > 0) modifiers.push({ label: option, quantity });
+    }
+  }
+  return modifiers;
 }
 
 export default function ProductDetailClient({ slug }: { slug: string }) {
@@ -36,6 +69,10 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   );
   const [remark, setRemark] = useState("");
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
+  const [requirementMessage, setRequirementMessage] = useState<{
+    groupId: string;
+    message: string;
+  } | null>(null);
 
   const productQuery = useAsyncResource(
     (signal) => fetchProductBySlug(slug, { signal }),
@@ -50,7 +87,6 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     [product],
   );
   const hasExactSelection = exactGroups.length > 0;
-  const effectiveProductQty = hasExactSelection ? 1 : productQty;
 
   const exactTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -66,6 +102,38 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
       (group) =>
         (exactTotals[group.id] ?? 0) === group.exactSelectionQuantity,
     );
+
+  const draftModifiers = useMemo(
+    () =>
+      product
+        ? buildModifiersFromSelection(
+            product.modifierGroups,
+            radioSelection,
+            modifierQty,
+          )
+        : [],
+    [product, radioSelection, modifierQty],
+  );
+
+  const requiredComplete =
+    !product ||
+    areRequiredModifierGroupsComplete(product.modifierGroups, draftModifiers);
+
+  const configuredUnitPriceMinor = useMemo(() => {
+    if (!product) return null;
+    const baseMinor =
+      product.priceThb === null ? null : Math.round(product.priceThb * 100);
+    return computeConfiguredUnitPriceMinor(
+      baseMinor,
+      product.modifierGroups,
+      draftModifiers,
+    );
+  }, [product, draftModifiers]);
+
+  const addTotalLabel =
+    configuredUnitPriceMinor === null
+      ? formatPriceThb(product?.priceThb ?? null)
+      : formatPriceThb((configuredUnitPriceMinor * productQty) / 100);
 
   function changeModifierQty(
     group: ProductModifierGroup,
@@ -86,17 +154,26 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
         }
       }
 
+      const max = getMaxSelection(group);
+      if (
+        !isExactSelectionGroup(group) &&
+        max !== null &&
+        delta > 0
+      ) {
+        const groupTotal = sumExactSelectionFromQtyMap(
+          { ...group, exactSelectionQuantity: max },
+          current,
+        );
+        if (groupTotal >= max) return current;
+      }
+
       const nextQty = clampQty(currentQty + delta);
       const next = { ...current, [optionKey]: nextQty };
 
       if (isExactSelectionGroup(group)) {
-        const nextTotal = sumExactSelectionFromQtyMap(group, next);
-        if (nextTotal < group.exactSelectionQuantity) {
-          setSelectionMessage(null);
-        } else if (nextTotal === group.exactSelectionQuantity) {
-          setSelectionMessage(null);
-        }
+        setSelectionMessage(null);
       }
+      setRequirementMessage(null);
 
       return next;
     });
@@ -120,27 +197,31 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
       return;
     }
 
-    const modifiers: { label: string; quantity?: number }[] = [];
+    const modifiers = buildModifiersFromSelection(
+      product.modifierGroups,
+      radioSelection,
+      modifierQty,
+    );
 
-    for (const group of product.modifierGroups) {
-      if (group.type === "radio") {
-        const selected = radioSelection[group.id];
-        if (selected) modifiers.push({ label: selected });
-        continue;
-      }
-
-      for (const option of group.options) {
-        const quantity = modifierQty[`${group.id}:${option}`] ?? 0;
-        if (quantity > 0) modifiers.push({ label: option, quantity });
-      }
+    const required = validateRequiredModifierGroups(
+      product.modifierGroups,
+      modifiers,
+    );
+    if (!required.ok) {
+      setRequirementMessage({
+        groupId: required.groupId,
+        message: required.message,
+      });
+      return;
     }
 
     setSelectionMessage(null);
+    setRequirementMessage(null);
     void addItem({
       productId: product.id,
       name: product.title,
       imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
-      quantity: effectiveProductQty,
+      quantity: productQty,
       modifiers,
       note: remark.trim() || undefined,
     });
@@ -192,7 +273,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   }
 
   const priceLabel = formatPriceThb(product.priceThb);
-  const addDisabled = hasExactSelection && !allExactSelectionsComplete;
+  const addDisabled = !allExactSelectionsComplete || !requiredComplete;
 
   return (
     <div className="product-detail-page modal-product-detail">
@@ -302,6 +383,17 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                       <p key={`desc-${index}`}>{paragraph}</p>
                     ))}
                     {product.description.length > 0 ? <hr /> : null}
+                    {product.allergenLabel || product.allergenText ? (
+                      <p>
+                        {product.allergenLabel ? (
+                          <strong>{product.allergenLabel}</strong>
+                        ) : null}
+                        {product.allergenLabel && product.allergenText ? (
+                          <br />
+                        ) : null}
+                        {product.allergenText}
+                      </p>
+                    ) : null}
                     {product.storageLabel || product.storageText ? (
                       <p>
                         {product.storageLabel ? (
@@ -326,6 +418,8 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 >
                   <div className="row product-modifier-list-remark">
                     {product.modifierGroups.map((group) => {
+                      if (group.isActive === false) return null;
+
                       const exact = isExactSelectionGroup(group)
                         ? group.exactSelectionQuantity
                         : null;
@@ -333,6 +427,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                         exact !== null ? (exactTotals[group.id] ?? 0) : 0;
                       const atExactMax =
                         exact !== null && selectedTotal >= exact;
+                      const maxSelection = getMaxSelection(group);
+                      const required = isRequiredModifierGroup(group);
+                      const optionalHint = !required
+                        ? formatOptionalHint(maxSelection)
+                        : null;
 
                       return (
                         <div
@@ -346,24 +445,28 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                               </div>
                             </div>
 
-                            {group.requiredText ? (
+                            {exact !== null ? (
+                              <div className="margin-top-5">
+                                <small
+                                  className="exact-selection-counter text-muted danger_message danger_red_message required-modi"
+                                  aria-live="polite"
+                                >
+                                  {formatExactSelectionProgress(
+                                    selectedTotal,
+                                    exact,
+                                  )}
+                                </small>
+                              </div>
+                            ) : group.requiredText ? (
                               <div className="margin-top-5">
                                 <small className="danger_message danger_red_message text-muted danger-message-custom required-modi">
                                   {group.requiredText}
                                 </small>
                               </div>
-                            ) : null}
-
-                            {exact !== null ? (
+                            ) : optionalHint ? (
                               <div className="margin-top-5">
-                                <small
-                                  className="exact-selection-counter text-muted"
-                                  aria-live="polite"
-                                >
-                                  {formatSelectedOfRequired(
-                                    selectedTotal,
-                                    exact,
-                                  )}
+                                <small className="text-muted optional-modi">
+                                  {optionalHint}
                                 </small>
                               </div>
                             ) : null}
@@ -381,11 +484,36 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                               </div>
                             ) : null}
 
+                            {requirementMessage?.groupId === group.id ? (
+                              <div className="margin-top-5">
+                                <small
+                                  className="danger_message danger_red_message text-muted danger-message-custom required-group-message"
+                                  role="alert"
+                                >
+                                  {requirementMessage.message}
+                                </small>
+                              </div>
+                            ) : null}
+
                             <table className="table-product-detail">
                               <tbody>
                                 {group.options.map((option) => {
                                   const optionKey = `${group.id}:${option}`;
                                   const optionQty = modifierQty[optionKey] ?? 0;
+                                  const optionPrice = getOptionPriceMinor(
+                                    group,
+                                    option,
+                                  );
+                                  const nonExactAtMax =
+                                    exact === null &&
+                                    maxSelection !== null &&
+                                    sumExactSelectionFromQtyMap(
+                                      {
+                                        ...group,
+                                        exactSelectionQuantity: maxSelection,
+                                      },
+                                      modifierQty,
+                                    ) >= maxSelection;
                                   return (
                                     <tr key={optionKey}>
                                       <td className="modifier-title">
@@ -395,7 +523,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                                       </td>
                                       <td className="modifier-price text-left">
                                         <span className="title-line-height">
-                                          ฿ —
+                                          {formatOptionPriceLabel(optionPrice)}
                                         </span>
                                       </td>
                                       <td className="modifier-quantity-input-group text-right theme-radio-color">
@@ -408,12 +536,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                                                 radioSelection[group.id] ===
                                                 option
                                               }
-                                              onChange={() =>
+                                              onChange={() => {
                                                 setRadioSelection((current) => ({
                                                   ...current,
                                                   [group.id]: option,
-                                                }))
-                                              }
+                                                }));
+                                                setRequirementMessage(null);
+                                              }}
                                               aria-label={option}
                                             />
                                           </div>
@@ -451,7 +580,9 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                                                 className="btn plus button-input-group"
                                                 type="button"
                                                 aria-label={`Increase ${option}`}
-                                                disabled={atExactMax}
+                                                disabled={
+                                                  atExactMax || nonExactAtMax
+                                                }
                                                 onClick={() =>
                                                   changeModifierQty(
                                                     group,
@@ -508,7 +639,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     className="btn minus quantity-input-group"
                     type="button"
                     aria-label="Decrease quantity"
-                    disabled={hasExactSelection || effectiveProductQty <= 1}
+                    disabled={productQty <= 1}
                     onClick={() =>
                       setProductQty((current) =>
                         Math.max(1, clampQty(current - 1)),
@@ -523,7 +654,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   size={9}
                   maxLength={3}
                   min={0}
-                  value={String(effectiveProductQty)}
+                  value={String(productQty)}
                   className="form-control text-center quantity-input-text quantity-input-group"
                   id="product-quantity"
                   readOnly
@@ -534,7 +665,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     className="btn plus quantity-input-group"
                     type="button"
                     aria-label="Increase quantity"
-                    disabled={hasExactSelection}
+                    disabled={productQty >= 999}
                     onClick={() =>
                       setProductQty((current) => clampQty(current + 1))
                     }
@@ -558,7 +689,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 >
                   ADD
                   <span>
-                    -<span id="totalPriceOfProduct"> {priceLabel}</span>
+                    -<span id="totalPriceOfProduct"> {addTotalLabel}</span>
                   </span>
                 </button>
               </div>

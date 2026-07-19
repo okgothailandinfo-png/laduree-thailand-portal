@@ -4,6 +4,8 @@ import {
   getExactSelectionGroups,
   validateExactSelectionModifiers,
 } from "@/lib/product/exact-selection";
+import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
+import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import type { Cart, CartItem } from "@/src/server/models/cart";
 import type { Product } from "@/src/server/models/product";
 import type {
@@ -66,7 +68,10 @@ function parseModifiers(
   });
 }
 
-function catalogPriceFields(product: Product | null): {
+function catalogPriceFields(
+  product: Product | null,
+  modifiers: CartItem["modifiers"],
+): {
   unitPriceMinor: number | null;
   productAvailable: boolean;
 } {
@@ -74,9 +79,49 @@ function catalogPriceFields(product: Product | null): {
     return { unitPriceMinor: null, productAvailable: false };
   }
   return {
-    unitPriceMinor: product.priceMinor,
+    unitPriceMinor: computeConfiguredUnitPriceMinor(
+      product.priceMinor,
+      product.modifierGroups,
+      modifiers,
+    ),
     productAvailable: product.available && product.isActive,
   };
+}
+
+function assertProductConfiguration(
+  product: Product,
+  modifiers: CartItem["modifiers"],
+  quantity: number,
+) {
+  const exactSelection = validateExactSelectionModifiers(
+    product.modifierGroups,
+    modifiers,
+    quantity,
+  );
+  if (!exactSelection.ok) {
+    throw new AppError("VALIDATION_ERROR", exactSelection.message, {
+      details: {
+        field: "modifiers",
+        code: exactSelection.code,
+        productId: product.id,
+      },
+    });
+  }
+
+  const required = validateRequiredModifierGroups(
+    product.modifierGroups,
+    modifiers,
+  );
+  if (!required.ok) {
+    throw new AppError("VALIDATION_ERROR", required.message, {
+      details: {
+        field: "modifiers",
+        code: required.code,
+        groupId: required.groupId,
+        productId: product.id,
+      },
+    });
+  }
 }
 
 export class DefaultCartService implements CartService {
@@ -126,20 +171,7 @@ export class DefaultCartService implements CartService {
     }
 
     const modifiers = input.modifiers ?? [];
-    const exactSelection = validateExactSelectionModifiers(
-      product.modifierGroups,
-      modifiers,
-      input.quantity,
-    );
-    if (!exactSelection.ok) {
-      throw new AppError("VALIDATION_ERROR", exactSelection.message, {
-        details: {
-          field: "modifiers",
-          code: exactSelection.code,
-          productId: product.id,
-        },
-      });
-    }
+    assertProductConfiguration(product, modifiers, input.quantity);
 
     const exactGroups = getExactSelectionGroups(product.modifierGroups);
     const exactSelectionQuantity =
@@ -160,30 +192,15 @@ export class DefaultCartService implements CartService {
     );
 
     if (existingIndex >= 0) {
-      // Fixed-size exact-selection boxes must stay quantity 1 per line.
-      // Identical configs therefore remain separate cart lines (one box each).
-      if (typeof exactSelectionQuantity === "number") {
-        const item: CartItem = {
-          id: randomUUID(),
-          productId: product.id,
-          name: product.title,
-          imageSrc: product.imagePlaceholder || "/product-placeholder.svg",
-          quantity: 1,
-          modifiers,
-          note: input.note,
-          exactSelectionQuantity,
-          ...catalogPriceFields(product),
-        };
-        cart.items.push(item);
-      } else {
-        const existing = cart.items[existingIndex];
-        cart.items[existingIndex] = {
-          ...existing,
-          quantity: existing.quantity + input.quantity,
-          ...catalogPriceFields(product),
-          exactSelectionQuantity,
-        };
-      }
+      // Identical product + identical modifiers merge (including fixed-size boxes).
+      // Outer quantity is independent of flavour total (e.g. qty 2 = two identical boxes).
+      const existing = cart.items[existingIndex];
+      cart.items[existingIndex] = {
+        ...existing,
+        quantity: existing.quantity + input.quantity,
+        ...catalogPriceFields(product, modifiers),
+        exactSelectionQuantity,
+      };
     } else {
       const item: CartItem = {
         id: randomUUID(),
@@ -194,7 +211,7 @@ export class DefaultCartService implements CartService {
         modifiers,
         note: input.note,
         exactSelectionQuantity,
-        ...catalogPriceFields(product),
+        ...catalogPriceFields(product, modifiers),
       };
       cart.items.push(item);
     }
@@ -216,22 +233,24 @@ export class DefaultCartService implements CartService {
     }
 
     const current = cart.items[index];
-    if (
+    const product = await this.products.findById(current.productId);
+    if (product) {
+      assertProductConfiguration(product, current.modifiers, input.quantity);
+    } else if (
       typeof current.exactSelectionQuantity === "number" &&
-      input.quantity !== 1
+      (!Number.isInteger(input.quantity) || input.quantity < 1)
     ) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "Fixed-size box products must be added with quantity 1. Adjust flavour selections instead.",
+        "Product quantity must be between 1 and 999.",
         { details: { field: "quantity", productId: current.productId } },
       );
     }
 
-    const product = await this.products.findById(current.productId);
     cart.items[index] = {
       ...current,
       quantity: input.quantity,
-      ...catalogPriceFields(product),
+      ...catalogPriceFields(product, current.modifiers),
     };
     const saved = await this.carts.save(cart);
     return toCartDto(saved);
@@ -269,7 +288,7 @@ export class DefaultCartService implements CartService {
 
     for (const item of cart.items) {
       const product = await this.products.findById(item.productId);
-      const catalog = catalogPriceFields(product);
+      const catalog = catalogPriceFields(product, item.modifiers);
       const exactSelectionQuantity = product
         ? (getExactSelectionGroups(product.modifierGroups)[0]
             ?.exactSelectionQuantity ??

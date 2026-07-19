@@ -16,6 +16,15 @@ export type ExactSelectionModifier = {
   quantity?: number;
 };
 
+/** EN message keys prepared for later TH translation (full i18n not yet wired). */
+export const EXACT_SELECTION_MESSAGE_KEYS = {
+  pleaseSelect: "product.exactSelection.pleaseSelect",
+  pleaseSelectNMore: "product.exactSelection.pleaseSelectNMore",
+  nOfNSelected: "product.exactSelection.nOfNSelected",
+  maximumSelected: "product.exactSelection.maximumSelected",
+  incompleteBeforeAdd: "product.exactSelection.incompleteBeforeAdd",
+} as const;
+
 export function isExactSelectionGroup(
   group: ExactSelectionModifierGroup,
 ): group is ExactSelectionModifierGroup & { exactSelectionQuantity: number } {
@@ -63,8 +72,22 @@ export function sumExactSelectionFromQtyMap(
   return total;
 }
 
+/**
+ * Customer-facing exact-selection progress copy (EN).
+ * Before: “Please select 8” · During: “Please select 3 more” · Done: “8 of 8 selected”
+ */
+export function formatExactSelectionProgress(
+  selected: number,
+  required: number,
+): string {
+  if (selected <= 0) return `Please select ${required}`;
+  if (selected >= required) return `${required} of ${required} selected`;
+  return `Please select ${required - selected} more`;
+}
+
+/** @deprecated Prefer formatExactSelectionProgress */
 export function formatSelectedOfRequired(selected: number, required: number): string {
-  return `Selected ${selected} of ${required}`;
+  return formatExactSelectionProgress(selected, required);
 }
 
 export function formatExactSelectionMaximumMessage(required: number): string {
@@ -81,7 +104,8 @@ export type ExactSelectionValidationResult =
 
 /**
  * Validate cart/order modifiers against configured exact-selection groups.
- * Also requires product line quantity = 1 when any exact-selection group exists.
+ * Outer product quantity is independent: flavours define one box configuration;
+ * quantity N means N identical boxes.
  */
 export function validateExactSelectionModifiers(
   groups: ExactSelectionModifierGroup[],
@@ -91,12 +115,15 @@ export function validateExactSelectionModifiers(
   const exactGroups = getExactSelectionGroups(groups);
   if (exactGroups.length === 0) return { ok: true };
 
-  if (productQuantity !== 1) {
+  if (
+    !Number.isInteger(productQuantity) ||
+    productQuantity < 1 ||
+    productQuantity > 999
+  ) {
     return {
       ok: false,
       code: "QUANTITY",
-      message:
-        "Fixed-size box products must be added with quantity 1. Adjust flavour selections instead.",
+      message: "Product quantity must be between 1 and 999.",
     };
   }
 

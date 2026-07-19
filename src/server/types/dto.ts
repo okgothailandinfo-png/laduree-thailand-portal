@@ -14,9 +14,18 @@ export type ProductSummaryDto = {
 
 export type ProductDetailDto = ProductSummaryDto & {
   description: string[];
+  allergenLabel: string;
+  allergenText: string;
   storageLabel: string;
   storageText: string;
   modifierGroups: ProductModifierGroupDto[];
+};
+
+export type ProductModifierOptionDetailDto = {
+  label: string;
+  priceMinor?: number | null;
+  sortOrder?: number;
+  isActive?: boolean;
 };
 
 export type ProductModifierGroupDto = {
@@ -25,8 +34,15 @@ export type ProductModifierGroupDto = {
   requiredText: string | null;
   type: "quantity" | "radio";
   options: string[];
+  optionDetails?: ProductModifierOptionDetailDto[];
   /** Fixed-size box exact selection (e.g. 8). Null/undefined = no exact rule. */
   exactSelectionQuantity?: number | null;
+  required?: boolean;
+  minSelection?: number | null;
+  maxSelection?: number | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  isAcknowledgement?: boolean;
 };
 
 export type CategoryDto = {
