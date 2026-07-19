@@ -103,6 +103,15 @@ export type AdminOrderDetailRecord = {
   history: OrderHistoryEntry[];
 };
 
+/** Customer completion / receipt payload source (no admin auth). */
+export type CustomerOrderCompletionRecord = {
+  order: Order;
+  paymentStatus: "pending" | "mock_accepted" | "failed" | "none";
+  history: OrderHistoryEntry[];
+  /** ISO timestamp from pickup verification when staff completed handoff. */
+  verifiedAt: string | null;
+};
+
 export type OrderStatusUpdateOptions = {
   note?: string | null;
   changedBy?: string | null;
@@ -223,6 +232,14 @@ export interface OrderRepository {
     query: AdminKitchenOrderListQuery,
   ): Promise<AdminKitchenOrderPage>;
   adminFindById(id: string): Promise<AdminOrderDetailRecord | null>;
+  /** Customer completion page — order + history + pickup verifiedAt. */
+  findCustomerCompletion(
+    id: string,
+  ): Promise<CustomerOrderCompletionRecord | null>;
+  /** Customer history list — preserves request order; skips unknown ids. */
+  findCustomerHistoryByIds(
+    ids: string[],
+  ): Promise<CustomerOrderCompletionRecord[]>;
 }
 
 export interface CartRepository {

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { fetchOrderById } from "@/lib/api/orders";
+import { rememberCustomerOrderId } from "@/lib/customer-orders";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
 import { useCart } from "../cart/CartContext";
@@ -32,6 +34,12 @@ export default function OrderConfirmationClient({
       isEmpty: (data) => data === null,
     },
   );
+
+  useEffect(() => {
+    if (orderQuery.status === "success" && orderQuery.data) {
+      rememberCustomerOrderId(orderQuery.data.id);
+    }
+  }, [orderQuery.status, orderQuery.data]);
 
   if (orderId) {
     const order = orderQuery.data;
@@ -190,6 +198,17 @@ export default function OrderConfirmationClient({
               </section>
 
               <div className="order-confirmation-actions">
+                {order.status === "completed" ? (
+                  <Link
+                    href={`/order-completed/${encodeURIComponent(order.id)}`}
+                    className="order-confirmation-continue"
+                  >
+                    View Completion
+                  </Link>
+                ) : null}
+                <Link href="/order-history" className="order-confirmation-continue">
+                  Order History
+                </Link>
                 <Link href="/" className="order-confirmation-continue">
                   Continue Shopping
                 </Link>

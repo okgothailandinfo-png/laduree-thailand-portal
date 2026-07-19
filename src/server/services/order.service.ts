@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { Order } from "@/src/server/models/order";
 import type {
   BoutiqueRepository,
+  CustomerOrderCompletionRecord,
   OrderRepository,
   PickupRepository,
   ProductRepository,
@@ -11,10 +12,13 @@ import { toOrderDto } from "@/src/server/services/mappers";
 import type {
   CreateOrderPaymentDto,
   CreateOrderRequestDto,
+  OrderCompletionDto,
   OrderDto,
+  OrderHistoryItemDto,
 } from "@/src/server/types/dto";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
+import { minorToMajor } from "@/src/server/utils/money";
 import {
   isDateKey,
   isValidEmail,
@@ -26,6 +30,9 @@ import {
   requirePositiveInt,
   requireString,
 } from "@/src/server/utils/validation";
+
+const RECEIPT_LOGO_URL = "/logo.jpg";
+const MAX_HISTORY_IDS = 50;
 
 const PAYMENT_LABELS: Record<CreateOrderPaymentDto["method"], string> = {
   "credit-card": "Credit Card",
@@ -289,4 +296,128 @@ export class DefaultOrderService implements OrderService {
     }
     return toOrderDto(order);
   }
+
+  async getOrderCompletion(id: string): Promise<OrderCompletionDto> {
+    const orderId = requireString(id, "id");
+    const record = await this.orders.findCustomerCompletion(orderId);
+    if (!record) {
+      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+    }
+    return toCompletionDto(record);
+  }
+
+  async listOrderHistory(ids: string[]): Promise<OrderHistoryItemDto[]> {
+    const uniqueIds = [
+      ...new Set(
+        ids
+          .map((id) => (typeof id === "string" ? id.trim() : ""))
+          .filter(Boolean),
+      ),
+    ].slice(0, MAX_HISTORY_IDS);
+
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const records = await this.orders.findCustomerHistoryByIds(uniqueIds);
+    return records.map(toHistoryItemDto);
+  }
+}
+
+function minorToThb(minor: number): number {
+  return minorToMajor(minor);
+}
+
+function resolveCompletedAt(record: CustomerOrderCompletionRecord): string | null {
+  const fromHistory = [...record.history]
+    .reverse()
+    .find((entry) => entry.toStatus === "completed");
+  if (fromHistory) return fromHistory.createdAt;
+  if (record.order.status === "completed") {
+    return record.verifiedAt;
+  }
+  return null;
+}
+
+function toCompletionDto(
+  record: CustomerOrderCompletionRecord,
+): OrderCompletionDto {
+  const { order } = record;
+  const completedAt = resolveCompletedAt(record);
+  const receiptItems = order.items.map((item) => {
+    const lineTotalMinor = item.unitPriceMinor * item.quantity;
+    return {
+      productId: item.productId,
+      name: item.name,
+      quantity: item.quantity,
+      unitPriceThb: minorToThb(item.unitPriceMinor),
+      lineTotalThb: minorToThb(lineTotalMinor),
+      modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
+    };
+  });
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    completedAt,
+    pickupBoutique: {
+      id: order.pickup.boutiqueId,
+      name: order.pickup.boutiqueName,
+      address: order.pickup.address,
+    },
+    pickup: {
+      dateKey: order.pickup.dateKey,
+      timeSlotLabel: order.pickup.timeSlotLabel,
+    },
+    paymentStatus: record.paymentStatus,
+    paymentMethodLabel: order.payment?.methodLabel ?? null,
+    items: order.items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      quantity: item.quantity,
+      modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
+      note: item.note,
+    })),
+    totalThb: minorToThb(order.totalMinor),
+    currency: "THB",
+    receipt: {
+      logoUrl: RECEIPT_LOGO_URL,
+      orderNumber: order.orderNumber,
+      boutique: {
+        name: order.pickup.boutiqueName,
+        address: order.pickup.address,
+      },
+      items: receiptItems,
+      totalThb: minorToThb(order.totalMinor),
+      currency: "THB",
+      pickupDateKey: order.pickup.dateKey,
+      pickupTimeSlotLabel: order.pickup.timeSlotLabel,
+      completedAt,
+    },
+    timeline: record.history.map((entry) => ({
+      status: entry.toStatus,
+      changedAt: entry.createdAt,
+      note: entry.note,
+    })),
+  };
+}
+
+function toHistoryItemDto(
+  record: CustomerOrderCompletionRecord,
+): OrderHistoryItemDto {
+  const { order } = record;
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    pickupStatus: order.status,
+    boutiqueName: order.pickup.boutiqueName,
+    pickupDateKey: order.pickup.dateKey,
+    pickupTimeSlotLabel: order.pickup.timeSlotLabel,
+    totalThb: minorToThb(order.totalMinor),
+    currency: "THB",
+    completedAt: resolveCompletedAt(record),
+    createdAt: order.createdAt,
+  };
 }

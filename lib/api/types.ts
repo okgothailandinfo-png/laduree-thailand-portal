@@ -211,6 +211,85 @@ export type OrderPickupCredentials = {
   expiresAt: string | null;
 };
 
+export type OrderCompletionPaymentStatus =
+  | "pending"
+  | "mock_accepted"
+  | "failed"
+  | "none";
+
+export type OrderCompletionReceiptItem = {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPriceThb: number;
+  lineTotalThb: number;
+  modifiers: Array<{ label: string; quantity?: number }>;
+};
+
+export type OrderCompletionReceipt = {
+  logoUrl: string;
+  orderNumber: string;
+  boutique: {
+    name: string;
+    address: string;
+  };
+  items: OrderCompletionReceiptItem[];
+  totalThb: number;
+  currency: "THB";
+  pickupDateKey: string;
+  pickupTimeSlotLabel: string;
+  completedAt: string | null;
+};
+
+export type OrderCompletionTimelineEntry = {
+  status: OrderDetail["status"];
+  changedAt: string;
+  note: string | null;
+};
+
+export type OrderCompletion = {
+  orderId: string;
+  orderNumber: string;
+  status: OrderDetail["status"];
+  completedAt: string | null;
+  pickupBoutique: {
+    id: string;
+    name: string;
+    address: string;
+  };
+  pickup: {
+    dateKey: string;
+    timeSlotLabel: string;
+  };
+  paymentStatus: OrderCompletionPaymentStatus;
+  paymentMethodLabel: string | null;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    modifiers: Array<{ label: string; quantity?: number }>;
+    note?: string;
+  }>;
+  totalThb: number;
+  currency: "THB";
+  receipt: OrderCompletionReceipt;
+  timeline: OrderCompletionTimelineEntry[];
+};
+
+export type OrderHistoryItem = {
+  orderId: string;
+  orderNumber: string;
+  status: OrderDetail["status"];
+  pickupStatus: OrderDetail["status"];
+  boutiqueName: string;
+  pickupDateKey: string;
+  pickupTimeSlotLabel: string;
+  totalThb: number;
+  currency: "THB";
+  completedAt: string | null;
+  createdAt: string;
+};
+
 export type PaymentStatus =
   | "PENDING"
   | "SUCCESS"

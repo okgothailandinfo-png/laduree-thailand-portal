@@ -7,6 +7,7 @@ import type {
   AdminKitchenOrderPage,
   AdminOrderDetailRecord,
   AdminOrderListPage,
+  CustomerOrderCompletionRecord,
   OrderPaymentUpdateOptions,
   OrderRepository,
   OrderStatusUpdateOptions,
@@ -80,5 +81,33 @@ export class MockOrderRepository implements OrderRepository {
   async adminFindById(id: string): Promise<AdminOrderDetailRecord | null> {
     void id;
     rejectAdmin();
+  }
+
+  async findCustomerCompletion(
+    id: string,
+  ): Promise<CustomerOrderCompletionRecord | null> {
+    const order = ordersById.get(id);
+    if (!order) return null;
+    return {
+      order,
+      paymentStatus: order.payment
+        ? order.payment.status === "mock_accepted"
+          ? "mock_accepted"
+          : "pending"
+        : "none",
+      history: [],
+      verifiedAt: order.status === "completed" ? order.createdAt : null,
+    };
+  }
+
+  async findCustomerHistoryByIds(
+    ids: string[],
+  ): Promise<CustomerOrderCompletionRecord[]> {
+    const results: CustomerOrderCompletionRecord[] = [];
+    for (const id of ids) {
+      const record = await this.findCustomerCompletion(id);
+      if (record) results.push(record);
+    }
+    return results;
   }
 }
