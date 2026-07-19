@@ -1,6 +1,6 @@
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
-import { requireAdminSession } from "@/src/server/admin/auth";
+import { requireAdminWrite } from "@/src/server/admin/auth";
 import { pickupVerificationService } from "@/src/server/services/container";
 
 /**
@@ -10,12 +10,12 @@ import { pickupVerificationService } from "@/src/server/services/container";
  */
 export async function POST(request: Request) {
   return handleApi(async () => {
-    await requireAdminSession();
+    await requireAdminWrite(request);
     const body = await request.json();
     const input = pickupVerificationService.parseVerifyBody(body);
     const data = await pickupVerificationService.verify(input, {
       rateLimitKey: "admin-pickup-verify",
     });
     return ok(data);
-  });
+  }, request);
 }

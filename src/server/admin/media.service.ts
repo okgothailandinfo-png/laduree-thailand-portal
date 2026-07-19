@@ -6,7 +6,9 @@ import type {
   AdminMediaUploadResult,
   AdminUpdateMediaInput,
 } from "@/src/server/admin/dto";
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type { MediaRepository } from "@/src/server/repositories/interfaces";
 import type { StorageService } from "@/src/server/storage/storage-service";
 import { AppError } from "@/src/server/utils/errors";
@@ -196,6 +198,17 @@ export class AdminMediaService {
         sizeBytes: stored.sizeBytes,
         storageProvider: this.storage.providerName,
       });
+      await writeAuditLog({
+        actorId: MOCK_ADMIN_USER.id,
+        action: "media.upload",
+        entityType: "Media",
+        entityId: media.id,
+        metadata: {
+          mimeType: stored.mimeType,
+          sizeBytes: stored.sizeBytes,
+          storageProvider: this.storage.providerName,
+        },
+      });
 
       return {
         mediaId: media.id,
@@ -272,6 +285,13 @@ export class AdminMediaService {
     logger.info("Media deleted", {
       mediaId,
       hadStoredFile: Boolean(storageKey),
+    });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "media.delete",
+      entityType: "Media",
+      entityId: mediaId,
+      metadata: { hadStoredFile: Boolean(storageKey) },
     });
   }
 }

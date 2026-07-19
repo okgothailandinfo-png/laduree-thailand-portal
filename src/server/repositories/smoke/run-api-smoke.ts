@@ -75,7 +75,7 @@ async function run(): Promise<void> {
   const dataSource = getDataSource();
   const results: CheckResult[] = [];
 
-  const categoriesRes = await getCategories();
+  const categoriesRes = await getCategories(new Request("http://localhost:3000/api/categories"));
   const categoriesJson: unknown = await categoriesRes.json();
   const categoriesEnvelope = assertSuccessEnvelope(categoriesJson);
   results.push({
@@ -84,7 +84,7 @@ async function run(): Promise<void> {
     detail: `status=${categoriesRes.status}; ${categoriesEnvelope.detail}`,
   });
 
-  const productsRes = await getProducts();
+  const productsRes = await getProducts(new Request("http://localhost:3000/api/products"));
   const productsJson: unknown = await productsRes.json();
   const productsEnvelope = assertSuccessEnvelope(productsJson);
   const products = Array.isArray(productsEnvelope.data)
@@ -141,7 +141,7 @@ async function run(): Promise<void> {
     detail: `status=${missingProductRes.status}; ${missingEnvelope.detail}`,
   });
 
-  const boutiquesRes = await getBoutiques();
+  const boutiquesRes = await getBoutiques(new Request("http://localhost:3000/api/boutiques"));
   const boutiquesJson: unknown = await boutiquesRes.json();
   const boutiquesEnvelope = assertSuccessEnvelope(boutiquesJson);
   const boutiques = Array.isArray(boutiquesEnvelope.data)

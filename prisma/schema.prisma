@@ -441,3 +441,47 @@ model NotificationSetting {
   @@index([channel])
   @@index([isEnabled])
 }
+
+/// Durable payment webhook idempotency (provider event ids).
+model WebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventId     String   @unique
+  provider    String   @default("mock")
+  processedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([processedAt])
+  @@index([provider])
+}
+
+/// Admin / system audit trail. Safe metadata only — no secrets or PII payloads.
+/// Transaction boundary: audit writes are best-effort AFTER the main operation
+/// commits. Audit failure must not roll back the business mutation.
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String
+  action       String
+  entityType   String
+  entityId     String?
+  metadataJson Json?
+  requestId    String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@index([requestId])
+}
+
+/// Optional client idempotency keys for checkout / mutating public APIs.
+model IdempotencyKey {
+  id           String   @id @default(uuid()) @db.Uuid
+  scope        String
+  keyHash      String
+  responseJson Json
+  createdAt    DateTime @default(now())
+
+  @@unique([scope, keyHash])
+  @@index([createdAt])
+}

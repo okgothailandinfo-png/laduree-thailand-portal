@@ -21,5 +21,5 @@ export async function POST(request: Request) {
     const data = await cartService.addItem(cartId, input);
     await writeCartIdCookie(data.id);
     return created(data);
-  });
+  }, request);
 }

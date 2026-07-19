@@ -16,5 +16,5 @@ export async function POST(request: Request) {
     const input = paymentService.parseCreatePaymentBody(raw);
     const data = await paymentService.createPayment(input.orderId);
     return created(data);
-  });
+  }, request);
 }

@@ -12,7 +12,9 @@ import type {
   AdminUpdateOrderPaymentInput,
   AdminUpdateOrderStatusInput,
 } from "@/src/server/admin/dto";
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Order, OrderStatus } from "@/src/server/models/order";
 import {
@@ -509,6 +511,13 @@ export class AdminOrderService {
           to: adminStatus(to),
         });
       }
+      await writeAuditLog({
+        actorId: MOCK_ADMIN_USER.id,
+        action: "order.status_change",
+        entityType: "Order",
+        entityId: updated.id,
+        metadata: { from: adminStatus(from), to: adminStatus(to) },
+      });
     }
 
     const detail = await this.orders.adminFindById(id);
@@ -581,6 +590,13 @@ export class AdminOrderService {
         orderNumber: existing.order.orderNumber,
         from,
         to,
+      });
+      await writeAuditLog({
+        actorId: MOCK_ADMIN_USER.id,
+        action: "payment.status_change",
+        entityType: "Order",
+        entityId: id,
+        metadata: { from, to },
       });
     }
 

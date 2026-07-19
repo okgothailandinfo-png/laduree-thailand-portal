@@ -5,7 +5,9 @@ import type {
   AdminCreateCategoryInput,
   AdminUpdateCategoryInput,
 } from "@/src/server/admin/dto";
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type {
   CategoryRepository,
   ProductRepository,
@@ -133,6 +135,13 @@ export class AdminCategoryService {
       categoryId: category.id,
       slug: category.slug,
     });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "category.create",
+      entityType: "Category",
+      entityId: category.id,
+      metadata: { slug: category.slug },
+    });
     return toDetail(category, 0);
   }
 
@@ -152,6 +161,13 @@ export class AdminCategoryService {
       slug: category.slug,
       isActive: category.isActive,
     });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "category.update",
+      entityType: "Category",
+      entityId: category.id,
+      metadata: { isActive: category.isActive },
+    });
     return toDetail(category, productCount);
   }
 
@@ -159,5 +175,11 @@ export class AdminCategoryService {
     requirePrismaDataSource();
     await this.categories.remove(requireString(id, "id"));
     logger.info("Category deleted", { categoryId: id });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "category.deactivate",
+      entityType: "Category",
+      entityId: id,
+    });
   }
 }

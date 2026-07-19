@@ -26,15 +26,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     const data = await cartService.updateItem(cartId, id, input);
     await writeCartIdCookie(data.id);
     return ok(data);
-  });
+  }, request);
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   return handleApi(async () => {
     const { id } = await context.params;
     const cartId = await readCartIdFromCookie();
     const data = await cartService.removeItem(cartId, id);
     await writeCartIdCookie(data.id);
     return ok(data);
-  });
+  }, request);
 }

@@ -13,6 +13,7 @@ import { MockPickupRepository } from "@/src/server/repositories/mock/pickup.repo
 import { MockPickupVerificationRepository } from "@/src/server/repositories/mock/pickup-verification.repository";
 import { MockProductRepository } from "@/src/server/repositories/mock/product.repository";
 import { MockWebhookEventRepository } from "@/src/server/repositories/mock/webhook-event.repository";
+import { PrismaWebhookEventRepository } from "@/src/server/repositories/prisma/webhook-event.repository";
 import {
   MockNotificationQueueRepository,
   MockNotificationSettingRepository,
@@ -70,12 +71,11 @@ function createPrismaRepositories(): RepositoryBundle {
     notificationQueue: new PrismaNotificationQueueRepository(),
     notificationSettings: new PrismaNotificationSettingRepository(),
     // Intentionally in-memory until dedicated Prisma models exist:
-    // - Cart has no Prisma model yet
-    // - Gateway PaymentRepository is separate from checkout PaymentRecord
-    // - Webhook event store is replaceable later
+    // - Cart has no Prisma model yet (Production Blocker)
+    // - Gateway PaymentRepository is separate from checkout PaymentRecord (Production Blocker)
     carts: new MockCartRepository(),
     payments: new MockPaymentRepository(),
-    webhookEvents: new MockWebhookEventRepository(),
+    webhookEvents: new PrismaWebhookEventRepository(),
   };
 }
 

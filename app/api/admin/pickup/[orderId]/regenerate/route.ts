@@ -1,6 +1,6 @@
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
-import { requireAdminSession } from "@/src/server/admin/auth";
+import { requireAdminWrite } from "@/src/server/admin/auth";
 import { pickupVerificationService } from "@/src/server/services/container";
 
 type RouteContext = { params: Promise<{ orderId: string }> };
@@ -10,11 +10,11 @@ type RouteContext = { params: Promise<{ orderId: string }> };
  * Invalidate previous credentials and issue new ones.
  * Mock admin session required (non-production authorization).
  */
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   return handleApi(async () => {
-    await requireAdminSession();
+    await requireAdminWrite(request);
     const { orderId } = await context.params;
     const data = await pickupVerificationService.regenerate(orderId);
     return ok(data);
-  });
+  }, request);
 }

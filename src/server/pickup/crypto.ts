@@ -17,9 +17,26 @@ const REVEAL_PREFIX = "v1";
 
 function resolveRevealKey(): Buffer {
   const material =
-    process.env.PICKUP_REVEAL_SECRET?.trim() ||
-    env.mockPaymentWebhookSecret ||
-    "dev-only-pickup-reveal-secret-not-for-production";
+    env.pickupRevealSecret.trim() ||
+    env.mockPaymentWebhookSecret.trim() ||
+    (env.allowsMockProviders
+      ? "dev-only-pickup-reveal-secret-not-for-production"
+      : "");
+  if (!material) {
+    throw new AppError(
+      "CONFIG_ERROR",
+      "PICKUP_REVEAL_SECRET is required.",
+    );
+  }
+  if (
+    !env.allowsMockProviders &&
+    material.includes("dev-only")
+  ) {
+    throw new AppError(
+      "CONFIG_ERROR",
+      "PICKUP_REVEAL_SECRET must not use a development placeholder.",
+    );
+  }
   return createHash("sha256").update(`pickup-reveal:${material}`).digest();
 }
 

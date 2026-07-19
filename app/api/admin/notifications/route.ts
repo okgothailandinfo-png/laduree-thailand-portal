@@ -14,5 +14,5 @@ export async function GET(request: Request) {
     const query = adminNotificationService.parseListQuery(searchParams);
     const data = await adminNotificationService.list(query);
     return ok(data);
-  });
+  }, request);
 }

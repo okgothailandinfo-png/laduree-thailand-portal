@@ -30,5 +30,5 @@ export async function GET(request: Request) {
 
     const data = await orderService.listOrderHistory(ids);
     return ok(data);
-  });
+  }, request);
 }

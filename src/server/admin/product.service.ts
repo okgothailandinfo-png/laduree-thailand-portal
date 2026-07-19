@@ -6,7 +6,9 @@ import type {
   AdminProductListResult,
   AdminUpdateProductInput,
 } from "@/src/server/admin/dto";
+import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
+import { writeAuditLog } from "@/src/server/audit/audit.service";
 import type {
   CategoryRepository,
   ProductRepository,
@@ -250,6 +252,13 @@ export class AdminProductService {
       slug: product.slug,
       sku: product.sku,
     });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "product.create",
+      entityType: "Product",
+      entityId: product.id,
+      metadata: { slug: product.slug },
+    });
     return toDetail(product, category.name);
   }
 
@@ -277,6 +286,13 @@ export class AdminProductService {
       slug: product.slug,
       isActive: product.isActive,
     });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "product.update",
+      entityType: "Product",
+      entityId: product.id,
+      metadata: { isActive: product.isActive },
+    });
     return toDetail(product, category?.name ?? "—");
   }
 
@@ -289,12 +305,26 @@ export class AdminProductService {
     if (result.mode === "deactivated" && result.product) {
       const category = await this.categories.findById(result.product.categoryId);
       logger.info("Product deactivated", { productId: id });
+      await writeAuditLog({
+        actorId: MOCK_ADMIN_USER.id,
+        action: "product.deactivate",
+        entityType: "Product",
+        entityId: id,
+        metadata: { mode: "deactivated" },
+      });
       return {
         mode: "deactivated",
         product: toDetail(result.product, category?.name ?? "—"),
       };
     }
     logger.info("Product deleted", { productId: id });
+    await writeAuditLog({
+      actorId: MOCK_ADMIN_USER.id,
+      action: "product.deactivate",
+      entityType: "Product",
+      entityId: id,
+      metadata: { mode: "deleted" },
+    });
     return { mode: "deleted", product: null };
   }
 }

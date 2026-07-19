@@ -16,5 +16,5 @@ export async function GET(request: Request) {
     const query = adminOrderService.parseKitchenQuery(searchParams);
     const data = await adminOrderService.listKitchen(query);
     return ok(data);
-  });
+  }, request);
 }

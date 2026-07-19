@@ -9,11 +9,11 @@ type RouteContext = { params: Promise<{ id: string }> };
  * GET /api/admin/orders/[id]
  * Mock admin session required (non-production authorization).
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
     await requireAdminSession();
     const { id } = await context.params;
     const data = await adminOrderService.getById(id);
     return ok(data);
-  });
+  }, request);
 }
