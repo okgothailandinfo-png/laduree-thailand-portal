@@ -1,7 +1,11 @@
 import { Prisma } from "@prisma/client";
-import type { AdminOrderListQuery } from "@/src/server/admin/dto";
+import type {
+  AdminKitchenOrderListQuery,
+  AdminOrderListQuery,
+} from "@/src/server/admin/dto";
 import type { Order, OrderStatus } from "@/src/server/models/order";
 import type {
+  AdminKitchenOrderPage,
   AdminOrderDetailRecord,
   AdminOrderListPage,
   OrderPaymentUpdateOptions,
@@ -90,6 +94,54 @@ function buildAdminWhere(
     }
     if (query.dateTo) {
       where.createdAt.lte = bangkokDayBounds(query.dateTo).end;
+    }
+  }
+
+  return where;
+}
+
+/** Active kitchen board statuses — unpaid PENDING drafts and CANCELLED are excluded. */
+const KITCHEN_STATUSES = [
+  "CONFIRMED",
+  "PLACED",
+  "PREPARING",
+  "READY_FOR_PICKUP",
+  "COMPLETED",
+] as const;
+
+function buildKitchenWhere(
+  query: AdminKitchenOrderListQuery,
+): Prisma.OrderWhereInput {
+  const where: Prisma.OrderWhereInput = {
+    pickupSlot: { dateKey: query.date },
+    // Unpaid pending payments are excluded — payment rules do not admit them to prep.
+    payment: { status: "MOCK_ACCEPTED" },
+    status: { in: [...KITCHEN_STATUSES] },
+  };
+
+  if (query.search?.trim()) {
+    const term = query.search.trim();
+    where.OR = [
+      { orderNumber: { contains: term, mode: "insensitive" } },
+      { customer: { customerName: { contains: term, mode: "insensitive" } } },
+      { customer: { email: { contains: term, mode: "insensitive" } } },
+      { customer: { mobileNumber: { contains: term, mode: "insensitive" } } },
+    ];
+  }
+
+  if (query.boutiqueId) {
+    where.boutiqueId = query.boutiqueId;
+  }
+
+  if (query.status) {
+    if (query.status === "new" || query.status === "pending") {
+      // Kitchen board never surfaces unpaid drafts; keep filter consistent.
+      where.status = "PENDING";
+      where.payment = { status: "MOCK_ACCEPTED" };
+    } else if (query.status === "cancelled") {
+      where.status = "CANCELLED";
+    } else {
+      where.status = toPrismaOrderStatus(query.status);
     }
   }
 
@@ -331,6 +383,24 @@ export class PrismaOrderRepository implements OrderRepository {
 
     return {
       total,
+      items: rows.map((row) => toListRow(row as PrismaOrderWithRelations)),
+    };
+  }
+
+  async adminKitchenList(
+    query: AdminKitchenOrderListQuery,
+  ): Promise<AdminKitchenOrderPage> {
+    const where = buildKitchenWhere(query);
+    const rows = await prisma.order.findMany({
+      where,
+      include: orderInclude,
+      orderBy: [
+        { pickupSlot: { startTime: "asc" } },
+        { createdAt: "asc" },
+      ],
+    });
+
+    return {
       items: rows.map((row) => toListRow(row as PrismaOrderWithRelations)),
     };
   }

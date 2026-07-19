@@ -1,6 +1,10 @@
-import type { AdminOrderListQuery } from "@/src/server/admin/dto";
+import type {
+  AdminKitchenOrderListQuery,
+  AdminOrderListQuery,
+} from "@/src/server/admin/dto";
 import type { Order, OrderStatus } from "@/src/server/models/order";
 import type {
+  AdminKitchenOrderPage,
   AdminOrderDetailRecord,
   AdminOrderListPage,
   OrderPaymentUpdateOptions,
@@ -62,6 +66,13 @@ export class MockOrderRepository implements OrderRepository {
   }
 
   async adminList(query: AdminOrderListQuery): Promise<AdminOrderListPage> {
+    void query;
+    rejectAdmin();
+  }
+
+  async adminKitchenList(
+    query: AdminKitchenOrderListQuery,
+  ): Promise<AdminKitchenOrderPage> {
     void query;
     rejectAdmin();
   }

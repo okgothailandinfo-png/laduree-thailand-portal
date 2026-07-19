@@ -418,3 +418,37 @@ export type AdminUpdateOrderPaymentInput = {
   /** When provided, must match current payment status — prevents duplicate updates. */
   expectedStatus?: Exclude<AdminPaymentStatus, "none">;
 };
+
+/** Kitchen / preparation dashboard — operational fields only (no full customer or payment payloads). */
+
+export type AdminKitchenOrderDto = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  boutiqueId: string;
+  boutiqueName: string;
+  pickupDate: string;
+  pickupTime: string;
+  itemCount: number;
+  /** Compact line-item summary for kitchen cards (e.g. "2× Macaron, 1× Cake"). */
+  productSummary: string;
+  customerNote: string | null;
+  orderStatus: AdminOrderStatus;
+  paymentStatus: AdminPaymentStatus;
+  allowedNextStatuses: AdminOrderStatus[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminKitchenOrderListQuery = {
+  /** Pickup date (YYYY-MM-DD, Asia/Bangkok). */
+  date: string;
+  boutiqueId?: string;
+  status?: AdminOrderStatus;
+  search?: string;
+};
+
+export type AdminKitchenOrderListResult = {
+  date: string;
+  items: AdminKitchenOrderDto[];
+};

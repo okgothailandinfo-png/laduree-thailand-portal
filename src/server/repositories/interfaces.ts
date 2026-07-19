@@ -8,6 +8,7 @@ import type {
   AdminCreateMediaInput,
   AdminCreateProductInput,
   AdminMediaListQuery,
+  AdminKitchenOrderListQuery,
   AdminOrderListQuery,
   AdminProductListQuery,
   AdminUpdateBannerInput,
@@ -82,6 +83,13 @@ export type AdminOrderListRow = {
 export type AdminOrderListPage = {
   items: AdminOrderListRow[];
   total: number;
+};
+
+/** Kitchen board row — same order payload as list, scoped by pickup date. */
+export type AdminKitchenOrderRow = AdminOrderListRow;
+
+export type AdminKitchenOrderPage = {
+  items: AdminKitchenOrderRow[];
 };
 
 export type AdminOrderDetailRecord = {
@@ -210,6 +218,9 @@ export interface OrderRepository {
     options?: OrderPaymentUpdateOptions,
   ): Promise<AdminOrderDetailRecord>;
   adminList(query: AdminOrderListQuery): Promise<AdminOrderListPage>;
+  adminKitchenList(
+    query: AdminKitchenOrderListQuery,
+  ): Promise<AdminKitchenOrderPage>;
   adminFindById(id: string): Promise<AdminOrderDetailRecord | null>;
 }
 
