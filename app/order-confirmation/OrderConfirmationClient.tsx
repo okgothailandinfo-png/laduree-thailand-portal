@@ -9,6 +9,7 @@ import { useCheckout } from "../checkout/CheckoutContext";
 import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
+import PickupCredentialsCard from "./PickupCredentialsCard";
 import "./order-confirmation.css";
 
 export default function OrderConfirmationClient({
@@ -117,6 +118,8 @@ export default function OrderConfirmationClient({
                   {order.pickup.timeSlotLabel}
                 </p>
               </section>
+
+              <PickupCredentialsCard orderId={order.id} />
 
               <section
                 className="order-confirmation-card"

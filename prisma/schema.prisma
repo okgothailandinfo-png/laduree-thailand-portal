@@ -262,18 +262,42 @@ model Order {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  boutique   Boutique       @relation(fields: [boutiqueId], references: [id], onDelete: Restrict)
-  pickupSlot PickupSlot     @relation(fields: [pickupSlotId], references: [id], onDelete: Restrict)
-  items      OrderItem[]
-  payment    PaymentRecord?
-  history    OrderHistory[]
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  boutique           Boutique            @relation(fields: [boutiqueId], references: [id], onDelete: Restrict)
+  pickupSlot         PickupSlot          @relation(fields: [pickupSlotId], references: [id], onDelete: Restrict)
+  items              OrderItem[]
+  payment            PaymentRecord?
+  history            OrderHistory[]
+  pickupVerification PickupVerification?
 
   @@index([customerId])
   @@index([boutiqueId])
   @@index([pickupSlotId])
   @@index([status])
   @@index([createdAt])
+}
+
+/// Pickup check-in credentials. Raw QR tokens are never stored — only hashes.
+/// customerRevealCipher holds AES-GCM ciphertext so the confirmation page can
+/// re-display codes without regenerating on refresh.
+model PickupVerification {
+  id                   String    @id @default(uuid()) @db.Uuid
+  orderId              String    @unique @db.Uuid
+  pickupCodeHash       String    @unique
+  tokenHash            String    @unique
+  /// AES-256-GCM ciphertext of { token, pickupCode } for customer display only.
+  customerRevealCipher String
+  expiresAt            DateTime?
+  verifiedAt           DateTime?
+  verifiedBy           String?
+  verificationAttempts Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([verifiedAt])
 }
 
 /// Audit trail for order status changes (admin and system).

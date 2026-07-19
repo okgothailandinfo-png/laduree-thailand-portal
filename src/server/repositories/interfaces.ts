@@ -37,6 +37,7 @@ import type {
   PickupSlotRecord,
 } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
+import type { PickupVerificationRepository } from "@/src/server/pickup/pickup-verification.repository";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 
@@ -240,6 +241,7 @@ export type RepositoryBundle = {
   boutiques: BoutiqueRepository;
   pickup: PickupRepository;
   orders: OrderRepository;
+  pickupVerifications: PickupVerificationRepository;
   carts: CartRepository;
   payments: PaymentRepository;
   webhookEvents: WebhookEventRepository;

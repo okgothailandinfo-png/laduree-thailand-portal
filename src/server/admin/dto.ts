@@ -452,3 +452,59 @@ export type AdminKitchenOrderListResult = {
   date: string;
   items: AdminKitchenOrderDto[];
 };
+
+/** Pickup check-in / QR verification (Sprint 19A) */
+
+export type AdminPickupVerificationStatus =
+  | "active"
+  | "verified"
+  | "expired"
+  | "unavailable";
+
+export type AdminPickupAllowedAction =
+  | "complete_pickup"
+  | "wait_until_ready"
+  | "none";
+
+export type AdminPickupVerifyResultDto = {
+  verificationId: string;
+  orderId: string;
+  orderNumber: string;
+  customerDisplayName: string;
+  boutique: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  pickupDate: string;
+  pickupTime: string;
+  itemCount: number;
+  orderStatus: AdminOrderStatus;
+  paymentStatus: AdminPaymentStatus;
+  verificationStatus: AdminPickupVerificationStatus;
+  allowedAction: AdminPickupAllowedAction;
+};
+
+export type AdminPickupVerifyInput =
+  | { token: string }
+  | { pickupCode: string };
+
+export type AdminPickupCompleteInput = {
+  expectedStatus: "ready_for_pickup";
+  verificationId: string;
+  note?: string | null;
+};
+
+export type AdminPickupCompleteResultDto = {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: AdminOrderStatus;
+  verificationStatus: AdminPickupVerificationStatus;
+  alreadyCompleted: boolean;
+};
+
+export type AdminPickupRegenerateResultDto = {
+  orderId: string;
+  orderNumber: string;
+  regenerated: true;
+};

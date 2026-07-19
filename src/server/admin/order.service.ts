@@ -21,6 +21,7 @@ import {
   getAllowedNextStatuses,
   toAdminWorkflowStatus,
 } from "@/src/server/orders/status-transitions";
+import type { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import type {
   AdminKitchenOrderRow,
   AdminOrderDetailRecord,
@@ -283,6 +284,7 @@ export class AdminOrderService {
   constructor(
     private readonly orders: OrderRepository,
     private readonly boutiques: BoutiqueRepository,
+    private readonly pickupVerifications?: PickupVerificationService,
   ) {}
 
   parseListQuery(searchParams: URLSearchParams): AdminOrderListQuery {
@@ -459,6 +461,17 @@ export class AdminOrderService {
       note: input.note,
       changedBy: "mock-admin",
     });
+
+    if (to === "confirmed" && this.pickupVerifications) {
+      try {
+        await this.pickupVerifications.ensureForOrder(updated.id);
+      } catch (error) {
+        logger.error("Failed to ensure pickup verification after confirm", {
+          orderId: updated.id,
+          message: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    }
 
     if (adminStatus(from) !== adminStatus(to)) {
       if (to === "cancelled") {

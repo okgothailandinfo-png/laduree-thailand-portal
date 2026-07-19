@@ -204,6 +204,13 @@ export type OrderDetail = {
   };
 };
 
+/** Customer confirmation pickup credentials (never log qrPayload / pickupCode). */
+export type OrderPickupCredentials = {
+  pickupCode: string;
+  qrPayload: string;
+  expiresAt: string | null;
+};
+
 export type PaymentStatus =
   | "PENDING"
   | "SUCCESS"
