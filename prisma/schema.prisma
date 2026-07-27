@@ -1,5 +1,9 @@
-// Ladurée Thailand Pickup — Prisma foundation (PostgreSQL)
-// Schema only: not wired to APIs/services/repositories yet.
+// Ladurée Thailand Pickup — Prisma schema (PostgreSQL)
+//
+// Sprint 21 Delivery Foundation: schema includes ServiceType + delivery columns.
+// Applying migration `20260727220000_delivery_foundation` is Pending Infrastructure
+// until DATABASE_URL / local Postgres is provisioned. Runtime Delivery uses
+// DATA_SOURCE=mock (in-memory Order repository) and must not be blocked on Prisma.
 
 generator client {
   provider = "prisma-client-js"

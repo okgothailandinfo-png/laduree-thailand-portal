@@ -191,6 +191,23 @@ As of Sprint 16C in this agent environment:
 - Live Prisma migrate/seed/admin CRUD against Postgres remain **pending** on a machine with local Postgres
 - Mock `smoke:repos`, `smoke:api`, and `smoke:admin` are expected to pass without a database
 
+## Sprint 21 — Delivery Foundation (mock-first)
+
+Delivery extends Pickup on the **mock data layer**. Do **not** block Delivery Foundation on Prisma.
+
+| Item | Status |
+|------|--------|
+| `serviceType` PICKUP / DELIVERY on domain Order + checkout | Done (mock) |
+| Delivery address + slot selection UI | Done (mock session + checkout) |
+| Delivery fee engine (zones / flat rate / distance stub) | Done (in-memory config; default zones empty — no invented prices) |
+| Courier provider stubs (GrabExpress, Lalamove, LINE MAN, Flash) | Done (no API calls) |
+| Prisma migration `20260727220000_delivery_foundation` | **Pending Infrastructure** |
+| `DATABASE_URL` / approved development PostgreSQL | **Pending Infrastructure** (intentionally empty) |
+
+Keep `DATA_SOURCE=mock` and leave `DATABASE_URL` empty until an approved development PostgreSQL database is provisioned. See `prisma/migrations/20260727220000_delivery_foundation/PENDING_INFRASTRUCTURE.md`.
+
+Do **not** run `npm run db:migrate` / `db:deploy` for Delivery Foundation work until infrastructure is ready. Do **not** invent or hard-code a database connection.
+
 ## Remaining production tasks / risks
 
 See also [production-hardening.md](./production-hardening.md) for fail-closed rules and Production Blockers.
@@ -204,3 +221,4 @@ See also [production-hardening.md](./production-hardening.md) for fail-closed ru
 - Payment gateway not implemented (mock payment refused in production)
 - Production must set `DATA_SOURCE=prisma` (mock refused)
 - Cloud storage / real notification providers / Redis rate-limit client still required before go-live
+- **Pending Infrastructure:** apply delivery foundation Prisma migration after local Postgres is available

@@ -82,6 +82,8 @@ function createPrismaRepositories(): RepositoryBundle {
 /**
  * Selects mock or Prisma repository implementations from DATA_SOURCE.
  * Admin Product/Category CRUD requires DATA_SOURCE=prisma.
+ * Sprint 21 Delivery Foundation: use DATA_SOURCE=mock while DATABASE_URL is empty
+ * (delivery Prisma migration is Pending Infrastructure).
  * See docs/backend-repositories.md for selection rules.
  */
 export function createRepositories(): RepositoryBundle {
