@@ -143,12 +143,38 @@ export type CreateOrderPaymentDto = {
   method: "credit-card" | "promptpay-qr" | "apple-pay" | "google-pay";
 };
 
+export type ServiceTypeDto = "PICKUP" | "DELIVERY";
+
+export type DeliveryAddressDto = {
+  recipient: string;
+  phone: string;
+  address: string;
+  subdistrict: string;
+  district: string;
+  province: string;
+  postalCode: string;
+};
+
 export type CreateOrderRequestDto = {
   items: CreateOrderItemDto[];
   customer: CreateOrderCustomerDto;
+  /** Defaults to PICKUP when omitted. */
+  serviceType?: ServiceTypeDto;
   pickup: CreateOrderPickupDto;
+  /** Required when serviceType is DELIVERY. */
+  delivery?: {
+    address: DeliveryAddressDto;
+  };
   payment: CreateOrderPaymentDto;
   termsAccepted: boolean;
+};
+
+export type OrderDeliveryDto = {
+  address: DeliveryAddressDto;
+  /** Delivery fee in THB major units. Null when pending/unmatched — never invented. */
+  feeThb: number | null;
+  zoneId?: string | null;
+  feeStrategy?: "FLAT_RATE" | "DISTANCE" | null;
 };
 
 export type OrderDto = {
@@ -162,6 +188,7 @@ export type OrderDto = {
     | "completed"
     | "cancelled"
     | "mock_placed";
+  serviceType: ServiceTypeDto;
   currency: "THB";
   /** Server-trusted order total in THB major units (never client-submitted). */
   totalThb: number;
@@ -182,6 +209,7 @@ export type OrderDto = {
     timeSlotId: string;
     timeSlotLabel: string;
   };
+  delivery?: OrderDeliveryDto;
   payment?: {
     method: CreateOrderPaymentDto["method"];
     methodLabel: string;
@@ -198,14 +226,22 @@ export type CheckoutCustomerRequestDto = {
 
 export type CheckoutPickupRequestDto = {
   boutiqueId: string;
-  /** Asia/Bangkok calendar date YYYY-MM-DD — authoritative for order pickup date. */
+  /** Asia/Bangkok calendar date YYYY-MM-DD — authoritative for order pickup/delivery date. */
   dateKey: string;
   pickupSlotId: string;
 };
 
+export type CheckoutDeliveryRequestDto = {
+  address: DeliveryAddressDto;
+};
+
 export type CheckoutRequestDto = {
   customer: CheckoutCustomerRequestDto;
+  /** Defaults to PICKUP when omitted — preserves existing Pickup clients. */
+  serviceType?: ServiceTypeDto;
   pickup: CheckoutPickupRequestDto;
+  /** Required when serviceType is DELIVERY. */
+  delivery?: CheckoutDeliveryRequestDto;
   /** Must be true; server rejects missing/false acknowledgements. */
   termsAccepted: boolean;
 };
@@ -216,6 +252,9 @@ export type CheckoutResponseDto = {
   total: number;
   itemCount: number;
   status: "PENDING";
+  serviceType: ServiceTypeDto;
+  /** Delivery fee in THB major units when quoted; null when PICKUP or fee pending. */
+  deliveryFee: number | null;
 };
 
 export type OrderCompletionPaymentStatus =

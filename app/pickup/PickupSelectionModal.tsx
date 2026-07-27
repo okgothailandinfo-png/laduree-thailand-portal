@@ -3,15 +3,35 @@
 import { useEffect, useId, useRef } from "react";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { usePickup, type PickupStep } from "./PickupContext";
-import { PICKUP_MESSAGES } from "./pickup-availability";
+import {
+  DELIVERY_MESSAGES,
+  isCompleteDeliveryAddress,
+  PICKUP_MESSAGES,
+} from "./pickup-availability";
 import { formatPickupDateKey } from "./pickup-dates";
 import "./pickup.css";
 
 const STEP_TITLES: Record<PickupStep, string> = {
   service: "SELECT YOUR DESIRED SERVICE",
+  address: "Please input the postal code for delivery",
   boutique: "Select Outlet To Pickup Order",
   datetime: "Choose Date & Time",
 };
+
+const ADDRESS_FIELDS = [
+  { key: "recipient", label: "Recipient", autoComplete: "name" },
+  { key: "phone", label: "Phone", autoComplete: "tel" },
+  { key: "address", label: "Address", autoComplete: "street-address" },
+  { key: "subdistrict", label: "Subdistrict", autoComplete: "address-level3" },
+  { key: "district", label: "District", autoComplete: "address-level2" },
+  { key: "province", label: "Province", autoComplete: "address-level1" },
+  {
+    key: "postalCode",
+    label: "Postal Code",
+    autoComplete: "postal-code",
+    placeholder: "Delivery location postal code",
+  },
+] as const;
 
 export default function PickupSelectionModal() {
   const {
@@ -20,9 +40,11 @@ export default function PickupSelectionModal() {
     step,
     setStep,
     draft,
+    setDraftServiceType,
     setDraftBoutique,
     setDraftDate,
     setDraftTimeSlot,
+    setDraftDeliveryAddress,
     validationError,
     confirmSelection,
     boutiques,
@@ -82,12 +104,53 @@ export default function PickupSelectionModal() {
   }, [isOpen, closePickupSelection]);
 
   const canContinueService = true;
+  const canContinueAddress = isCompleteDeliveryAddress(draft.deliveryAddress);
   const canContinueBoutique = draft.boutiqueId !== null;
   const canConfirm =
     draft.boutiqueId !== null &&
     draft.dateKey !== null &&
     draft.timeSlotId !== null &&
-    timeSlots.some((slot) => slot.id === draft.timeSlotId);
+    timeSlots.some((slot) => slot.id === draft.timeSlotId) &&
+    (draft.serviceType !== "DELIVERY" ||
+      isCompleteDeliveryAddress(draft.deliveryAddress));
+
+  const boutiqueTitle =
+    draft.serviceType === "DELIVERY"
+      ? "Select Delivery Outlet"
+      : STEP_TITLES.boutique;
+
+  const dateLabel =
+    draft.serviceType === "DELIVERY" ? "Select Delivery Date" : "Select Date";
+  const timeLabel = "Select Time slot";
+
+  function goBack() {
+    if (step === "datetime") {
+      setStep("boutique");
+      return;
+    }
+    if (step === "boutique") {
+      setStep(draft.serviceType === "DELIVERY" ? "address" : "service");
+      return;
+    }
+    if (step === "address") {
+      setStep("service");
+    }
+  }
+
+  function continueFromService() {
+    if (draft.serviceType === "DELIVERY") {
+      setStep("address");
+      return;
+    }
+    setStep("boutique");
+  }
+
+  function continueFromAddress() {
+    if (!isCompleteDeliveryAddress(draft.deliveryAddress)) {
+      return;
+    }
+    setStep("boutique");
+  }
 
   return (
     <div
@@ -111,7 +174,7 @@ export default function PickupSelectionModal() {
       >
         <div className="pickup-modal-header">
           <h2 id={titleId} className="pickup-modal-title">
-            {STEP_TITLES[step]}
+            {step === "boutique" ? boutiqueTitle : STEP_TITLES[step]}
           </h2>
           <button
             ref={closeRef}
@@ -135,8 +198,11 @@ export default function PickupSelectionModal() {
             <div className="pickup-service-grid">
               <button
                 type="button"
-                className="pickup-service-card is-selected"
-                aria-pressed="true"
+                className={`pickup-service-card${
+                  draft.serviceType === "PICKUP" ? " is-selected" : ""
+                }`}
+                aria-pressed={draft.serviceType === "PICKUP"}
+                onClick={() => setDraftServiceType("PICKUP")}
               >
                 <span className="pickup-service-card__title">Pick-up</span>
                 <span className="pickup-service-card__sub">
@@ -146,19 +212,49 @@ export default function PickupSelectionModal() {
               </button>
               <button
                 type="button"
-                className="pickup-service-card"
-                disabled
-                aria-disabled="true"
-                title="Delivery is not available in this sprint"
+                className={`pickup-service-card${
+                  draft.serviceType === "DELIVERY" ? " is-selected" : ""
+                }`}
+                aria-pressed={draft.serviceType === "DELIVERY"}
+                onClick={() => setDraftServiceType("DELIVERY")}
               >
                 <span className="pickup-service-card__title">Delivery</span>
                 <span className="pickup-service-card__sub">
-                  Served to your doorstep
+                  Served to your
                 </span>
-                <span className="pickup-service-card__sub">
-                  Not available yet
-                </span>
+                <span className="pickup-service-card__sub">doorstep</span>
               </button>
+            </div>
+          ) : null}
+
+          {step === "address" ? (
+            <div className="pickup-address-form">
+              {ADDRESS_FIELDS.map((field) => (
+                <label key={field.key} className="pickup-address-field">
+                  <span className="pickup-address-field__label">
+                    {field.label}
+                  </span>
+                  <input
+                    type="text"
+                    className="pickup-address-field__input"
+                    autoComplete={field.autoComplete}
+                    placeholder={
+                      "placeholder" in field ? field.placeholder : undefined
+                    }
+                    value={draft.deliveryAddress[field.key]}
+                    onChange={(event) =>
+                      setDraftDeliveryAddress({
+                        [field.key]: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+              ))}
+              {!draft.deliveryAddress.postalCode.trim() ? (
+                <p className="pickup-slots-hint" role="status">
+                  {DELIVERY_MESSAGES.postalRequired}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -206,7 +302,7 @@ export default function PickupSelectionModal() {
               <>
                 <div className="pickup-datetime-section">
                   <p className="pickup-datetime-label" id="pickup-date-label">
-                    Select Date
+                    {dateLabel}
                   </p>
                   {datesStatus === "idle" ? (
                     <p className="pickup-slots-hint" role="status">
@@ -249,7 +345,7 @@ export default function PickupSelectionModal() {
 
                 <div className="pickup-datetime-section">
                   <p className="pickup-datetime-label" id="pickup-slot-label">
-                    Select Time slot
+                    {timeLabel}
                   </p>
                   {!draft.dateKey ? (
                     <p className="pickup-slots-hint" role="status">
@@ -302,9 +398,7 @@ export default function PickupSelectionModal() {
             <button
               type="button"
               className="pickup-btn pickup-btn-secondary"
-              onClick={() =>
-                setStep(step === "datetime" ? "boutique" : "service")
-              }
+              onClick={goBack}
             >
               Back
             </button>
@@ -315,7 +409,18 @@ export default function PickupSelectionModal() {
               type="button"
               className="pickup-btn"
               disabled={!canContinueService}
-              onClick={() => setStep("boutique")}
+              onClick={continueFromService}
+            >
+              Continue
+            </button>
+          ) : null}
+
+          {step === "address" ? (
+            <button
+              type="button"
+              className="pickup-btn"
+              disabled={!canContinueAddress}
+              onClick={continueFromAddress}
             >
               Continue
             </button>

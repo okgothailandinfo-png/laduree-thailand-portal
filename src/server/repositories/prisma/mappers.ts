@@ -391,10 +391,22 @@ export type PrismaOrderWithRelations = PrismaOrder & {
 
 export function toDomainOrder(row: PrismaOrderWithRelations): Order {
   const payment = toDomainPayment(row.payment);
+  const serviceType = row.serviceType === "DELIVERY" ? "DELIVERY" : "PICKUP";
+  const hasDeliveryAddress =
+    serviceType === "DELIVERY" &&
+    row.deliveryRecipient &&
+    row.deliveryPhone &&
+    row.deliveryAddress &&
+    row.deliverySubdistrict &&
+    row.deliveryDistrict &&
+    row.deliveryProvince &&
+    row.deliveryPostalCode;
+
   return {
     id: row.id,
     orderNumber: row.orderNumber,
     status: toDomainOrderStatus(row.status),
+    serviceType,
     currency: "THB",
     createdAt: row.createdAt.toISOString(),
     totalMinor: row.totalMinor,
@@ -423,6 +435,24 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
       timeSlotId: row.pickupSlotId,
       timeSlotLabel: row.pickupSlot.label,
     },
+    ...(hasDeliveryAddress
+      ? {
+          delivery: {
+            address: {
+              recipient: row.deliveryRecipient!,
+              phone: row.deliveryPhone!,
+              address: row.deliveryAddress!,
+              subdistrict: row.deliverySubdistrict!,
+              district: row.deliveryDistrict!,
+              province: row.deliveryProvince!,
+              postalCode: row.deliveryPostalCode!,
+            },
+            feeMinor: row.deliveryFeeMinor ?? null,
+            zoneId: row.deliveryZoneId ?? null,
+            feeStrategy: row.deliveryFeeStrategy ?? null,
+          },
+        }
+      : {}),
     ...(payment ? { payment } : {}),
   };
 }

@@ -90,11 +90,19 @@ export default function CheckoutPageClient() {
             email: info.email.trim(),
             phone: info.mobileNumber.trim(),
           },
+          serviceType: pickup.serviceType,
           pickup: {
             boutiqueId: pickup.boutique.id,
             dateKey: pickup.dateKey,
             pickupSlotId: pickup.timeSlot.id,
           },
+          ...(pickup.serviceType === "DELIVERY" && pickup.deliveryAddress
+            ? {
+                delivery: {
+                  address: { ...pickup.deliveryAddress },
+                },
+              }
+            : {}),
           termsAccepted: info.termsAccepted === true,
         },
         { idempotencyKey: idempotencyKeyRef.current },

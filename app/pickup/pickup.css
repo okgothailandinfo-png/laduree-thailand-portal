@@ -183,6 +183,40 @@
   cursor: not-allowed;
 }
 
+.pickup-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pickup-address-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pickup-address-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #615236;
+}
+
+.pickup-address-field__input {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #d7d7d7;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+}
+
+.pickup-address-field__input:focus {
+  outline: 1px solid var(--main-color, #84754e);
+  border-color: var(--main-color, #84754e);
+}
+
 .pickup-service-card__title {
   font-size: 18px;
   font-weight: 700;

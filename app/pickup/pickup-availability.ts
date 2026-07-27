@@ -2,6 +2,28 @@ import type { PickupTimeSlot } from "@/lib/api/types";
 
 export const PICKUP_CONFIRMED_STORAGE_KEY = "laduree.pickup.confirmed.v1";
 
+export type FulfillmentServiceType = "PICKUP" | "DELIVERY";
+
+export type DeliveryAddressDraft = {
+  recipient: string;
+  phone: string;
+  address: string;
+  subdistrict: string;
+  district: string;
+  province: string;
+  postalCode: string;
+};
+
+export const EMPTY_DELIVERY_ADDRESS: DeliveryAddressDraft = {
+  recipient: "",
+  phone: "",
+  address: "",
+  subdistrict: "",
+  district: "",
+  province: "",
+  postalCode: "",
+};
+
 export const PICKUP_MESSAGES = {
   missingBoutique: "Please select a pickup boutique first.",
   noDates: "No pickup dates available.",
@@ -16,7 +38,16 @@ export const PICKUP_MESSAGES = {
     "Your selected pickup time is no longer available. Please choose another time.",
 } as const;
 
+/** Singapore-verified delivery strings (docs/user-flow.md). */
+export const DELIVERY_MESSAGES = {
+  postalRequired: "The Postal Code field is required.",
+  addressIncomplete: "Wrong postal code or address",
+  addressUnavailable:
+    "The postal / address is not available for delivery yet.",
+} as const;
+
 export type PersistedConfirmedPickup = {
+  serviceType?: FulfillmentServiceType;
   boutique: {
     id: string;
     name: string;
@@ -27,6 +58,7 @@ export type PersistedConfirmedPickup = {
   };
   dateKey: string;
   timeSlot: PickupTimeSlot;
+  deliveryAddress?: DeliveryAddressDraft;
 };
 
 export function isAbortError(error: unknown): boolean {
@@ -66,6 +98,48 @@ export function slotsContainId(
   return slots.some((slot) => slot.id === timeSlotId);
 }
 
+export function isCompleteDeliveryAddress(
+  address: DeliveryAddressDraft | null | undefined,
+): boolean {
+  if (!address) return false;
+  return (
+    address.recipient.trim().length > 0 &&
+    address.phone.trim().length > 0 &&
+    address.address.trim().length > 0 &&
+    address.subdistrict.trim().length > 0 &&
+    address.district.trim().length > 0 &&
+    address.province.trim().length > 0 &&
+    address.postalCode.trim().length > 0
+  );
+}
+
+function parseDeliveryAddress(
+  raw: unknown,
+): DeliveryAddressDraft | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const value = raw as Partial<DeliveryAddressDraft>;
+  if (
+    typeof value.recipient !== "string" ||
+    typeof value.phone !== "string" ||
+    typeof value.address !== "string" ||
+    typeof value.subdistrict !== "string" ||
+    typeof value.district !== "string" ||
+    typeof value.province !== "string" ||
+    typeof value.postalCode !== "string"
+  ) {
+    return undefined;
+  }
+  return {
+    recipient: value.recipient,
+    phone: value.phone,
+    address: value.address,
+    subdistrict: value.subdistrict,
+    district: value.district,
+    province: value.province,
+    postalCode: value.postalCode,
+  };
+}
+
 export function parsePersistedConfirmed(
   raw: string | null,
 ): PersistedConfirmedPickup | null {
@@ -83,7 +157,19 @@ export function parsePersistedConfirmed(
     ) {
       return null;
     }
-    return value as PersistedConfirmedPickup;
+    const serviceType =
+      value.serviceType === "DELIVERY" ? "DELIVERY" : "PICKUP";
+    const deliveryAddress = parseDeliveryAddress(value.deliveryAddress);
+    if (serviceType === "DELIVERY" && !isCompleteDeliveryAddress(deliveryAddress)) {
+      return null;
+    }
+    return {
+      serviceType,
+      boutique: value.boutique as PersistedConfirmedPickup["boutique"],
+      dateKey: value.dateKey,
+      timeSlot: value.timeSlot,
+      ...(deliveryAddress ? { deliveryAddress } : {}),
+    };
   } catch {
     return null;
   }

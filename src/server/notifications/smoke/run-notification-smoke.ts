@@ -28,6 +28,7 @@ function sampleOrder(overrides?: {
     id: overrides?.id ?? randomUUID(),
     orderNumber: overrides?.orderNumber ?? `NTF-${Date.now()}`,
     status: overrides?.status ?? "confirmed",
+    serviceType: "PICKUP",
     currency: "THB",
     createdAt: new Date().toISOString(),
     items: [],

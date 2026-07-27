@@ -197,6 +197,7 @@ export class PrismaOrderRepository implements OrderRepository {
             id: order.id,
             orderNumber: order.orderNumber,
             status: toPrismaOrderStatus(order.status),
+            serviceType: order.serviceType,
             customerId: customer.id,
             boutiqueId: order.pickup.boutiqueId,
             pickupSlotId: order.pickup.timeSlotId,
@@ -204,6 +205,20 @@ export class PrismaOrderRepository implements OrderRepository {
             totalMinor: order.totalMinor,
             specialRequest: order.customer.specialRequest,
             termsAccepted: order.termsAccepted,
+            ...(order.delivery
+              ? {
+                  deliveryRecipient: order.delivery.address.recipient,
+                  deliveryPhone: order.delivery.address.phone,
+                  deliveryAddress: order.delivery.address.address,
+                  deliverySubdistrict: order.delivery.address.subdistrict,
+                  deliveryDistrict: order.delivery.address.district,
+                  deliveryProvince: order.delivery.address.province,
+                  deliveryPostalCode: order.delivery.address.postalCode,
+                  deliveryFeeMinor: order.delivery.feeMinor,
+                  deliveryZoneId: order.delivery.zoneId ?? null,
+                  deliveryFeeStrategy: order.delivery.feeStrategy ?? null,
+                }
+              : {}),
             items: {
               create: order.items.map((item) => ({
                 productId: item.productId,

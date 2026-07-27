@@ -173,10 +173,23 @@ export type CheckoutRequest = {
     email: string;
     phone: string;
   };
+  /** Defaults to PICKUP when omitted. */
+  serviceType?: "PICKUP" | "DELIVERY";
   pickup: {
     boutiqueId: string;
     dateKey: string;
     pickupSlotId: string;
+  };
+  delivery?: {
+    address: {
+      recipient: string;
+      phone: string;
+      address: string;
+      subdistrict: string;
+      district: string;
+      province: string;
+      postalCode: string;
+    };
   };
   termsAccepted: boolean;
 };
@@ -187,6 +200,8 @@ export type CheckoutResponse = {
   total: number;
   itemCount: number;
   status: "PENDING";
+  serviceType: "PICKUP" | "DELIVERY";
+  deliveryFee: number | null;
 };
 
 export type OrderDetail = {
@@ -200,6 +215,7 @@ export type OrderDetail = {
     | "completed"
     | "cancelled"
     | "mock_placed";
+  serviceType: "PICKUP" | "DELIVERY";
   currency: "THB";
   /** Server-trusted order total in THB major units. */
   totalThb: number;
@@ -226,6 +242,20 @@ export type OrderDetail = {
     dateKey: string;
     timeSlotId: string;
     timeSlotLabel: string;
+  };
+  delivery?: {
+    address: {
+      recipient: string;
+      phone: string;
+      address: string;
+      subdistrict: string;
+      district: string;
+      province: string;
+      postalCode: string;
+    };
+    feeThb: number | null;
+    zoneId?: string | null;
+    feeStrategy?: "FLAT_RATE" | "DISTANCE" | null;
   };
   payment?: {
     method: string;

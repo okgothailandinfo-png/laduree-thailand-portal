@@ -2,6 +2,14 @@ import { randomUUID } from "crypto";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
+import {
+  createDeliveryFeeEngine,
+  type DeliveryFeeEngine,
+} from "@/src/server/delivery/fee-engine";
+import type { DeliveryAddress } from "@/src/server/models/delivery";
+import type { Order } from "@/src/server/models/order";
+import type { ServiceType } from "@/src/server/models/service-type";
+import { isServiceType } from "@/src/server/models/service-type";
 import type {
   BoutiqueRepository,
   CartRepository,
@@ -9,10 +17,10 @@ import type {
   PickupRepository,
   ProductRepository,
 } from "@/src/server/repositories/interfaces";
-import type { Order } from "@/src/server/models/order";
 import type {
   CheckoutRequestDto,
   CheckoutResponseDto,
+  DeliveryAddressDto,
 } from "@/src/server/types/dto";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
@@ -32,6 +40,36 @@ function minorToMajor(minor: number): number {
   return minor / 100;
 }
 
+function parseDeliveryAddress(
+  raw: unknown,
+  fieldPrefix: string,
+): DeliveryAddressDto {
+  const addressRaw = requireObject(raw, fieldPrefix);
+  const phone = requireString(addressRaw.phone, `${fieldPrefix}.phone`);
+  if (!isValidPhone(phone)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `${fieldPrefix}.phone is invalid.`,
+      { details: { field: `${fieldPrefix}.phone` } },
+    );
+  }
+  return {
+    recipient: requireString(addressRaw.recipient, `${fieldPrefix}.recipient`),
+    phone,
+    address: requireString(addressRaw.address, `${fieldPrefix}.address`),
+    subdistrict: requireString(
+      addressRaw.subdistrict,
+      `${fieldPrefix}.subdistrict`,
+    ),
+    district: requireString(addressRaw.district, `${fieldPrefix}.district`),
+    province: requireString(addressRaw.province, `${fieldPrefix}.province`),
+    postalCode: requireString(
+      addressRaw.postalCode,
+      `${fieldPrefix}.postalCode`,
+    ),
+  };
+}
+
 export class DefaultCheckoutService {
   constructor(
     private readonly carts: CartRepository,
@@ -39,6 +77,7 @@ export class DefaultCheckoutService {
     private readonly boutiques: BoutiqueRepository,
     private readonly pickup: PickupRepository,
     private readonly orders: OrderRepository,
+    private readonly deliveryFees: DeliveryFeeEngine = createDeliveryFeeEngine(),
   ) {}
 
   parseCheckoutBody(raw: unknown): CheckoutRequestDto {
@@ -76,13 +115,26 @@ export class DefaultCheckoutService {
       );
     }
 
-    return {
+    let serviceType: ServiceType = "PICKUP";
+    if (body.serviceType !== undefined && body.serviceType !== null) {
+      if (!isServiceType(body.serviceType)) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "serviceType must be PICKUP or DELIVERY.",
+          { details: { field: "serviceType" } },
+        );
+      }
+      serviceType = body.serviceType;
+    }
+
+    const result: CheckoutRequestDto = {
       customer: {
         firstName: requireString(customerRaw.firstName, "customer.firstName"),
         lastName: requireString(customerRaw.lastName, "customer.lastName"),
         email,
         phone,
       },
+      serviceType,
       pickup: {
         boutiqueId: requireString(pickupRaw.boutiqueId, "pickup.boutiqueId"),
         dateKey,
@@ -93,6 +145,15 @@ export class DefaultCheckoutService {
       },
       termsAccepted: true,
     };
+
+    if (serviceType === "DELIVERY") {
+      const deliveryRaw = requireObject(body.delivery, "delivery");
+      result.delivery = {
+        address: parseDeliveryAddress(deliveryRaw.address, "delivery.address"),
+      };
+    }
+
+    return result;
   }
 
   async createDraftCheckout(
@@ -116,6 +177,8 @@ export class DefaultCheckoutService {
         details: { field: "cart" },
       });
     }
+
+    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
 
     const boutique = await this.boutiques.findById(input.pickup.boutiqueId);
     if (!boutique) {
@@ -164,8 +227,42 @@ export class DefaultCheckoutService {
       );
     }
 
+    let deliveryAddress: DeliveryAddress | undefined;
+    let deliveryFeeMinor: number | null = null;
+    let deliveryZoneId: string | null = null;
+    let deliveryFeeStrategy: "FLAT_RATE" | "DISTANCE" | null = null;
+
+    if (serviceType === "DELIVERY") {
+      if (!input.delivery?.address) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "delivery.address is required for DELIVERY.",
+          { details: { field: "delivery.address" } },
+        );
+      }
+      deliveryAddress = { ...input.delivery.address };
+      const quote = this.deliveryFees.quote({ address: deliveryAddress });
+      if (!quote.matched || quote.reason === "ZONE_INACTIVE") {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "The postal / address is not available for delivery yet.",
+          {
+            details: {
+              field: "delivery.address",
+              code: quote.reason,
+            },
+          },
+        );
+      }
+      deliveryFeeMinor = quote.feeMinor;
+      deliveryZoneId = quote.zoneId;
+      deliveryFeeStrategy = quote.strategy;
+      // feeMinor may remain null when ZONE_FEE_PENDING / DISTANCE_UNSUPPORTED —
+      // never invent a price; items-only total until owner approves a rate.
+    }
+
     const items: Order["items"] = [];
-    let totalMinor = 0;
+    let itemsMinor = 0;
     let itemCount = 0;
 
     for (const line of cart.items) {
@@ -227,7 +324,7 @@ export class DefaultCheckoutService {
         );
       }
 
-      totalMinor += unitPriceMinor * line.quantity;
+      itemsMinor += unitPriceMinor * line.quantity;
       itemCount += line.quantity;
 
       items.push({
@@ -240,6 +337,7 @@ export class DefaultCheckoutService {
       });
     }
 
+    const totalMinor = itemsMinor + (deliveryFeeMinor ?? 0);
     const customerName =
       `${input.customer.firstName} ${input.customer.lastName}`.trim();
 
@@ -247,6 +345,7 @@ export class DefaultCheckoutService {
       id: randomUUID(),
       orderNumber: createDraftOrderNumber(),
       status: "pending",
+      serviceType,
       currency: "THB",
       createdAt: new Date().toISOString(),
       items,
@@ -256,6 +355,12 @@ export class DefaultCheckoutService {
         customerName,
         mobileNumber: input.customer.phone,
         email: input.customer.email,
+        ...(deliveryAddress
+          ? {
+              recipientName: deliveryAddress.recipient,
+              recipientPhone: deliveryAddress.phone,
+            }
+          : {}),
       },
       pickup: {
         boutiqueId: boutique.id,
@@ -265,22 +370,38 @@ export class DefaultCheckoutService {
         timeSlotId: slot.id,
         timeSlotLabel: availableSlot.label || slot.label,
       },
+      ...(serviceType === "DELIVERY" && deliveryAddress
+        ? {
+            delivery: {
+              address: deliveryAddress,
+              feeMinor: deliveryFeeMinor,
+              zoneId: deliveryZoneId,
+              feeStrategy: deliveryFeeStrategy,
+            },
+          }
+        : {}),
     };
 
     const saved = await this.orders.create(order);
     logger.info("Draft checkout created", {
       orderId: saved.id,
       orderNumber: saved.orderNumber,
+      serviceType: saved.serviceType,
       totalMinor: saved.totalMinor,
+      deliveryFeeMinor,
     });
 
+    const subtotal = minorToMajor(itemsMinor);
     const total = minorToMajor(saved.totalMinor);
     return {
       orderId: saved.id,
-      subtotal: total,
+      subtotal,
       total,
       itemCount,
       status: "PENDING",
+      serviceType: saved.serviceType,
+      deliveryFee:
+        deliveryFeeMinor === null ? null : minorToMajor(deliveryFeeMinor),
     };
   }
 }

@@ -16,25 +16,36 @@ import type { Boutique, PickupTimeSlot } from "@/lib/api/types";
 import { hasValidConfirmedPickupIds } from "../cart/checkout-eligibility";
 import {
   isAbortError,
+  isCompleteDeliveryAddress,
+  EMPTY_DELIVERY_ADDRESS,
   PICKUP_MESSAGES,
+  DELIVERY_MESSAGES,
   readPersistedConfirmed,
   reconcileDraftDate,
   reconcileDraftTimeSlot,
   slotsContainId,
   writePersistedConfirmed,
+  type DeliveryAddressDraft,
+  type FulfillmentServiceType,
 } from "./pickup-availability";
 import { getCandidateDateKeys } from "./pickup-dates";
 
+export type { DeliveryAddressDraft, FulfillmentServiceType };
+
 export type PickupDraft = {
+  serviceType: FulfillmentServiceType;
   boutiqueId: string | null;
   dateKey: string | null;
   timeSlotId: string | null;
+  deliveryAddress: DeliveryAddressDraft;
 };
 
 export type ConfirmedPickup = {
+  serviceType: FulfillmentServiceType;
   boutique: Boutique;
   dateKey: string;
   timeSlot: PickupTimeSlot;
+  deliveryAddress?: DeliveryAddressDraft;
 };
 
 export type AsyncStatus = "idle" | "loading" | "success" | "error" | "empty";
@@ -46,9 +57,13 @@ type PickupContextValue = {
   step: PickupStep;
   setStep: (step: PickupStep) => void;
   draft: PickupDraft;
+  setDraftServiceType: (serviceType: FulfillmentServiceType) => void;
   setDraftBoutique: (id: string) => void;
   setDraftDate: (dateKey: string) => void;
   setDraftTimeSlot: (slotId: string) => void;
+  setDraftDeliveryAddress: (
+    patch: Partial<DeliveryAddressDraft>,
+  ) => void;
   validationError: string | null;
   clearValidationError: () => void;
   confirmSelection: () => boolean;
@@ -72,14 +87,16 @@ type PickupContextValue = {
   reloadSlots: () => void;
 };
 
-export type PickupStep = "service" | "boutique" | "datetime";
+export type PickupStep = "service" | "address" | "boutique" | "datetime";
 
 const PickupContext = createContext<PickupContextValue | null>(null);
 
 const emptyDraft: PickupDraft = {
+  serviceType: "PICKUP",
   boutiqueId: null,
   dateKey: null,
   timeSlotId: null,
+  deliveryAddress: { ...EMPTY_DELIVERY_ADDRESS },
 };
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -102,9 +119,19 @@ export function PickupProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<PickupStep>("service");
   const [draft, setDraft] = useState<PickupDraft>(emptyDraft);
-  const [confirmed, setConfirmed] = useState<ConfirmedPickup | null>(() =>
-    readPersistedConfirmed(),
-  );
+  const [confirmed, setConfirmed] = useState<ConfirmedPickup | null>(() => {
+    const persisted = readPersistedConfirmed();
+    if (!persisted) return null;
+    return {
+      serviceType: persisted.serviceType ?? "PICKUP",
+      boutique: persisted.boutique,
+      dateKey: persisted.dateKey,
+      timeSlot: persisted.timeSlot,
+      ...(persisted.deliveryAddress
+        ? { deliveryAddress: persisted.deliveryAddress }
+        : {}),
+    };
+  });
   const [confirmedSlotAvailable, setConfirmedSlotAvailable] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [boutiques, setBoutiques] = useState<Boutique[]>([]);
@@ -356,9 +383,13 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       setValidationError(null);
       if (confirmed) {
         setDraft({
+          serviceType: confirmed.serviceType,
           boutiqueId: confirmed.boutique.id,
           dateKey: confirmed.dateKey,
           timeSlotId: confirmed.timeSlot.id,
+          deliveryAddress: confirmed.deliveryAddress
+            ? { ...confirmed.deliveryAddress }
+            : { ...EMPTY_DELIVERY_ADDRESS },
         });
         setAvailableDateKeys([]);
         setDatesStatus("loading");
@@ -386,12 +417,33 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     setValidationError(null);
   }, []);
 
+  const setDraftServiceType = useCallback((serviceType: FulfillmentServiceType) => {
+    setDraft((prev) => {
+      if (prev.serviceType === serviceType) return prev;
+      return {
+        ...emptyDraft,
+        serviceType,
+        deliveryAddress:
+          serviceType === "DELIVERY"
+            ? { ...EMPTY_DELIVERY_ADDRESS }
+            : { ...EMPTY_DELIVERY_ADDRESS },
+      };
+    });
+    clearAvailability();
+    setValidationError(null);
+  }, [clearAvailability]);
+
   const setDraftBoutique = useCallback((id: string) => {
     let changed = false;
     setDraft((prev) => {
       if (prev.boutiqueId === id) return prev;
       changed = true;
-      return { boutiqueId: id, dateKey: null, timeSlotId: null };
+      return {
+        ...prev,
+        boutiqueId: id,
+        dateKey: null,
+        timeSlotId: null,
+      };
     });
     setValidationError(null);
     if (!changed) return;
@@ -422,11 +474,33 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     setValidationError(null);
   }, []);
 
+  const setDraftDeliveryAddress = useCallback(
+    (patch: Partial<DeliveryAddressDraft>) => {
+      setDraft((prev) => ({
+        ...prev,
+        deliveryAddress: { ...prev.deliveryAddress, ...patch },
+      }));
+      setValidationError(null);
+    },
+    [],
+  );
+
   const clearValidationError = useCallback(() => {
     setValidationError(null);
   }, []);
 
   const confirmSelection = useCallback(() => {
+    if (draft.serviceType === "DELIVERY") {
+      if (!isCompleteDeliveryAddress(draft.deliveryAddress)) {
+        if (!draft.deliveryAddress.postalCode.trim()) {
+          setValidationError(DELIVERY_MESSAGES.postalRequired);
+        } else {
+          setValidationError(DELIVERY_MESSAGES.addressIncomplete);
+        }
+        setStep("address");
+        return false;
+      }
+    }
     if (!draft.boutiqueId) {
       setValidationError(PICKUP_MESSAGES.missingBoutique);
       setStep("boutique");
@@ -454,9 +528,13 @@ export function PickupProvider({ children }: { children: ReactNode }) {
     }
 
     persistConfirmed({
+      serviceType: draft.serviceType,
       boutique,
       dateKey: draft.dateKey,
       timeSlot,
+      ...(draft.serviceType === "DELIVERY"
+        ? { deliveryAddress: { ...draft.deliveryAddress } }
+        : {}),
     });
     setValidationError(null);
     setIsOpen(false);
@@ -479,9 +557,11 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       step,
       setStep,
       draft,
+      setDraftServiceType,
       setDraftBoutique,
       setDraftDate,
       setDraftTimeSlot,
+      setDraftDeliveryAddress,
       validationError,
       clearValidationError,
       confirmSelection,
@@ -493,7 +573,9 @@ export function PickupProvider({ children }: { children: ReactNode }) {
             boutiqueId: confirmed.boutique.id,
             dateKey: confirmed.dateKey,
             timeSlotId: confirmed.timeSlot.id,
-          }),
+          }) &&
+          (confirmed.serviceType !== "DELIVERY" ||
+            isCompleteDeliveryAddress(confirmed.deliveryAddress)),
       ),
       confirmedSlotAvailable,
       resetSelection,
@@ -517,9 +599,11 @@ export function PickupProvider({ children }: { children: ReactNode }) {
       closePickupSelection,
       step,
       draft,
+      setDraftServiceType,
       setDraftBoutique,
       setDraftDate,
       setDraftTimeSlot,
+      setDraftDeliveryAddress,
       validationError,
       clearValidationError,
       confirmSelection,

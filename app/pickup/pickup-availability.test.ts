@@ -91,6 +91,7 @@ describe("pickup availability loading helpers", () => {
     assert.ok(parsed);
     assert.equal(parsed?.dateKey, "2026-07-21");
     assert.equal(parsed?.timeSlot.id, "1030-1100");
+    assert.equal(parsed?.serviceType, "PICKUP");
   });
 
   it("rejects invalid persisted selection payloads safely", () => {

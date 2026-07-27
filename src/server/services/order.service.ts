@@ -296,6 +296,7 @@ export class DefaultOrderService implements OrderService {
       id: randomUUID(),
       orderNumber: createOrderNumber(),
       status: "mock_placed",
+      serviceType: input.serviceType ?? "PICKUP",
       currency: "THB",
       createdAt: new Date().toISOString(),
       items,
@@ -310,6 +311,16 @@ export class DefaultOrderService implements OrderService {
         timeSlotId: slot.id,
         timeSlotLabel: slot.label,
       },
+      ...(input.serviceType === "DELIVERY" && input.delivery?.address
+        ? {
+            delivery: {
+              address: { ...input.delivery.address },
+              feeMinor: null,
+              zoneId: null,
+              feeStrategy: null,
+            },
+          }
+        : {}),
       payment: {
         method: input.payment.method,
         methodLabel: PAYMENT_LABELS[input.payment.method],

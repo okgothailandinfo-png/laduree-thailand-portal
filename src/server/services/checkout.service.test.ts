@@ -61,6 +61,7 @@ const product: Product = {
 function createService(options?: {
   slotDateKey?: string;
   availableDateKey?: string;
+  feeEngine?: import("@/src/server/delivery/fee-engine").DeliveryFeeEngine;
 }) {
   const slotDateKey = options?.slotDateKey ?? "";
   const availableDateKey = options?.availableDateKey ?? "2026-07-21";
@@ -223,6 +224,7 @@ function createService(options?: {
       boutiqueRepo,
       pickupRepo,
       orderRepo,
+      options?.feeEngine,
     ),
     orders,
   };
@@ -248,7 +250,127 @@ describe("DefaultCheckoutService production readiness", () => {
     const order = orders.get(result.orderId);
     assert.ok(order);
     assert.equal(order.pickup.dateKey, "2026-07-21");
+    assert.equal(order.serviceType, "PICKUP");
+    assert.equal(result.serviceType, "PICKUP");
+    assert.equal(result.deliveryFee, null);
     assert.equal(result.total, 990);
+    assert.equal(order.delivery, undefined);
+  });
+
+  it("defaults omitted serviceType to PICKUP (Pickup regression)", () => {
+    const { service } = createService();
+    const parsed = service.parseCheckoutBody({
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      pickup: {
+        boutiqueId: "boutique-1",
+        dateKey: "2026-07-21",
+        pickupSlotId: "1030-1100",
+      },
+      termsAccepted: true,
+    });
+    assert.equal(parsed.serviceType, "PICKUP");
+    assert.equal(parsed.delivery, undefined);
+  });
+
+  it("creates DELIVERY draft with flat-rate fee when zone is configured", async () => {
+    const { createDeliveryFeeEngine } = await import(
+      "@/src/server/delivery/fee-engine"
+    );
+    const feeEngine = createDeliveryFeeEngine([
+      {
+        id: "zone-bkk-test",
+        name: "Bangkok test zone",
+        postalCodes: ["10330"],
+        provinces: ["Bangkok"],
+        districts: [],
+        boutiqueId: "boutique-1",
+        strategy: "FLAT_RATE",
+        flatRateMinor: 8000,
+        isActive: true,
+      },
+    ]);
+    const { service, orders } = createService({
+      slotDateKey: "",
+      feeEngine,
+    });
+    const result = await service.createDraftCheckout("cart-1", {
+      serviceType: "DELIVERY",
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      pickup: {
+        boutiqueId: "boutique-1",
+        dateKey: "2026-07-21",
+        pickupSlotId: "1030-1100",
+      },
+      delivery: {
+        address: {
+          recipient: "Ada Lovelace",
+          phone: "+66812345678",
+          address: "1 Test Road",
+          subdistrict: "Lumphini",
+          district: "Pathum Wan",
+          province: "Bangkok",
+          postalCode: "10330",
+        },
+      },
+      termsAccepted: true,
+    });
+    const order = orders.get(result.orderId);
+    assert.ok(order);
+    assert.equal(order.serviceType, "DELIVERY");
+    assert.equal(result.serviceType, "DELIVERY");
+    assert.equal(result.deliveryFee, 80);
+    assert.equal(result.subtotal, 990);
+    assert.equal(result.total, 1070);
+    assert.ok(order.delivery);
+    assert.equal(order.delivery?.feeMinor, 8000);
+    assert.equal(order.delivery?.address.postalCode, "10330");
+  });
+
+  it("rejects DELIVERY when address has no matching zone", async () => {
+    const { service } = createService({ slotDateKey: "" });
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          pickup: {
+            boutiqueId: "boutique-1",
+            dateKey: "2026-07-21",
+            pickupSlotId: "1030-1100",
+          },
+          delivery: {
+            address: {
+              recipient: "Ada Lovelace",
+              phone: "+66812345678",
+              address: "1 Test Road",
+              subdistrict: "Unknown",
+              district: "Unknown",
+              province: "Unknown",
+              postalCode: "00000",
+            },
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.code === "VALIDATION_ERROR" &&
+        error.message.includes("not available for delivery"),
+    );
   });
 
   it("rejects stale pickup slots for the requested date", async () => {
