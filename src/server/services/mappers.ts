@@ -82,6 +82,7 @@ export function toOrderDto(order: Order): OrderDto {
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
+    serviceType: order.serviceType,
     currency: order.currency,
     totalThb: order.totalMinor / 100,
     createdAt: order.createdAt,
@@ -93,7 +94,25 @@ export function toOrderDto(order: Order): OrderDto {
       note: item.note,
     })),
     customer: { ...order.customer },
-    pickup: { ...order.pickup },
+    ...(order.pickup ? { pickup: { ...order.pickup } } : {}),
+    ...(order.delivery
+      ? {
+          delivery: {
+            mode: order.delivery.mode,
+            address: { ...order.delivery.address },
+            feeThb:
+              order.delivery.feeMinor === null
+                ? null
+                : order.delivery.feeMinor / 100,
+            zoneId: order.delivery.zoneId ?? null,
+            feeStrategy: order.delivery.feeStrategy ?? null,
+            dateKey: order.delivery.dateKey,
+            timeSlotId: order.delivery.timeSlotId ?? null,
+            timeSlotLabel: order.delivery.timeSlotLabel ?? null,
+            promiseRelativeLabel: order.delivery.promiseRelativeLabel ?? null,
+          },
+        }
+      : {}),
     ...(order.payment ? { payment: { ...order.payment } } : {}),
   };
 }

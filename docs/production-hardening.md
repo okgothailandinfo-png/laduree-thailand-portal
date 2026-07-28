@@ -30,6 +30,16 @@ Real providers / auth are **not** implemented in this sprint. Production runtime
 8. Redis/Upstash rate-limit client wiring (interface + fail-closed config exist)
 9. Customer order access control (capability token / signed link) for IDOR hardening
 
+## Pending Infrastructure (does not block mock feature work)
+
+Tracked in `PENDING_INFRASTRUCTURE` (`src/server/config/env.ts`):
+
+1. Approved development PostgreSQL database (`DATABASE_URL` intentionally empty)
+2. Apply `prisma/migrations/20260727220000_delivery_foundation` (ServiceType + delivery columns)
+3. Owner-approved delivery zone flat rates for the fee engine
+
+Sprint 21 Delivery Foundation runs on `DATA_SOURCE=mock` until the above are ready. See `docs/backend-repositories.md`.
+
 ## Security headers / CSP exceptions
 
 Configured in `next.config.ts` via `src/server/http/security-headers.ts`.

@@ -195,20 +195,28 @@ export class DefaultOrderService implements OrderService {
   }
 
   async createOrder(input: CreateOrderRequestDto): Promise<OrderDto> {
-    const boutique = await this.boutiques.findById(input.pickup.boutiqueId);
+    if (!input.pickup) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup is required for legacy place-order.",
+        { details: { field: "pickup" } },
+      );
+    }
+    const pickup = input.pickup;
+    const boutique = await this.boutiques.findById(pickup.boutiqueId);
     if (!boutique) {
       throw new AppError(
         "NOT_FOUND",
-        `Boutique not found: ${input.pickup.boutiqueId}`,
+        `Boutique not found: ${pickup.boutiqueId}`,
       );
     }
 
     const availability = await this.pickup.getAvailability({
-      boutiqueId: input.pickup.boutiqueId,
-      dateKey: input.pickup.dateKey,
+      boutiqueId: pickup.boutiqueId,
+      dateKey: pickup.dateKey,
     });
     const slot = availability?.slots.find(
-      (item) => item.id === input.pickup.timeSlotId,
+      (item) => item.id === pickup.timeSlotId,
     );
     if (!slot) {
       throw new AppError(
@@ -296,6 +304,7 @@ export class DefaultOrderService implements OrderService {
       id: randomUUID(),
       orderNumber: createOrderNumber(),
       status: "mock_placed",
+      serviceType: input.serviceType ?? "PICKUP",
       currency: "THB",
       createdAt: new Date().toISOString(),
       items,
@@ -306,10 +315,25 @@ export class DefaultOrderService implements OrderService {
         boutiqueId: boutique.id,
         boutiqueName: boutique.name,
         address: boutique.address,
-        dateKey: input.pickup.dateKey,
+        dateKey: pickup.dateKey,
         timeSlotId: slot.id,
         timeSlotLabel: slot.label,
       },
+      ...(input.serviceType === "DELIVERY" && input.delivery?.address
+        ? {
+            delivery: {
+              mode: input.delivery.mode ?? "EARLIEST_AVAILABLE",
+              address: { ...input.delivery.address },
+              feeMinor: null,
+              zoneId: null,
+              feeStrategy: null,
+              dateKey: input.delivery.dateKey ?? null,
+              timeSlotId: null,
+              timeSlotLabel: null,
+              promiseRelativeLabel: null,
+            },
+          }
+        : {}),
       payment: {
         method: input.payment.method,
         methodLabel: PAYMENT_LABELS[input.payment.method],
@@ -409,13 +433,27 @@ function toCompletionDto(
     status: order.status,
     completedAt,
     pickupBoutique: {
-      id: order.pickup.boutiqueId,
-      name: order.pickup.boutiqueName,
-      address: order.pickup.address,
+      id: order.pickup?.boutiqueId ?? order.delivery?.fulfilmentBoutiqueId ?? "delivery",
+      name: order.pickup?.boutiqueName ?? "Delivery",
+      address:
+        order.pickup?.address ??
+        (order.delivery
+          ? [
+              order.delivery.address.address,
+              order.delivery.address.subdistrict,
+              order.delivery.address.district,
+              order.delivery.address.province,
+              order.delivery.address.postalCode,
+            ].join(", ")
+          : ""),
     },
     pickup: {
-      dateKey: order.pickup.dateKey,
-      timeSlotLabel: order.pickup.timeSlotLabel,
+      dateKey: order.pickup?.dateKey ?? order.delivery?.dateKey ?? "",
+      timeSlotLabel:
+        order.pickup?.timeSlotLabel ??
+        order.delivery?.timeSlotLabel ??
+        order.delivery?.promiseRelativeLabel ??
+        "",
     },
     paymentStatus: record.paymentStatus,
     paymentMethodLabel: order.payment?.methodLabel ?? null,
@@ -432,14 +470,28 @@ function toCompletionDto(
       logoUrl: RECEIPT_LOGO_URL,
       orderNumber: order.orderNumber,
       boutique: {
-        name: order.pickup.boutiqueName,
-        address: order.pickup.address,
+        name: order.pickup?.boutiqueName ?? "Delivery",
+        address:
+          order.pickup?.address ??
+          (order.delivery
+            ? [
+                order.delivery.address.address,
+                order.delivery.address.subdistrict,
+                order.delivery.address.district,
+                order.delivery.address.province,
+                order.delivery.address.postalCode,
+              ].join(", ")
+            : ""),
       },
       items: receiptItems,
       totalThb: minorToThb(order.totalMinor),
       currency: "THB",
-      pickupDateKey: order.pickup.dateKey,
-      pickupTimeSlotLabel: order.pickup.timeSlotLabel,
+      pickupDateKey: order.pickup?.dateKey ?? order.delivery?.dateKey ?? "",
+      pickupTimeSlotLabel:
+        order.pickup?.timeSlotLabel ??
+        order.delivery?.timeSlotLabel ??
+        order.delivery?.promiseRelativeLabel ??
+        "",
       completedAt,
     },
     timeline: record.history.map((entry) => ({
@@ -459,9 +511,13 @@ function toHistoryItemDto(
     orderNumber: order.orderNumber,
     status: order.status,
     pickupStatus: order.status,
-    boutiqueName: order.pickup.boutiqueName,
-    pickupDateKey: order.pickup.dateKey,
-    pickupTimeSlotLabel: order.pickup.timeSlotLabel,
+    boutiqueName: order.pickup?.boutiqueName ?? "Delivery",
+    pickupDateKey: order.pickup?.dateKey ?? order.delivery?.dateKey ?? "",
+    pickupTimeSlotLabel:
+      order.pickup?.timeSlotLabel ??
+      order.delivery?.timeSlotLabel ??
+      order.delivery?.promiseRelativeLabel ??
+      "",
     totalThb: minorToThb(order.totalMinor),
     currency: "THB",
     completedAt: resolveCompletedAt(record),

@@ -173,10 +173,30 @@ export type CheckoutRequest = {
     email: string;
     phone: string;
   };
-  pickup: {
+  /** Defaults to PICKUP when omitted. */
+  serviceType?: "PICKUP" | "DELIVERY";
+  /** Required for PICKUP; must be omitted for DELIVERY. */
+  pickup?: {
     boutiqueId: string;
     dateKey: string;
     pickupSlotId: string;
+  };
+  /** Required when serviceType is DELIVERY. */
+  delivery?: {
+    mode: "EARLIEST_AVAILABLE" | "PREORDER";
+    address: {
+      recipient: string;
+      phone: string;
+      address: string;
+      subdistrict: string;
+      district: string;
+      province: string;
+      postalCode: string;
+      building?: string;
+      notes?: string;
+    };
+    /** Required when mode is PREORDER (future date only). */
+    dateKey?: string;
   };
   termsAccepted: boolean;
 };
@@ -187,6 +207,12 @@ export type CheckoutResponse = {
   total: number;
   itemCount: number;
   status: "PENDING";
+  serviceType: "PICKUP" | "DELIVERY";
+  deliveryMode?: "EARLIEST_AVAILABLE" | "PREORDER" | null;
+  deliveryFee: number | null;
+  deliveryDateKey?: string | null;
+  deliveryTimeWindowLabel?: string | null;
+  deliveryPromiseRelativeLabel?: "Today" | "Tomorrow" | null;
 };
 
 export type OrderDetail = {
@@ -200,6 +226,7 @@ export type OrderDetail = {
     | "completed"
     | "cancelled"
     | "mock_placed";
+  serviceType: "PICKUP" | "DELIVERY";
   currency: "THB";
   /** Server-trusted order total in THB major units. */
   totalThb: number;
@@ -219,13 +246,35 @@ export type OrderDetail = {
     recipientPhone?: string;
     specialRequest?: string;
   };
-  pickup: {
+  /** Present for PICKUP orders. */
+  pickup?: {
     boutiqueId: string;
     boutiqueName: string;
     address: string;
     dateKey: string;
     timeSlotId: string;
     timeSlotLabel: string;
+  };
+  delivery?: {
+    mode: "EARLIEST_AVAILABLE" | "PREORDER";
+    address: {
+      recipient: string;
+      phone: string;
+      address: string;
+      subdistrict: string;
+      district: string;
+      province: string;
+      postalCode: string;
+      building?: string;
+      notes?: string;
+    };
+    feeThb: number | null;
+    zoneId?: string | null;
+    feeStrategy?: "FLAT_RATE" | "DISTANCE" | null;
+    dateKey?: string | null;
+    timeSlotId?: string | null;
+    timeSlotLabel?: string | null;
+    promiseRelativeLabel?: "Today" | "Tomorrow" | null;
   };
   payment?: {
     method: string;

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { parsePersistedConfirmed } from "./pickup-availability";
 
 /**
  * Documents the reopen/refetch contract that previously left the modal stuck
@@ -65,5 +66,64 @@ describe("pickup modal reopen refetch contract", () => {
 
     assert.equal(confirmed, null);
     assert.equal(cartItemCount, 2);
+  });
+
+  it("defaults persisted confirmation without serviceType to PICKUP", () => {
+    // Contract: v1 sessionStorage payloads without serviceType remain Pickup.
+    const raw = JSON.stringify({
+      boutique: {
+        id: "b1",
+        name: "Boutique",
+        code: "B1",
+        address: "Bangkok",
+        openingHours: "10:00–20:00",
+        lastOrderTime: "19:30",
+      },
+      dateKey: "2026-07-21",
+      timeSlot: {
+        id: "1030-1100",
+        label: "10:30–11:00",
+        start: "10:30",
+        end: "11:00",
+      },
+    });
+    const parsed = parsePersistedConfirmed(raw);
+    assert.ok(parsed);
+    assert.equal(parsed?.serviceType, "PICKUP");
+  });
+
+  it("allows persisted DELIVERY confirmation without postal for shopping-first flow", () => {
+    const parsed = parsePersistedConfirmed(
+      JSON.stringify({
+        serviceType: "DELIVERY",
+        boutique: {
+          id: "b1",
+          name: "Boutique",
+          code: "B1",
+          address: "Bangkok",
+          openingHours: "10:00–20:00",
+          lastOrderTime: "19:30",
+        },
+        dateKey: "2026-07-21",
+        timeSlot: {
+          id: "1030-1100",
+          label: "10:30–11:00",
+          start: "10:30",
+          end: "11:00",
+        },
+        deliveryAddress: {
+          recipient: "",
+          phone: "",
+          address: "",
+          subdistrict: "",
+          district: "",
+          province: "",
+          postalCode: "",
+        },
+      }),
+    );
+    assert.equal(parsed?.serviceType, "DELIVERY");
+    assert.equal(parsed?.deliveryMode, "EARLIEST_AVAILABLE");
+    assert.equal(parsed?.deliveryQuote?.status, "EMPTY");
   });
 });

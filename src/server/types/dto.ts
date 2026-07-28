@@ -143,12 +143,49 @@ export type CreateOrderPaymentDto = {
   method: "credit-card" | "promptpay-qr" | "apple-pay" | "google-pay";
 };
 
+export type ServiceTypeDto = "PICKUP" | "DELIVERY";
+export type DeliveryModeDto = "EARLIEST_AVAILABLE" | "PREORDER";
+
+export type DeliveryAddressDto = {
+  recipient: string;
+  phone: string;
+  address: string;
+  subdistrict: string;
+  district: string;
+  province: string;
+  postalCode: string;
+  building?: string;
+  notes?: string;
+};
+
 export type CreateOrderRequestDto = {
   items: CreateOrderItemDto[];
   customer: CreateOrderCustomerDto;
-  pickup: CreateOrderPickupDto;
+  /** Defaults to PICKUP when omitted. */
+  serviceType?: ServiceTypeDto;
+  /** Required for PICKUP; omitted for DELIVERY. */
+  pickup?: CreateOrderPickupDto;
+  /** Required when serviceType is DELIVERY. */
+  delivery?: {
+    mode: DeliveryModeDto;
+    address: DeliveryAddressDto;
+    dateKey?: string;
+  };
   payment: CreateOrderPaymentDto;
   termsAccepted: boolean;
+};
+
+export type OrderDeliveryDto = {
+  mode: DeliveryModeDto;
+  address: DeliveryAddressDto;
+  /** Delivery fee in THB major units. Null when pending — never invented. */
+  feeThb: number | null;
+  zoneId?: string | null;
+  feeStrategy?: "FLAT_RATE" | "DISTANCE" | null;
+  dateKey: string | null;
+  timeSlotId?: string | null;
+  timeSlotLabel?: string | null;
+  promiseRelativeLabel?: "Today" | "Tomorrow" | null;
 };
 
 export type OrderDto = {
@@ -162,6 +199,7 @@ export type OrderDto = {
     | "completed"
     | "cancelled"
     | "mock_placed";
+  serviceType: ServiceTypeDto;
   currency: "THB";
   /** Server-trusted order total in THB major units (never client-submitted). */
   totalThb: number;
@@ -174,7 +212,8 @@ export type OrderDto = {
     note?: string;
   }>;
   customer: CreateOrderCustomerDto;
-  pickup: {
+  /** Present for PICKUP orders. */
+  pickup?: {
     boutiqueId: string;
     boutiqueName: string;
     address: string;
@@ -182,6 +221,7 @@ export type OrderDto = {
     timeSlotId: string;
     timeSlotLabel: string;
   };
+  delivery?: OrderDeliveryDto;
   payment?: {
     method: CreateOrderPaymentDto["method"];
     methodLabel: string;
@@ -203,9 +243,21 @@ export type CheckoutPickupRequestDto = {
   pickupSlotId: string;
 };
 
+export type CheckoutDeliveryRequestDto = {
+  mode: DeliveryModeDto;
+  address: DeliveryAddressDto;
+  /** Required when mode is PREORDER (future date only). */
+  dateKey?: string;
+};
+
 export type CheckoutRequestDto = {
   customer: CheckoutCustomerRequestDto;
-  pickup: CheckoutPickupRequestDto;
+  /** Defaults to PICKUP when omitted — preserves existing Pickup clients. */
+  serviceType?: ServiceTypeDto;
+  /** Required for PICKUP; must be omitted for DELIVERY. */
+  pickup?: CheckoutPickupRequestDto;
+  /** Required when serviceType is DELIVERY. */
+  delivery?: CheckoutDeliveryRequestDto;
   /** Must be true; server rejects missing/false acknowledgements. */
   termsAccepted: boolean;
 };
@@ -216,6 +268,13 @@ export type CheckoutResponseDto = {
   total: number;
   itemCount: number;
   status: "PENDING";
+  serviceType: ServiceTypeDto;
+  deliveryMode?: DeliveryModeDto | null;
+  /** Delivery fee in THB major units when quoted; null when PICKUP. */
+  deliveryFee: number | null;
+  deliveryDateKey?: string | null;
+  deliveryTimeWindowLabel?: string | null;
+  deliveryPromiseRelativeLabel?: "Today" | "Tomorrow" | null;
 };
 
 export type OrderCompletionPaymentStatus =

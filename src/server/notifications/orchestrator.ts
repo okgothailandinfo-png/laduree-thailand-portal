@@ -27,12 +27,22 @@ function buildPayload(
   baseUrl: string,
 ): NotificationTemplatePayload {
   const completionUrl = `${baseUrl.replace(/\/$/, "")}/order-completed/${encodeURIComponent(order.id)}`;
+  const boutiqueName =
+    order.pickup?.boutiqueName ??
+    (order.delivery ? "Delivery" : "Ladurée");
+  const pickupDate =
+    order.pickup?.dateKey ?? order.delivery?.dateKey ?? "";
+  const pickupTime =
+    order.pickup?.timeSlotLabel ??
+    order.delivery?.timeSlotLabel ??
+    order.delivery?.promiseRelativeLabel ??
+    "";
   return {
     customerName: order.customer.customerName,
     orderNumber: order.orderNumber,
-    boutiqueName: order.pickup.boutiqueName,
-    pickupDate: order.pickup.dateKey,
-    pickupTime: order.pickup.timeSlotLabel,
+    boutiqueName,
+    pickupDate,
+    pickupTime,
     total: formatTotalThb(order.totalMinor),
     completionUrl,
   };

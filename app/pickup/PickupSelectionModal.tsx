@@ -2,16 +2,59 @@
 
 import { useEffect, useId, useRef } from "react";
 import CatalogStatus from "../catalog/CatalogStatus";
+import DeliveryModeSelector from "./DeliveryModeSelector";
+import PickupOutletList from "./PickupOutletList";
 import { usePickup, type PickupStep } from "./PickupContext";
-import { PICKUP_MESSAGES } from "./pickup-availability";
+import {
+  DELIVERY_MESSAGES,
+  hasValidDeliveryPostalCode,
+  PICKUP_MESSAGES,
+} from "./pickup-availability";
 import { formatPickupDateKey } from "./pickup-dates";
+import ServiceSegmentedControl from "./ServiceSegmentedControl";
 import "./pickup.css";
 
 const STEP_TITLES: Record<PickupStep, string> = {
   service: "SELECT YOUR DESIRED SERVICE",
+  address: "Please input the postal code for delivery",
+  mode: "Select Delivery Option",
   boutique: "Select Outlet To Pickup Order",
   datetime: "Choose Date & Time",
 };
+
+const ADDRESS_FIELDS = [
+  {
+    key: "postalCode",
+    label: "Postal Code",
+    autoComplete: "postal-code",
+    placeholder: "Delivery location postal code",
+    prominent: true,
+  },
+  { key: "recipient", label: "Recipient", autoComplete: "name" },
+  { key: "phone", label: "Phone", autoComplete: "tel" },
+  { key: "address", label: "Address", autoComplete: "street-address" },
+  { key: "subdistrict", label: "Subdistrict", autoComplete: "address-level3" },
+  { key: "district", label: "District", autoComplete: "address-level2" },
+  { key: "province", label: "Province", autoComplete: "address-level1" },
+] as const;
+
+function BackArrowIcon() {
+  return (
+    <svg
+      width="20"
+      height="14"
+      viewBox="0 0 20 14"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M7 14L8.41 12.59L3.83 8H20V6H3.83L8.42 1.41L7 0L0 7L7 14Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
 
 export default function PickupSelectionModal() {
   const {
@@ -20,11 +63,16 @@ export default function PickupSelectionModal() {
     step,
     setStep,
     draft,
+    setDraftServiceType,
     setDraftBoutique,
     setDraftDate,
     setDraftTimeSlot,
+    setDraftDeliveryMode,
+    setDraftDeliveryAddress,
     validationError,
     confirmSelection,
+    confirmDeliveryServiceOnly,
+    confirming,
     boutiques,
     boutiquesStatus,
     boutiquesError,
@@ -37,17 +85,25 @@ export default function PickupSelectionModal() {
     slotsStatus,
     slotsError,
     reloadSlots,
+    deliveryQuoteStatus,
+    deliveryQuoteError,
+    deliveryPreorderDateKeys,
+    deliveryWindowByDate,
+    reloadDeliveryQuote,
   } = usePickup();
 
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+
+  const isDelivery = draft.serviceType === "DELIVERY";
+  const isPreorder = isDelivery && draft.deliveryMode === "PREORDER";
 
   useEffect(() => {
     if (!isOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const t = window.setTimeout(() => closeRef.current?.focus(), 0);
+    const t = window.setTimeout(() => backRef.current?.focus(), 0);
     return () => {
       document.body.style.overflow = previous;
       window.clearTimeout(t);
@@ -81,13 +137,81 @@ export default function PickupSelectionModal() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isOpen, closePickupSelection]);
 
-  const canContinueService = true;
+  const canContinueAddress = hasValidDeliveryPostalCode(
+    draft.deliveryAddress.postalCode,
+  );
   const canContinueBoutique = draft.boutiqueId !== null;
-  const canConfirm =
+
+  const canConfirmPickup =
     draft.boutiqueId !== null &&
     draft.dateKey !== null &&
     draft.timeSlotId !== null &&
     timeSlots.some((slot) => slot.id === draft.timeSlotId);
+
+  const canConfirmPreorderDelivery =
+    draft.dateKey !== null &&
+    Boolean(draft.dateKey && deliveryWindowByDate[draft.dateKey]);
+
+  const canContinueService =
+    draft.serviceType === "PICKUP"
+      ? draft.boutiqueId !== null
+      : true;
+
+  function goBack() {
+    if (step === "datetime") {
+      setStep(isDelivery ? "mode" : "service");
+      return;
+    }
+    if (step === "mode") {
+      setStep("service");
+      return;
+    }
+    if (step === "boutique") {
+      setStep("service");
+      return;
+    }
+    if (step === "address") {
+      setStep("service");
+      return;
+    }
+    closePickupSelection();
+  }
+
+  function continueFromService() {
+    if (draft.serviceType === "DELIVERY") {
+      confirmDeliveryServiceOnly();
+      return;
+    }
+    if (!draft.boutiqueId) return;
+    setStep("datetime");
+  }
+
+  function continueFromAddress() {
+    if (!hasValidDeliveryPostalCode(draft.deliveryAddress.postalCode)) {
+      return;
+    }
+    setStep("mode");
+    reloadDeliveryQuote();
+  }
+
+  function continueFromMode() {
+    confirmDeliveryServiceOnly();
+  }
+
+  const dateLabel = isDelivery ? "Select Delivery Date" : "Select Date";
+  const timeLabel = "Select Time slot";
+  const showPickupTimeSlots = !isDelivery;
+
+  const dateKeys = isDelivery ? deliveryPreorderDateKeys : availableDateKeys;
+  const dateKeysStatus = isDelivery ? deliveryQuoteStatus : datesStatus;
+  const dateKeysError = isDelivery ? deliveryQuoteError : datesError;
+  const pickupSlots = timeSlots;
+  const pickupSlotsStatus = slotsStatus;
+  const pickupSlotsError = slotsError;
+  const preorderWindow =
+    isPreorder && draft.dateKey
+      ? (deliveryWindowByDate[draft.dateKey] ?? null)
+      : null;
 
   return (
     <div
@@ -110,11 +234,19 @@ export default function PickupSelectionModal() {
         aria-labelledby={titleId}
       >
         <div className="pickup-modal-header">
+          <button
+            ref={backRef}
+            type="button"
+            className="pickup-modal-back"
+            aria-label={step === "service" ? "Close" : "Back"}
+            onClick={goBack}
+          >
+            <BackArrowIcon />
+          </button>
           <h2 id={titleId} className="pickup-modal-title">
             {STEP_TITLES[step]}
           </h2>
           <button
-            ref={closeRef}
             type="button"
             className="pickup-modal-close"
             aria-label="Close"
@@ -132,73 +264,130 @@ export default function PickupSelectionModal() {
           ) : null}
 
           {step === "service" ? (
-            <div className="pickup-service-grid">
-              <button
-                type="button"
-                className="pickup-service-card is-selected"
-                aria-pressed="true"
-              >
-                <span className="pickup-service-card__title">Pick-up</span>
-                <span className="pickup-service-card__sub">
-                  Order &amp; collect
-                </span>
-                <span className="pickup-service-card__sub">no queuing</span>
-              </button>
-              <button
-                type="button"
-                className="pickup-service-card"
-                disabled
-                aria-disabled="true"
-                title="Delivery is not available in this sprint"
-              >
-                <span className="pickup-service-card__title">Delivery</span>
-                <span className="pickup-service-card__sub">
-                  Served to your doorstep
-                </span>
-                <span className="pickup-service-card__sub">
-                  Not available yet
-                </span>
-              </button>
+            <div className="service-selection">
+              <ServiceSegmentedControl
+                value={draft.serviceType}
+                onChange={setDraftServiceType}
+              />
+
+              {draft.serviceType === "PICKUP" ? (
+                <div
+                  id="service-panel-pickup"
+                  role="tabpanel"
+                  aria-labelledby="service-tab-pickup"
+                  className="service-selection__panel"
+                >
+                  <h3 className="service-selection__heading">
+                    Select Outlet To Pickup Order
+                  </h3>
+                  <PickupOutletList
+                    boutiques={boutiques}
+                    selectedId={draft.boutiqueId}
+                    onSelect={setDraftBoutique}
+                    status={boutiquesStatus}
+                    errorMessage={boutiquesError}
+                    onRetry={reloadBoutiques}
+                  />
+                </div>
+              ) : (
+                <div
+                  id="service-panel-delivery"
+                  role="tabpanel"
+                  aria-labelledby="service-tab-delivery"
+                  className="service-selection__panel"
+                >
+                  <h3 className="service-selection__heading">
+                    Select Delivery Option
+                  </h3>
+                  <DeliveryModeSelector
+                    value={draft.deliveryMode}
+                    onChange={setDraftDeliveryMode}
+                  />
+                  <p className="pickup-slots-hint" role="status">
+                    {DELIVERY_MESSAGES.enterPostalInCart}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {step === "address" ? (
+            <div className="pickup-address-form">
+              {ADDRESS_FIELDS.map((field) => (
+                <label
+                  key={field.key}
+                  className={`pickup-address-field${
+                    "prominent" in field && field.prominent
+                      ? " pickup-address-field--prominent"
+                      : ""
+                  }`}
+                >
+                  <span className="pickup-address-field__label">
+                    {field.label}
+                  </span>
+                  <input
+                    type="text"
+                    className="pickup-address-field__input"
+                    autoComplete={field.autoComplete}
+                    placeholder={
+                      "placeholder" in field ? field.placeholder : undefined
+                    }
+                    value={draft.deliveryAddress[field.key]}
+                    onChange={(event) =>
+                      setDraftDeliveryAddress({
+                        [field.key]: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+              ))}
+              {!hasValidDeliveryPostalCode(draft.deliveryAddress.postalCode) ? (
+                <p className="pickup-slots-hint" role="status">
+                  {DELIVERY_MESSAGES.postalRequired}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {step === "mode" ? (
+            <div className="pickup-mode-form">
+              <DeliveryModeSelector
+                value={draft.deliveryMode}
+                onChange={setDraftDeliveryMode}
+              />
+              {deliveryQuoteStatus === "loading" ? (
+                <CatalogStatus status="loading" />
+              ) : deliveryQuoteStatus === "error" ? (
+                <CatalogStatus
+                  status="error"
+                  errorMessage={
+                    deliveryQuoteError ?? DELIVERY_MESSAGES.unavailable
+                  }
+                  onRetry={reloadDeliveryQuote}
+                />
+              ) : (
+                <p className="pickup-slots-hint" role="status">
+                  {DELIVERY_MESSAGES.enterPostalInCart}
+                </p>
+              )}
             </div>
           ) : null}
 
           {step === "boutique" ? (
-            boutiquesStatus === "loading" ||
-            boutiquesStatus === "error" ||
-            boutiquesStatus === "empty" ? (
-              <CatalogStatus
+            <div className="service-selection__panel">
+              <PickupOutletList
+                boutiques={boutiques}
+                selectedId={draft.boutiqueId}
+                onSelect={setDraftBoutique}
                 status={boutiquesStatus}
                 errorMessage={boutiquesError}
-                emptyMessage="No boutiques available."
                 onRetry={reloadBoutiques}
               />
-            ) : (
-              <ul className="pickup-outlet-list">
-                {boutiques.map((boutique, index) => (
-                  <li key={boutique.id}>
-                    <button
-                      type="button"
-                      className={`pickup-outlet-item${
-                        draft.boutiqueId === boutique.id ? " is-selected" : ""
-                      }`}
-                      aria-pressed={draft.boutiqueId === boutique.id}
-                      onClick={() => setDraftBoutique(boutique.id)}
-                    >
-                      <span className="pickup-outlet-item__name">
-                        {index + 1}. {boutique.name}
-                      </span>
-                      <span className="pickup-outlet-item__address">
-                        {boutique.address}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )
+            </div>
           ) : null}
 
           {step === "datetime" ? (
-            !draft.boutiqueId ? (
+            !isDelivery && !draft.boutiqueId ? (
               <div className="pickup-error" role="alert">
                 {PICKUP_MESSAGES.missingBoutique}
               </div>
@@ -206,22 +395,33 @@ export default function PickupSelectionModal() {
               <>
                 <div className="pickup-datetime-section">
                   <p className="pickup-datetime-label" id="pickup-date-label">
-                    Select Date
+                    {dateLabel}
                   </p>
-                  {datesStatus === "idle" ? (
+                  {dateKeysStatus === "idle" ? (
                     <p className="pickup-slots-hint" role="status">
-                      {PICKUP_MESSAGES.missingBoutique}
+                      {isDelivery
+                        ? DELIVERY_MESSAGES.noPreorderDates
+                        : PICKUP_MESSAGES.missingBoutique}
                     </p>
-                  ) : datesStatus === "loading" ||
-                    datesStatus === "error" ||
-                    datesStatus === "empty" ? (
+                  ) : dateKeysStatus === "loading" ||
+                    dateKeysStatus === "error" ||
+                    dateKeysStatus === "empty" ? (
                     <CatalogStatus
-                      status={datesStatus}
+                      status={dateKeysStatus}
                       errorMessage={
-                        datesError ?? PICKUP_MESSAGES.datesFailed
+                        dateKeysError ??
+                        (isDelivery
+                          ? DELIVERY_MESSAGES.noPreorderDates
+                          : PICKUP_MESSAGES.datesFailed)
                       }
-                      emptyMessage={PICKUP_MESSAGES.noDates}
-                      onRetry={reloadDates}
+                      emptyMessage={
+                        isDelivery
+                          ? DELIVERY_MESSAGES.noPreorderDates
+                          : PICKUP_MESSAGES.noDates
+                      }
+                      onRetry={
+                        isDelivery ? reloadDeliveryQuote : reloadDates
+                      }
                     />
                   ) : (
                     <div
@@ -229,7 +429,7 @@ export default function PickupSelectionModal() {
                       role="group"
                       aria-labelledby="pickup-date-label"
                     >
-                      {availableDateKeys.map((dateKey) => {
+                      {dateKeys.map((dateKey) => {
                         const selected = draft.dateKey === dateKey;
                         return (
                           <button
@@ -247,77 +447,103 @@ export default function PickupSelectionModal() {
                   )}
                 </div>
 
-                <div className="pickup-datetime-section">
-                  <p className="pickup-datetime-label" id="pickup-slot-label">
-                    Select Time slot
-                  </p>
-                  {!draft.dateKey ? (
+                {isPreorder && draft.dateKey ? (
+                  preorderWindow ? (
                     <p className="pickup-slots-hint" role="status">
-                      Select a date to load time slots.
+                      {preorderWindow.label}
                     </p>
-                  ) : slotsStatus === "idle" ||
-                    slotsStatus === "loading" ||
-                    slotsStatus === "error" ||
-                    slotsStatus === "empty" ? (
-                    <CatalogStatus
-                      status={
-                        slotsStatus === "idle" ? "loading" : slotsStatus
-                      }
-                      errorMessage={
-                        slotsError ?? PICKUP_MESSAGES.slotsFailed
-                      }
-                      emptyMessage={PICKUP_MESSAGES.noSlots}
-                      onRetry={reloadSlots}
-                    />
                   ) : (
-                    <div
-                      className="pickup-slot-list"
-                      role="group"
-                      aria-labelledby="pickup-slot-label"
-                    >
-                      {timeSlots.map((slot) => {
-                        const selected = draft.timeSlotId === slot.id;
-                        return (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            className={`pickup-slot-btn${selected ? " is-selected" : ""}`}
-                            aria-pressed={selected}
-                            onClick={() => setDraftTimeSlot(slot.id)}
-                          >
-                            {slot.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                    <p className="pickup-slots-hint" role="status">
+                      {DELIVERY_MESSAGES.noPreorderWindow}
+                    </p>
+                  )
+                ) : null}
+
+                {showPickupTimeSlots ? (
+                  <div className="pickup-datetime-section">
+                    <p className="pickup-datetime-label" id="pickup-slot-label">
+                      {timeLabel}
+                    </p>
+                    {!draft.dateKey ? (
+                      <p className="pickup-slots-hint" role="status">
+                        Select a date to load time slots.
+                      </p>
+                    ) : pickupSlotsStatus === "idle" ||
+                      pickupSlotsStatus === "loading" ||
+                      pickupSlotsStatus === "error" ||
+                      pickupSlotsStatus === "empty" ? (
+                      <CatalogStatus
+                        status={
+                          pickupSlotsStatus === "idle"
+                            ? "loading"
+                            : pickupSlotsStatus
+                        }
+                        errorMessage={
+                          pickupSlotsError ?? PICKUP_MESSAGES.slotsFailed
+                        }
+                        emptyMessage={PICKUP_MESSAGES.noSlots}
+                        onRetry={reloadSlots}
+                      />
+                    ) : (
+                      <div
+                        className="pickup-slot-list"
+                        role="group"
+                        aria-labelledby="pickup-slot-label"
+                      >
+                        {pickupSlots.map((slot) => {
+                          const selected = draft.timeSlotId === slot.id;
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              className={`pickup-slot-btn${selected ? " is-selected" : ""}`}
+                              aria-pressed={selected}
+                              onClick={() => setDraftTimeSlot(slot.id)}
+                            >
+                              {slot.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </>
             )
           ) : null}
         </div>
 
         <div className="pickup-modal-footer">
-          {step !== "service" ? (
-            <button
-              type="button"
-              className="pickup-btn pickup-btn-secondary"
-              onClick={() =>
-                setStep(step === "datetime" ? "boutique" : "service")
-              }
-            >
-              Back
-            </button>
-          ) : null}
-
           {step === "service" ? (
             <button
               type="button"
               className="pickup-btn"
-              disabled={!canContinueService}
-              onClick={() => setStep("boutique")}
+              disabled={!canContinueService || confirming}
+              onClick={continueFromService}
+            >
+              {draft.serviceType === "DELIVERY" ? "Confirm" : "Continue"}
+            </button>
+          ) : null}
+
+          {step === "address" ? (
+            <button
+              type="button"
+              className="pickup-btn"
+              disabled={!canContinueAddress}
+              onClick={continueFromAddress}
             >
               Continue
+            </button>
+          ) : null}
+
+          {step === "mode" ? (
+            <button
+              type="button"
+              className="pickup-btn"
+              disabled={confirming}
+              onClick={continueFromMode}
+            >
+              Confirm
             </button>
           ) : null}
 
@@ -339,9 +565,14 @@ export default function PickupSelectionModal() {
             <button
               type="button"
               className="pickup-btn"
-              disabled={!canConfirm}
+              disabled={
+                confirming ||
+                (isPreorder
+                  ? !canConfirmPreorderDelivery
+                  : !canConfirmPickup)
+              }
               onClick={() => {
-                confirmSelection();
+                void confirmSelection();
               }}
             >
               Confirm

@@ -1,5 +1,9 @@
-// Ladurée Thailand Pickup — Prisma foundation (PostgreSQL)
-// Schema only: not wired to APIs/services/repositories yet.
+// Ladurée Thailand Pickup — Prisma schema (PostgreSQL)
+//
+// Sprint 21 Delivery Foundation: schema includes ServiceType + delivery columns.
+// Applying migration `20260727220000_delivery_foundation` is Pending Infrastructure
+// until DATABASE_URL / local Postgres is provisioned. Runtime Delivery uses
+// DATA_SOURCE=mock (in-memory Order repository) and must not be blocked on Prisma.
 
 generator client {
   provider = "prisma-client-js"
@@ -18,6 +22,16 @@ enum OrderStatus {
   READY_FOR_PICKUP
   COMPLETED
   CANCELLED
+}
+
+enum ServiceType {
+  PICKUP
+  DELIVERY
+}
+
+enum DeliveryFeeStrategy {
+  FLAT_RATE
+  DISTANCE
 }
 
 enum PaymentMethod {
@@ -251,14 +265,28 @@ model Order {
   id             String      @id @default(uuid()) @db.Uuid
   orderNumber    String      @unique
   status         OrderStatus @default(PENDING)
+  /// PICKUP (default) or DELIVERY — Pickup behaviour unchanged when PICKUP.
+  serviceType    ServiceType @default(PICKUP)
   customerId     String      @db.Uuid
   boutiqueId     String      @db.Uuid
   pickupSlotId   String      @db.Uuid
   currency       String      @default("THB") @db.Char(3)
-  /// Order total in satang (minor units)
+  /// Order total in satang (minor units), including delivery fee when quoted.
   totalMinor     Int         @default(0)
   specialRequest String?
   termsAccepted  Boolean     @default(false)
+  /// Delivery address — null for PICKUP orders.
+  deliveryRecipient   String?
+  deliveryPhone       String?
+  deliveryAddress     String?
+  deliverySubdistrict String?
+  deliveryDistrict    String?
+  deliveryProvince    String?
+  deliveryPostalCode  String?
+  /// Delivery fee in satang. Null when PICKUP or when zone fee is pending/unmatched.
+  deliveryFeeMinor    Int?
+  deliveryZoneId      String?
+  deliveryFeeStrategy DeliveryFeeStrategy?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -275,6 +303,7 @@ model Order {
   @@index([boutiqueId])
   @@index([pickupSlotId])
   @@index([status])
+  @@index([serviceType])
   @@index([createdAt])
 }
 

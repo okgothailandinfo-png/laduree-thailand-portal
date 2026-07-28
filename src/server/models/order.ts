@@ -1,3 +1,5 @@
+import type { OrderDelivery } from "@/src/server/models/delivery";
+import type { ServiceType } from "@/src/server/models/service-type";
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
 export type OrderStatus =
@@ -53,14 +55,25 @@ export type Order = {
   id: string;
   orderNumber: string;
   status: OrderStatus;
+  /** Defaults to PICKUP for full backward compatibility. */
+  serviceType: ServiceType;
   currency: "THB";
   createdAt: string;
   items: OrderItem[];
   customer: OrderCustomer;
-  pickup: OrderPickup;
+  /**
+   * Required for PICKUP. Omitted for DELIVERY — customers never select a boutique
+   * or pickup slot; delivery details live on `delivery`.
+   */
+  pickup?: OrderPickup;
+  /** Present when serviceType is DELIVERY. */
+  delivery?: OrderDelivery;
   /** Omitted for draft checkout orders (PENDING, no payment yet). */
   payment?: OrderPayment;
-  /** Order total in satang; calculated in the service layer. */
+  /**
+   * Order total in satang (items + delivery fee when quoted).
+   * Calculated in the service layer — never trust client totals.
+   */
   totalMinor: number;
   termsAccepted: boolean;
 };

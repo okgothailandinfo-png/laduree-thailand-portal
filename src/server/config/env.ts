@@ -517,3 +517,13 @@ export const PRODUCTION_BLOCKERS = [
   "Redis/Upstash rate-limit client wiring (config fail-closed; client not implemented)",
   "Customer order access control (capability token / signed link) for IDOR hardening",
 ] as const;
+
+/**
+ * Infrastructure not yet provisioned — does not block mock-layer feature work.
+ * Sprint 21 Delivery Foundation runs on DATA_SOURCE=mock until these are ready.
+ */
+export const PENDING_INFRASTRUCTURE = [
+  "Approved development PostgreSQL database (DATABASE_URL intentionally empty)",
+  "Apply prisma/migrations/20260727220000_delivery_foundation (ServiceType + delivery columns)",
+  "Owner-approved delivery zone flat rates for createDeliveryFeeEngine",
+] as const;
