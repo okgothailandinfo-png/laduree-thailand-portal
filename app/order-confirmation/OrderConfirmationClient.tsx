@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
+import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderById } from "@/lib/api/orders";
 import { rememberCustomerOrderId } from "@/lib/customer-orders";
 import CatalogStatus from "../catalog/CatalogStatus";
@@ -10,9 +11,110 @@ import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
 import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
+import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import PickupCredentialsCard from "./PickupCredentialsCard";
 import "./order-confirmation.css";
+
+const DELIVERY_TRACKING_STATUSES = [
+  "Order received",
+  "Preparing",
+  "Ready for dispatch",
+  "Out for delivery",
+  "Delivered",
+] as const;
+
+function deliveryModeLabel(
+  mode: "EARLIEST_AVAILABLE" | "PREORDER",
+): string {
+  return mode === "EARLIEST_AVAILABLE" ? "Earliest Delivery" : "Pre-order";
+}
+
+function deliveryTimeDetails(
+  mode: "EARLIEST_AVAILABLE" | "PREORDER",
+  opts: {
+    dateKey?: string | null;
+    timeSlotLabel?: string | null;
+    timeSlot?: { start: string; end: string } | null;
+    promiseDateKey?: string | null;
+    promiseTimeWindow?: { start: string; end: string } | null;
+  },
+): { dateLabel: string; windowLabel: string } | null {
+  if (mode === "EARLIEST_AVAILABLE") {
+    const dateKey = opts.promiseDateKey ?? opts.dateKey;
+    const window = opts.promiseTimeWindow ?? opts.timeSlot;
+    if (!dateKey || !window) return null;
+    return {
+      dateLabel: formatPickupDateKeyLong(dateKey),
+      windowLabel: `${window.start} To ${window.end}`,
+    };
+  }
+  if (opts.dateKey && (opts.timeSlot || opts.timeSlotLabel)) {
+    return {
+      dateLabel: formatPickupDateKeyLong(opts.dateKey),
+      windowLabel: opts.timeSlot
+        ? `${opts.timeSlot.start} To ${opts.timeSlot.end}`
+        : (opts.timeSlotLabel ?? ""),
+    };
+  }
+  return null;
+}
+
+function DeliveryTrackingSection() {
+  return (
+    <section
+      className="order-confirmation-card"
+      aria-labelledby="confirmation-tracking"
+    >
+      <h2
+        id="confirmation-tracking"
+        className="order-confirmation-card__title"
+      >
+        Order Tracking
+      </h2>
+      <ol className="order-confirmation-tracking">
+        {DELIVERY_TRACKING_STATUSES.map((status) => (
+          <li key={status}>{status}</li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function DeliveryFulfillmentSummary({
+  mode,
+  addressLines,
+  time,
+  feeThb,
+}: {
+  mode: "EARLIEST_AVAILABLE" | "PREORDER";
+  addressLines: ReactNode;
+  time: { dateLabel: string; windowLabel: string } | null;
+  feeThb?: number | null;
+}) {
+  return (
+    <>
+      <p className="order-confirmation-meta">{deliveryModeLabel(mode)}</p>
+      {time ? (
+        <p className="order-confirmation-meta">
+          Delivery Time
+          <br />
+          {time.dateLabel}
+          <br />
+          {time.windowLabel}
+        </p>
+      ) : null}
+      {typeof feeThb === "number" ? (
+        <p className="order-confirmation-meta">
+          Delivery Fee
+          <br />
+          {formatPriceThb(feeThb)}
+        </p>
+      ) : null}
+      <p className="order-confirmation-meta">{addressLines}</p>
+    </>
+  );
+}
 
 export default function OrderConfirmationClient({
   orderId,
@@ -49,6 +151,7 @@ export default function OrderConfirmationClient({
       orderQuery.status === "loading" ||
       orderQuery.status === "error" ||
       orderQuery.status === "empty";
+    const isDelivery = order?.serviceType === "DELIVERY";
 
     return (
       <main className="order-confirmation-page">
@@ -111,23 +214,50 @@ export default function OrderConfirmationClient({
                   id="confirmation-pickup"
                   className="order-confirmation-card__title"
                 >
-                  Pickup boutique
+                  {isDelivery ? "Delivery" : "Pickup boutique"}
                 </h2>
-                <p className="order-confirmation-meta">
-                  {order.pickup.boutiqueName}
-                  <br />
-                  {order.pickup.address}
-                </p>
-                <p className="order-confirmation-meta">
-                  Pickup date &amp; time
-                  <br />
-                  {formatPickupDateKeyLong(order.pickup.dateKey)}
-                  <br />
-                  {order.pickup.timeSlotLabel}
-                </p>
+                {isDelivery && order.delivery ? (
+                  <DeliveryFulfillmentSummary
+                    mode={order.delivery.mode}
+                    feeThb={order.delivery.feeThb}
+                    time={deliveryTimeDetails(order.delivery.mode, {
+                      dateKey: order.delivery.dateKey,
+                      timeSlotLabel: order.delivery.timeSlotLabel,
+                    })}
+                    addressLines={
+                      <>
+                        {order.delivery.address.recipient}
+                        <br />
+                        {order.delivery.address.address},{" "}
+                        {order.delivery.address.subdistrict},{" "}
+                        {order.delivery.address.district},{" "}
+                        {order.delivery.address.province}{" "}
+                        {order.delivery.address.postalCode}
+                      </>
+                    }
+                  />
+                ) : order.pickup ? (
+                  <>
+                    <p className="order-confirmation-meta">
+                      {order.pickup.boutiqueName}
+                      <br />
+                      {order.pickup.address}
+                    </p>
+                    <p className="order-confirmation-meta">
+                      Pickup date &amp; time
+                      <br />
+                      {formatPickupDateKeyLong(order.pickup.dateKey)}
+                      <br />
+                      {order.pickup.timeSlotLabel}
+                    </p>
+                  </>
+                ) : null}
               </section>
 
-              <PickupCredentialsCard orderId={order.id} />
+              {isDelivery ? <DeliveryTrackingSection /> : null}
+              {!isDelivery ? (
+                <PickupCredentialsCard orderId={order.id} />
+              ) : null}
 
               <section
                 className="order-confirmation-card"
@@ -186,6 +316,12 @@ export default function OrderConfirmationClient({
                     <span>Subtotal</span>
                     <span>฿ —</span>
                   </div>
+                  {isDelivery && typeof order.delivery?.feeThb === "number" ? (
+                    <div className="order-confirmation-totals__row">
+                      <span>Delivery Fee</span>
+                      <span>{formatPriceThb(order.delivery.feeThb)}</span>
+                    </div>
+                  ) : null}
                   <div className="order-confirmation-totals__row">
                     <span>Tax</span>
                     <span>฿ —</span>
@@ -229,6 +365,7 @@ export default function OrderConfirmationClient({
     !!pickup &&
     !!checkout &&
     !!placedOrder;
+  const isClientDelivery = pickup?.serviceType === "DELIVERY";
 
   return (
     <main className="order-confirmation-page">
@@ -314,21 +451,59 @@ export default function OrderConfirmationClient({
                 id="confirmation-pickup"
                 className="order-confirmation-card__title"
               >
-                Pickup boutique
+                {isClientDelivery ? "Delivery" : "Pickup boutique"}
               </h2>
-              <p className="order-confirmation-meta">
-                {pickup.boutique.name}
-                <br />
-                {pickup.boutique.address}
-              </p>
-              <p className="order-confirmation-meta">
-                Pickup date &amp; time
-                <br />
-                {formatPickupDateKeyLong(pickup.dateKey)}
-                <br />
-                {pickup.timeSlot.start} To {pickup.timeSlot.end}
-              </p>
+              {isClientDelivery ? (
+                <DeliveryFulfillmentSummary
+                  mode={pickup.deliveryMode}
+                  feeThb={
+                    isDeliveryQuoteValidForCheckout(pickup.deliveryQuote)
+                      ? pickup.deliveryQuote.deliveryFee
+                      : null
+                  }
+                  time={
+                    isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+                    pickup.deliveryQuote.deliveryDate &&
+                    pickup.deliveryQuote.deliveryWindow
+                      ? {
+                          dateLabel: formatPickupDateKeyLong(
+                            pickup.deliveryQuote.deliveryDate,
+                          ),
+                          windowLabel: `${pickup.deliveryQuote.deliveryWindow.start} To ${pickup.deliveryQuote.deliveryWindow.end}`,
+                        }
+                      : null
+                  }
+                  addressLines={
+                    <>
+                      {pickup.deliveryAddress.recipient}
+                      <br />
+                      {pickup.deliveryAddress.address},{" "}
+                      {pickup.deliveryAddress.subdistrict},{" "}
+                      {pickup.deliveryAddress.district},{" "}
+                      {pickup.deliveryAddress.province}{" "}
+                      {pickup.deliveryAddress.postalCode}
+                    </>
+                  }
+                />
+              ) : (
+                <>
+                  <p className="order-confirmation-meta">
+                    {pickup.boutique.name}
+                    <br />
+                    {pickup.boutique.address}
+                  </p>
+                  <p className="order-confirmation-meta">
+                    Pickup date &amp; time
+                    <br />
+                    {formatPickupDateKeyLong(pickup.dateKey)}
+                    <br />
+                    {pickup.timeSlot.start} To {pickup.timeSlot.end}
+                  </p>
+                </>
+              )}
             </section>
+
+            {isClientDelivery ? <DeliveryTrackingSection /> : null}
 
             <section
               className="order-confirmation-card"
@@ -422,6 +597,16 @@ export default function OrderConfirmationClient({
                   <span>Subtotal</span>
                   <span>฿ —</span>
                 </div>
+                {isClientDelivery &&
+                isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+                typeof pickup.deliveryQuote.deliveryFee === "number" ? (
+                  <div className="order-confirmation-totals__row">
+                    <span>Delivery Fee</span>
+                    <span>
+                      {formatPriceThb(pickup.deliveryQuote.deliveryFee)}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="order-confirmation-totals__row">
                   <span>Tax</span>
                   <span>฿ —</span>

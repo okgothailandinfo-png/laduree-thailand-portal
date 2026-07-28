@@ -92,7 +92,7 @@ describe("pickup modal reopen refetch contract", () => {
     assert.equal(parsed?.serviceType, "PICKUP");
   });
 
-  it("rejects persisted DELIVERY confirmation without a complete address", () => {
+  it("allows persisted DELIVERY confirmation without postal for shopping-first flow", () => {
     const parsed = parsePersistedConfirmed(
       JSON.stringify({
         serviceType: "DELIVERY",
@@ -122,6 +122,8 @@ describe("pickup modal reopen refetch contract", () => {
         },
       }),
     );
-    assert.equal(parsed, null);
+    assert.equal(parsed?.serviceType, "DELIVERY");
+    assert.equal(parsed?.deliveryMode, "EARLIEST_AVAILABLE");
+    assert.equal(parsed?.deliveryQuote?.status, "EMPTY");
   });
 });

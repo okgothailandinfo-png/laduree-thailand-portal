@@ -3,6 +3,11 @@ import { describe, it } from "node:test";
 import type { Cart } from "@/src/server/models/cart";
 import type { Order } from "@/src/server/models/order";
 import type { Product } from "@/src/server/models/product";
+import type { DeliveryZone } from "@/src/server/models/delivery";
+import {
+  createDeliveryAvailabilityEngine,
+  createDeliveryFeeEngine,
+} from "@/src/server/delivery";
 import type {
   BoutiqueRepository,
   CartRepository,
@@ -58,10 +63,58 @@ const product: Product = {
   ],
 };
 
+const deliveryAddress = {
+  recipient: "Ada Lovelace",
+  phone: "+66812345678",
+  address: "1 Test Road",
+  subdistrict: "Lumphini",
+  district: "Pathum Wan",
+  province: "Bangkok",
+  postalCode: "10330",
+};
+
+const zoneWithFee: DeliveryZone = {
+  id: "zone-bkk-test",
+  name: "Bangkok test zone",
+  postalCodes: ["10330"],
+  provinces: ["Bangkok"],
+  districts: [],
+  boutiqueId: null,
+  strategy: "FLAT_RATE",
+  flatRateMinor: 8000,
+  isActive: true,
+};
+
+const zoneFeePending: DeliveryZone = {
+  ...zoneWithFee,
+  id: "zone-pending",
+  flatRateMinor: null,
+};
+
+
+const SAMPLE_WINDOW = {
+  id: "1230-1530",
+  label: "12:30–15:30",
+  start: "12:30",
+  end: "15:30",
+};
+
+const EARLIEST_RULE = {
+  id: "rule-1",
+  sameDayCutoffTime: "23:59",
+  nextDayEnabled: true,
+  earliestTimeWindow: SAMPLE_WINDOW,
+  isActive: true,
+};
+
 function createService(options?: {
   slotDateKey?: string;
   availableDateKey?: string;
-  feeEngine?: import("@/src/server/delivery/fee-engine").DeliveryFeeEngine;
+  zones?: DeliveryZone[];
+  availabilityRules?: Parameters<
+    typeof createDeliveryAvailabilityEngine
+  >[0];
+  preorderConfig?: Parameters<typeof createDeliveryAvailabilityEngine>[1];
 }) {
   const slotDateKey = options?.slotDateKey ?? "";
   const availableDateKey = options?.availableDateKey ?? "2026-07-21";
@@ -135,11 +188,11 @@ function createService(options?: {
 
   const boutique = {
     id: "boutique-1",
-    name: "[BOUTIQUE PENDING APPROVAL]",
-    code: "PENDING",
-    address: "[ADDRESS PENDING APPROVAL]",
-    openingHours: "[CONTENT PENDING APPROVAL]",
-    lastOrderTime: "[CONTENT PENDING APPROVAL]",
+    name: "Boutique",
+    code: "B1",
+    address: "Bangkok",
+    openingHours: "10:00–20:00",
+    lastOrderTime: "19:30",
   };
   const boutiqueRepo: BoutiqueRepository = {
     async list() {
@@ -153,34 +206,35 @@ function createService(options?: {
     },
   };
 
+  let pickupCalls = 0;
   const pickupRepo: PickupRepository = {
-    async listSlots() {
-      return [{ id: "1030-1100", label: "10:30–11:00", start: "10:30", end: "11:00" }];
-    },
-    async getAvailability(params) {
-      if (params.boutiqueId !== "boutique-1") return null;
-      if (params.dateKey !== availableDateKey) {
-        return {
-          boutiqueId: params.boutiqueId,
-          dateKey: params.dateKey,
-          timezone: "Asia/Bangkok",
-          slots: [],
-        };
+    async getAvailability({ boutiqueId, dateKey }) {
+      pickupCalls += 1;
+      if (dateKey !== availableDateKey) {
+        return { boutiqueId, dateKey, timezone: "Asia/Bangkok", slots: [] };
       }
       return {
-        boutiqueId: params.boutiqueId,
-        dateKey: params.dateKey,
+        boutiqueId,
+        dateKey,
         timezone: "Asia/Bangkok",
         slots: [
-          { id: "1030-1100", label: "10:30–11:00", start: "10:30", end: "11:00" },
+          {
+            id: "1030-1100",
+            label: "10:30–11:00",
+            start: "10:30",
+            end: "11:00",
+          },
         ],
       };
+    },
+    async listSlots() {
+      return [];
     },
     async findSlotById(id) {
       if (id !== "1030-1100") return null;
       return {
         id: "1030-1100",
-        boutiqueId: null,
+        boutiqueId: "boutique-1",
         dateKey: slotDateKey,
         label: "10:30–11:00",
         start: "10:30",
@@ -217,6 +271,12 @@ function createService(options?: {
       unused as OrderRepository["findCustomerHistoryByIds"],
   };
 
+  const feeEngine = createDeliveryFeeEngine(options?.zones ?? []);
+  const availability = createDeliveryAvailabilityEngine(
+    options?.availabilityRules ?? [],
+    options?.preorderConfig,
+  );
+
   return {
     service: new DefaultCheckoutService(
       cartRepo,
@@ -224,9 +284,11 @@ function createService(options?: {
       boutiqueRepo,
       pickupRepo,
       orderRepo,
-      options?.feeEngine,
+      feeEngine,
+      availability,
     ),
     orders,
+    getPickupCalls: () => pickupCalls,
   };
 }
 
@@ -249,8 +311,8 @@ describe("DefaultCheckoutService production readiness", () => {
     });
     const order = orders.get(result.orderId);
     assert.ok(order);
-    assert.equal(order.pickup.dateKey, "2026-07-21");
     assert.equal(order.serviceType, "PICKUP");
+    assert.equal(order.pickup?.dateKey, "2026-07-21");
     assert.equal(result.serviceType, "PICKUP");
     assert.equal(result.deliveryFee, null);
     assert.equal(result.total, 990);
@@ -275,102 +337,6 @@ describe("DefaultCheckoutService production readiness", () => {
     });
     assert.equal(parsed.serviceType, "PICKUP");
     assert.equal(parsed.delivery, undefined);
-  });
-
-  it("creates DELIVERY draft with flat-rate fee when zone is configured", async () => {
-    const { createDeliveryFeeEngine } = await import(
-      "@/src/server/delivery/fee-engine"
-    );
-    const feeEngine = createDeliveryFeeEngine([
-      {
-        id: "zone-bkk-test",
-        name: "Bangkok test zone",
-        postalCodes: ["10330"],
-        provinces: ["Bangkok"],
-        districts: [],
-        boutiqueId: "boutique-1",
-        strategy: "FLAT_RATE",
-        flatRateMinor: 8000,
-        isActive: true,
-      },
-    ]);
-    const { service, orders } = createService({
-      slotDateKey: "",
-      feeEngine,
-    });
-    const result = await service.createDraftCheckout("cart-1", {
-      serviceType: "DELIVERY",
-      customer: {
-        firstName: "Ada",
-        lastName: "Lovelace",
-        email: "ada@example.com",
-        phone: "+66812345678",
-      },
-      pickup: {
-        boutiqueId: "boutique-1",
-        dateKey: "2026-07-21",
-        pickupSlotId: "1030-1100",
-      },
-      delivery: {
-        address: {
-          recipient: "Ada Lovelace",
-          phone: "+66812345678",
-          address: "1 Test Road",
-          subdistrict: "Lumphini",
-          district: "Pathum Wan",
-          province: "Bangkok",
-          postalCode: "10330",
-        },
-      },
-      termsAccepted: true,
-    });
-    const order = orders.get(result.orderId);
-    assert.ok(order);
-    assert.equal(order.serviceType, "DELIVERY");
-    assert.equal(result.serviceType, "DELIVERY");
-    assert.equal(result.deliveryFee, 80);
-    assert.equal(result.subtotal, 990);
-    assert.equal(result.total, 1070);
-    assert.ok(order.delivery);
-    assert.equal(order.delivery?.feeMinor, 8000);
-    assert.equal(order.delivery?.address.postalCode, "10330");
-  });
-
-  it("rejects DELIVERY when address has no matching zone", async () => {
-    const { service } = createService({ slotDateKey: "" });
-    await assert.rejects(
-      () =>
-        service.createDraftCheckout("cart-1", {
-          serviceType: "DELIVERY",
-          customer: {
-            firstName: "Ada",
-            lastName: "Lovelace",
-            email: "ada@example.com",
-            phone: "+66812345678",
-          },
-          pickup: {
-            boutiqueId: "boutique-1",
-            dateKey: "2026-07-21",
-            pickupSlotId: "1030-1100",
-          },
-          delivery: {
-            address: {
-              recipient: "Ada Lovelace",
-              phone: "+66812345678",
-              address: "1 Test Road",
-              subdistrict: "Unknown",
-              district: "Unknown",
-              province: "Unknown",
-              postalCode: "00000",
-            },
-          },
-          termsAccepted: true,
-        }),
-      (error: unknown) =>
-        error instanceof AppError &&
-        error.code === "VALIDATION_ERROR" &&
-        error.message.includes("not available for delivery"),
-    );
   });
 
   it("rejects stale pickup slots for the requested date", async () => {
@@ -444,6 +410,314 @@ describe("DefaultCheckoutService production readiness", () => {
         }),
       (error: unknown) =>
         error instanceof AppError && error.code === "VALIDATION_ERROR",
+    );
+  });
+});
+
+describe("Delivery checkout flow (no boutique)", () => {
+  it("does not require boutiqueId and does not run pickup validation", async () => {
+    const { service, orders, getPickupCalls } = createService({
+      zones: [zoneWithFee],
+      availabilityRules: [
+        EARLIEST_RULE,
+      ],
+    });
+    const parsed = service.parseCheckoutBody({
+      serviceType: "DELIVERY",
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      delivery: {
+        mode: "EARLIEST_AVAILABLE",
+        address: deliveryAddress,
+      },
+      termsAccepted: true,
+    });
+    assert.equal(parsed.pickup, undefined);
+    assert.equal(parsed.delivery?.mode, "EARLIEST_AVAILABLE");
+
+    const before = getPickupCalls();
+    const result = await service.createDraftCheckout("cart-1", parsed);
+    assert.equal(getPickupCalls(), before);
+    const order = orders.get(result.orderId);
+    assert.ok(order);
+    assert.equal(order.serviceType, "DELIVERY");
+    assert.equal(order.pickup, undefined);
+    assert.equal(order.delivery?.mode, "EARLIEST_AVAILABLE");
+    assert.equal(order.delivery?.address.postalCode, "10330");
+  });
+
+  it("defaults delivery mode to EARLIEST_AVAILABLE when omitted in parse", () => {
+    const { service } = createService();
+    const parsed = service.parseCheckoutBody({
+      serviceType: "DELIVERY",
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      delivery: {
+        address: deliveryAddress,
+      },
+      termsAccepted: true,
+    });
+    assert.equal(parsed.delivery?.mode, "EARLIEST_AVAILABLE");
+  });
+
+  it("EARLIEST_AVAILABLE checkout does not require customer-selected date/time", async () => {
+    const { service, orders } = createService({
+      zones: [zoneWithFee],
+      availabilityRules: [
+        EARLIEST_RULE,
+      ],
+    });
+    const result = await service.createDraftCheckout("cart-1", {
+      serviceType: "DELIVERY",
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      delivery: {
+        mode: "EARLIEST_AVAILABLE",
+        address: deliveryAddress,
+      },
+      termsAccepted: true,
+    });
+    const order = orders.get(result.orderId);
+    assert.ok(order?.delivery?.dateKey);
+    assert.ok(order?.delivery?.timeSlotId);
+    assert.ok(order?.delivery?.timeSlotLabel);
+    assert.ok(result.deliveryPromiseRelativeLabel);
+    assert.ok(result.deliveryTimeWindowLabel);
+  });
+
+  it("PREORDER mode requires future date and assigns system window", async () => {
+    const windows = new Map([
+      [
+        "2026-08-01",
+        {
+          id: "1400-1430",
+          label: "14:00–14:30",
+          start: "14:00",
+          end: "14:30",
+        },
+      ],
+    ]);
+    const { service } = createService({
+      zones: [zoneWithFee],
+      preorderConfig: { windowByDateKey: windows },
+    });
+
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          delivery: {
+            mode: "PREORDER",
+            address: deliveryAddress,
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError && error.message.includes("dateKey"),
+    );
+
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          delivery: {
+            mode: "PREORDER",
+            address: deliveryAddress,
+            dateKey: "2026-07-28",
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message.toLowerCase().includes("future"),
+    );
+
+    const ok = await service.createDraftCheckout("cart-1", {
+      serviceType: "DELIVERY",
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      delivery: {
+        mode: "PREORDER",
+        address: deliveryAddress,
+        dateKey: "2026-08-01",
+      },
+      termsAccepted: true,
+    });
+    assert.equal(ok.deliveryMode, "PREORDER");
+    assert.equal(ok.deliveryDateKey, "2026-08-01");
+    assert.equal(ok.deliveryTimeWindowLabel, "14:00–14:30");
+  });
+
+  it("rejects pickup payload on DELIVERY checkout", () => {
+    const { service } = createService();
+    assert.throws(
+      () =>
+        service.parseCheckoutBody({
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          pickup: {
+            boutiqueId: "boutique-1",
+            dateKey: "2026-07-21",
+            pickupSlotId: "1030-1100",
+          },
+          delivery: {
+            mode: "EARLIEST_AVAILABLE",
+            address: deliveryAddress,
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message.includes("pickup must not be provided"),
+    );
+  });
+
+  it("unsupported zone blocks checkout", async () => {
+    const { service } = createService({
+      zones: [zoneWithFee],
+      availabilityRules: [
+        EARLIEST_RULE,
+      ],
+    });
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          delivery: {
+            mode: "EARLIEST_AVAILABLE",
+            address: {
+              ...deliveryAddress,
+              postalCode: "00000",
+              province: "Unknown Province",
+              district: "Unknown",
+            },
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message.includes("not available for delivery"),
+    );
+  });
+
+  it("missing trusted delivery fee blocks checkout", async () => {
+    const { service } = createService({
+      zones: [zoneFeePending],
+      availabilityRules: [
+        EARLIEST_RULE,
+      ],
+    });
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          delivery: {
+            mode: "EARLIEST_AVAILABLE",
+            address: deliveryAddress,
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message.includes("Delivery fee is unavailable"),
+    );
+  });
+
+  it("order confirmation payload retains delivery mode and address", async () => {
+    const { service, orders } = createService({
+      zones: [zoneWithFee],
+      availabilityRules: [
+        EARLIEST_RULE,
+      ],
+    });
+    const result = await service.createDraftCheckout("cart-1", {
+      serviceType: "DELIVERY",
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      delivery: {
+        mode: "EARLIEST_AVAILABLE",
+        address: deliveryAddress,
+      },
+      termsAccepted: true,
+    });
+    const order = orders.get(result.orderId);
+    assert.ok(order?.delivery);
+    assert.equal(order.delivery.mode, "EARLIEST_AVAILABLE");
+    assert.equal(order.delivery.address.recipient, "Ada Lovelace");
+    assert.equal(order.delivery.address.postalCode, "10330");
+    assert.equal(order.delivery.feeMinor, 8000);
+  });
+
+  it("EARLIEST_AVAILABLE unavailable when no approved cut-off rule exists", async () => {
+    const { service } = createService({ zones: [zoneWithFee] });
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          delivery: {
+            mode: "EARLIEST_AVAILABLE",
+            address: deliveryAddress,
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message.includes("not available at this time"),
     );
   });
 });

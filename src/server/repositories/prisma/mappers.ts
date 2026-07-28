@@ -427,17 +427,10 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
       recipientPhone: row.customer.recipientPhone ?? undefined,
       specialRequest: row.specialRequest ?? undefined,
     },
-    pickup: {
-      boutiqueId: row.boutiqueId,
-      boutiqueName: row.boutique.name,
-      address: row.boutique.address,
-      dateKey: row.pickupSlot.dateKey,
-      timeSlotId: row.pickupSlotId,
-      timeSlotLabel: row.pickupSlot.label,
-    },
     ...(hasDeliveryAddress
       ? {
           delivery: {
+            mode: "EARLIEST_AVAILABLE" as const,
             address: {
               recipient: row.deliveryRecipient!,
               phone: row.deliveryPhone!,
@@ -450,6 +443,23 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
             feeMinor: row.deliveryFeeMinor ?? null,
             zoneId: row.deliveryZoneId ?? null,
             feeStrategy: row.deliveryFeeStrategy ?? null,
+            dateKey: row.pickupSlot.dateKey,
+            timeSlotId: null,
+            timeSlotLabel: null,
+            promiseRelativeLabel: null,
+            fulfilmentBoutiqueId: row.boutiqueId,
+          },
+        }
+      : {}),
+    ...(serviceType === "PICKUP"
+      ? {
+          pickup: {
+            boutiqueId: row.boutiqueId,
+            boutiqueName: row.boutique.name,
+            address: row.boutique.address,
+            dateKey: row.pickupSlot.dateKey,
+            timeSlotId: row.pickupSlotId,
+            timeSlotLabel: row.pickupSlot.label,
           },
         }
       : {}),

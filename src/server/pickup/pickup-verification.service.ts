@@ -336,7 +336,7 @@ export class PickupVerificationService {
 
     const { order } = detail;
 
-    if (options?.boutiqueId && order.pickup.boutiqueId !== options.boutiqueId) {
+    if (options?.boutiqueId && (order.pickup?.boutiqueId ?? '') !== options.boutiqueId) {
       await this.safeIncrementAttempts(record.id);
       logger.info("Pickup verification failed", {
         reason: "boutique_mismatch",
@@ -416,12 +416,12 @@ export class PickupVerificationService {
       orderNumber: order.orderNumber,
       customerDisplayName: customerDisplayName(order),
       boutique: {
-        id: order.pickup.boutiqueId,
-        name: order.pickup.boutiqueName,
+        id: order.pickup?.boutiqueId ?? '',
+        name: order.pickup?.boutiqueName ?? '',
         code: detail.boutiqueCode,
       },
-      pickupDate: order.pickup.dateKey,
-      pickupTime: order.pickup.timeSlotLabel,
+      pickupDate: order.pickup?.dateKey ?? '',
+      pickupTime: order.pickup?.timeSlotLabel ?? '',
       itemCount: itemCountOf(order),
       orderStatus: toAdminWorkflowStatus(order.status),
       paymentStatus: detail.paymentStatus,

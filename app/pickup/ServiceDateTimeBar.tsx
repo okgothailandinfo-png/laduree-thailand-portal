@@ -1,7 +1,22 @@
 "use client";
 
 import { usePickup } from "./PickupContext";
+import type { DeliveryQuote } from "./delivery-quote";
 import { formatPickupDateKey } from "./pickup-dates";
+
+function formatDeliveryBarSummary(
+  deliveryMode: "EARLIEST_AVAILABLE" | "PREORDER",
+  quote: DeliveryQuote,
+): string {
+  if (deliveryMode === "EARLIEST_AVAILABLE") {
+    const relative = quote.relativeLabel ?? "";
+    const window = quote.deliveryWindow?.label ?? "";
+    return [relative, window].filter(Boolean).join(" · ");
+  }
+  const date = quote.deliveryDate ? formatPickupDateKey(quote.deliveryDate) : "";
+  const window = quote.deliveryWindow?.label ?? "";
+  return [date, window].filter(Boolean).join(" · ");
+}
 
 /** Mobile header strip — Singapore `.select-datetime-service`. */
 export default function ServiceDateTimeBar() {
@@ -16,21 +31,48 @@ export default function ServiceDateTimeBar() {
         aria-haspopup="dialog"
         onClick={() =>
           openPickupSelection({
-            step: isPickupComplete ? "datetime" : "service",
+            step: isPickupComplete
+              ? confirmed?.serviceType === "DELIVERY" &&
+                confirmed.deliveryMode === "PREORDER"
+                ? "datetime"
+                : confirmed?.serviceType === "DELIVERY"
+                  ? "mode"
+                  : "datetime"
+              : "service",
           })
         }
       >
         <span className="select-datetime-service__text">
           {isPickupComplete && confirmed ? (
-            <>
-              <span className="select-datetime-service__summary">
-                {confirmed.boutique.name}
-              </span>
-              <span className="select-datetime-service__summary-meta">
-                {formatPickupDateKey(confirmed.dateKey)} ·{" "}
-                {confirmed.timeSlot.label}
-              </span>
-            </>
+            confirmed.serviceType === "DELIVERY" ? (
+              <>
+                <span className="select-datetime-service__summary">
+                  {confirmed.deliveryAddress.recipient ||
+                    confirmed.deliveryAddress.postalCode}
+                </span>
+                <span className="select-datetime-service__summary-meta">
+                  {confirmed.deliveryMode === "EARLIEST_AVAILABLE"
+                    ? `Earliest Delivery · ${formatDeliveryBarSummary(
+                        confirmed.deliveryMode,
+                        confirmed.deliveryQuote,
+                      )}`
+                    : `Pre-order · ${formatDeliveryBarSummary(
+                        confirmed.deliveryMode,
+                        confirmed.deliveryQuote,
+                      )}`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="select-datetime-service__summary">
+                  {confirmed.boutique.name}
+                </span>
+                <span className="select-datetime-service__summary-meta">
+                  {formatPickupDateKey(confirmed.dateKey)} ·{" "}
+                  {confirmed.timeSlot.label}
+                </span>
+              </>
+            )
           ) : (
             <span>Select service, date and time</span>
           )}

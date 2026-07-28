@@ -3,11 +3,18 @@ import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import {
-  createDeliveryFeeEngine,
+  createRuntimeDeliveryAvailabilityEngine,
+  createRuntimeDeliveryFeeEngine,
+  type DeliveryAvailabilityEngine,
   type DeliveryFeeEngine,
-} from "@/src/server/delivery/fee-engine";
-import type { DeliveryAddress } from "@/src/server/models/delivery";
-import type { Order } from "@/src/server/models/order";
+} from "@/src/server/delivery";
+import {
+  isDeliveryDemoFixtureEnabled,
+  resolveDemoEarliestPromise,
+} from "@/src/server/delivery/demo-fixture";
+import type { DeliveryAddress, DeliveryMode } from "@/src/server/models/delivery";
+import { isDeliveryMode } from "@/src/server/models/delivery";
+import type { Order, OrderItem } from "@/src/server/models/order";
 import type { ServiceType } from "@/src/server/models/service-type";
 import { isServiceType } from "@/src/server/models/service-type";
 import type {
@@ -18,6 +25,8 @@ import type {
   ProductRepository,
 } from "@/src/server/repositories/interfaces";
 import type {
+  CheckoutDeliveryRequestDto,
+  CheckoutPickupRequestDto,
   CheckoutRequestDto,
   CheckoutResponseDto,
   DeliveryAddressDto,
@@ -40,6 +49,24 @@ function minorToMajor(minor: number): number {
   return minor / 100;
 }
 
+function optionalTrimmedString(
+  raw: Record<string, unknown>,
+  key: string,
+  fieldPrefix: string,
+): string | undefined {
+  const value = raw[key];
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `${fieldPrefix}.${key} must be a string.`,
+      { details: { field: `${fieldPrefix}.${key}` } },
+    );
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function parseDeliveryAddress(
   raw: unknown,
   fieldPrefix: string,
@@ -53,6 +80,17 @@ function parseDeliveryAddress(
       { details: { field: `${fieldPrefix}.phone` } },
     );
   }
+  const postalCode = requireString(
+    addressRaw.postalCode,
+    `${fieldPrefix}.postalCode`,
+  );
+  if (!/^\d{5}$/.test(postalCode.trim())) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `${fieldPrefix}.postalCode must be a 5-digit Thai postal code.`,
+      { details: { field: `${fieldPrefix}.postalCode` } },
+    );
+  }
   return {
     recipient: requireString(addressRaw.recipient, `${fieldPrefix}.recipient`),
     phone,
@@ -63,10 +101,31 @@ function parseDeliveryAddress(
     ),
     district: requireString(addressRaw.district, `${fieldPrefix}.district`),
     province: requireString(addressRaw.province, `${fieldPrefix}.province`),
-    postalCode: requireString(
-      addressRaw.postalCode,
-      `${fieldPrefix}.postalCode`,
-    ),
+    postalCode: postalCode.trim(),
+    building: optionalTrimmedString(addressRaw, "building", fieldPrefix),
+    notes: optionalTrimmedString(addressRaw, "notes", fieldPrefix),
+  };
+}
+
+function parseCustomer(body: Record<string, unknown>) {
+  const customerRaw = requireObject(body.customer, "customer");
+  const email = requireString(customerRaw.email, "customer.email");
+  const phone = requireString(customerRaw.phone, "customer.phone");
+  if (!isValidEmail(email)) {
+    throw new AppError("VALIDATION_ERROR", "customer.email is invalid.", {
+      details: { field: "customer.email" },
+    });
+  }
+  if (!isValidPhone(phone)) {
+    throw new AppError("VALIDATION_ERROR", "customer.phone is invalid.", {
+      details: { field: "customer.phone" },
+    });
+  }
+  return {
+    firstName: requireString(customerRaw.firstName, "customer.firstName"),
+    lastName: requireString(customerRaw.lastName, "customer.lastName"),
+    email,
+    phone,
   };
 }
 
@@ -77,35 +136,12 @@ export class DefaultCheckoutService {
     private readonly boutiques: BoutiqueRepository,
     private readonly pickup: PickupRepository,
     private readonly orders: OrderRepository,
-    private readonly deliveryFees: DeliveryFeeEngine = createDeliveryFeeEngine(),
+    private readonly deliveryFees: DeliveryFeeEngine = createRuntimeDeliveryFeeEngine(),
+    private readonly deliveryAvailability: DeliveryAvailabilityEngine = createRuntimeDeliveryAvailabilityEngine(),
   ) {}
 
   parseCheckoutBody(raw: unknown): CheckoutRequestDto {
     const body = requireObject(raw, "body");
-    const customerRaw = requireObject(body.customer, "customer");
-    const pickupRaw = requireObject(body.pickup, "pickup");
-
-    const email = requireString(customerRaw.email, "customer.email");
-    const phone = requireString(customerRaw.phone, "customer.phone");
-    if (!isValidEmail(email)) {
-      throw new AppError("VALIDATION_ERROR", "customer.email is invalid.", {
-        details: { field: "customer.email" },
-      });
-    }
-    if (!isValidPhone(phone)) {
-      throw new AppError("VALIDATION_ERROR", "customer.phone is invalid.", {
-        details: { field: "customer.phone" },
-      });
-    }
-
-    const dateKey = requireString(pickupRaw.dateKey, "pickup.dateKey");
-    if (!isDateKey(dateKey)) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "pickup.dateKey must be YYYY-MM-DD.",
-        { details: { field: "pickup.dateKey" } },
-      );
-    }
 
     if (body.termsAccepted !== true) {
       throw new AppError(
@@ -127,45 +163,79 @@ export class DefaultCheckoutService {
       serviceType = body.serviceType;
     }
 
-    const result: CheckoutRequestDto = {
-      customer: {
-        firstName: requireString(customerRaw.firstName, "customer.firstName"),
-        lastName: requireString(customerRaw.lastName, "customer.lastName"),
-        email,
-        phone,
-      },
-      serviceType,
-      pickup: {
-        boutiqueId: requireString(pickupRaw.boutiqueId, "pickup.boutiqueId"),
-        dateKey,
-        pickupSlotId: requireString(
-          pickupRaw.pickupSlotId,
-          "pickup.pickupSlotId",
-        ),
-      },
-      termsAccepted: true,
-    };
+    const customer = parseCustomer(body);
 
     if (serviceType === "DELIVERY") {
+      if (body.pickup !== undefined && body.pickup !== null) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "pickup must not be provided for DELIVERY.",
+          { details: { field: "pickup" } },
+        );
+      }
       const deliveryRaw = requireObject(body.delivery, "delivery");
-      result.delivery = {
+      const modeRaw = deliveryRaw.mode ?? "EARLIEST_AVAILABLE";
+      if (!isDeliveryMode(modeRaw)) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "delivery.mode must be EARLIEST_AVAILABLE or PREORDER.",
+          { details: { field: "delivery.mode" } },
+        );
+      }
+      const delivery: CheckoutDeliveryRequestDto = {
+        mode: modeRaw,
         address: parseDeliveryAddress(deliveryRaw.address, "delivery.address"),
+      };
+      if (modeRaw === "PREORDER") {
+        const dateKey = requireString(deliveryRaw.dateKey, "delivery.dateKey");
+        if (!isDateKey(dateKey)) {
+          throw new AppError(
+            "VALIDATION_ERROR",
+            "delivery.dateKey must be YYYY-MM-DD.",
+            { details: { field: "delivery.dateKey" } },
+          );
+        }
+        delivery.dateKey = dateKey;
+      }
+      return {
+        customer,
+        serviceType,
+        delivery,
+        termsAccepted: true,
       };
     }
 
-    return result;
+    // PICKUP path — unchanged requirements.
+    const pickupRaw = requireObject(body.pickup, "pickup");
+    const dateKey = requireString(pickupRaw.dateKey, "pickup.dateKey");
+    if (!isDateKey(dateKey)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.dateKey must be YYYY-MM-DD.",
+        { details: { field: "pickup.dateKey" } },
+      );
+    }
+    const pickup: CheckoutPickupRequestDto = {
+      boutiqueId: requireString(pickupRaw.boutiqueId, "pickup.boutiqueId"),
+      dateKey,
+      pickupSlotId: requireString(
+        pickupRaw.pickupSlotId,
+        "pickup.pickupSlotId",
+      ),
+    };
+    return {
+      customer,
+      serviceType: "PICKUP",
+      pickup,
+      termsAccepted: true,
+    };
   }
 
-  async createDraftCheckout(
-    cartId: string | undefined,
-    input: CheckoutRequestDto,
-  ): Promise<CheckoutResponseDto> {
-    if (!cartId) {
-      throw new AppError("VALIDATION_ERROR", "Cart not found.", {
-        details: { field: "cart" },
-      });
-    }
-
+  private async buildCartItems(cartId: string): Promise<{
+    items: OrderItem[];
+    itemsMinor: number;
+    itemCount: number;
+  }> {
     const cart = await this.carts.findById(cartId);
     if (!cart) {
       throw new AppError("VALIDATION_ERROR", "Cart not found.", {
@@ -178,90 +248,7 @@ export class DefaultCheckoutService {
       });
     }
 
-    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
-
-    const boutique = await this.boutiques.findById(input.pickup.boutiqueId);
-    if (!boutique) {
-      throw new AppError(
-        "NOT_FOUND",
-        `Boutique not found: ${input.pickup.boutiqueId}`,
-      );
-    }
-
-    const slot = await this.pickup.findSlotById(input.pickup.pickupSlotId);
-    if (!slot) {
-      throw new AppError(
-        "NOT_FOUND",
-        `Pickup slot not found: ${input.pickup.pickupSlotId}`,
-      );
-    }
-    if (slot.boutiqueId && slot.boutiqueId !== boutique.id) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "pickup.pickupSlotId does not belong to the selected boutique.",
-        { details: { field: "pickup.pickupSlotId" } },
-      );
-    }
-    // Prisma rows bind slots to a calendar date; mock templates leave dateKey empty.
-    if (slot.dateKey && slot.dateKey !== input.pickup.dateKey) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "pickup.dateKey does not match the selected pickup slot.",
-        { details: { field: "pickup.dateKey" } },
-      );
-    }
-
-    // Re-check live availability using the client-confirmed dateKey (authoritative).
-    const availability = await this.pickup.getAvailability({
-      boutiqueId: boutique.id,
-      dateKey: input.pickup.dateKey,
-    });
-    const availableSlot = availability?.slots.find(
-      (item) => item.id === slot.id,
-    );
-    if (!availableSlot) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "pickup.pickupSlotId is not available for the selected boutique/date.",
-        { details: { field: "pickup.pickupSlotId" } },
-      );
-    }
-
-    let deliveryAddress: DeliveryAddress | undefined;
-    let deliveryFeeMinor: number | null = null;
-    let deliveryZoneId: string | null = null;
-    let deliveryFeeStrategy: "FLAT_RATE" | "DISTANCE" | null = null;
-
-    if (serviceType === "DELIVERY") {
-      if (!input.delivery?.address) {
-        throw new AppError(
-          "VALIDATION_ERROR",
-          "delivery.address is required for DELIVERY.",
-          { details: { field: "delivery.address" } },
-        );
-      }
-      deliveryAddress = { ...input.delivery.address };
-      const quote = this.deliveryFees.quote({ address: deliveryAddress });
-      if (!quote.matched || quote.reason === "ZONE_INACTIVE") {
-        throw new AppError(
-          "VALIDATION_ERROR",
-          "The postal / address is not available for delivery yet.",
-          {
-            details: {
-              field: "delivery.address",
-              code: quote.reason,
-            },
-          },
-        );
-      }
-      deliveryFeeMinor = quote.feeMinor;
-      deliveryZoneId = quote.zoneId;
-      deliveryFeeStrategy = quote.strategy;
-      // feeMinor may remain null when ZONE_FEE_PENDING / DISTANCE_UNSUPPORTED —
-      // never invent a price; items-only total until owner approves a rate.
-    }
-
-    const items: Order["items"] = [];
+    const items: OrderItem[] = [];
     let itemsMinor = 0;
     let itemCount = 0;
 
@@ -326,7 +313,6 @@ export class DefaultCheckoutService {
 
       itemsMinor += unitPriceMinor * line.quantity;
       itemCount += line.quantity;
-
       items.push({
         productId: product.id,
         name: product.title,
@@ -337,7 +323,65 @@ export class DefaultCheckoutService {
       });
     }
 
-    const totalMinor = itemsMinor + (deliveryFeeMinor ?? 0);
+    return { items, itemsMinor, itemCount };
+  }
+
+  private async createPickupDraft(
+    cartId: string,
+    input: CheckoutRequestDto,
+  ): Promise<CheckoutResponseDto> {
+    if (!input.pickup) {
+      throw new AppError("VALIDATION_ERROR", "pickup is required for PICKUP.", {
+        details: { field: "pickup" },
+      });
+    }
+
+    const boutique = await this.boutiques.findById(input.pickup.boutiqueId);
+    if (!boutique) {
+      throw new AppError(
+        "NOT_FOUND",
+        `Boutique not found: ${input.pickup.boutiqueId}`,
+      );
+    }
+
+    const slot = await this.pickup.findSlotById(input.pickup.pickupSlotId);
+    if (!slot) {
+      throw new AppError(
+        "NOT_FOUND",
+        `Pickup slot not found: ${input.pickup.pickupSlotId}`,
+      );
+    }
+    if (slot.boutiqueId && slot.boutiqueId !== boutique.id) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.pickupSlotId does not belong to the selected boutique.",
+        { details: { field: "pickup.pickupSlotId" } },
+      );
+    }
+    if (slot.dateKey && slot.dateKey !== input.pickup.dateKey) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.dateKey does not match the selected pickup slot.",
+        { details: { field: "pickup.dateKey" } },
+      );
+    }
+
+    const availability = await this.pickup.getAvailability({
+      boutiqueId: boutique.id,
+      dateKey: input.pickup.dateKey,
+    });
+    const availableSlot = availability?.slots.find(
+      (item) => item.id === slot.id,
+    );
+    if (!availableSlot) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.pickupSlotId is not available for the selected boutique/date.",
+        { details: { field: "pickup.pickupSlotId" } },
+      );
+    }
+
+    const { items, itemsMinor, itemCount } = await this.buildCartItems(cartId);
     const customerName =
       `${input.customer.firstName} ${input.customer.lastName}`.trim();
 
@@ -345,22 +389,16 @@ export class DefaultCheckoutService {
       id: randomUUID(),
       orderNumber: createDraftOrderNumber(),
       status: "pending",
-      serviceType,
+      serviceType: "PICKUP",
       currency: "THB",
       createdAt: new Date().toISOString(),
       items,
-      totalMinor,
+      totalMinor: itemsMinor,
       termsAccepted: input.termsAccepted,
       customer: {
         customerName,
         mobileNumber: input.customer.phone,
         email: input.customer.email,
-        ...(deliveryAddress
-          ? {
-              recipientName: deliveryAddress.recipient,
-              recipientPhone: deliveryAddress.phone,
-            }
-          : {}),
       },
       pickup: {
         boutiqueId: boutique.id,
@@ -370,16 +408,6 @@ export class DefaultCheckoutService {
         timeSlotId: slot.id,
         timeSlotLabel: availableSlot.label || slot.label,
       },
-      ...(serviceType === "DELIVERY" && deliveryAddress
-        ? {
-            delivery: {
-              address: deliveryAddress,
-              feeMinor: deliveryFeeMinor,
-              zoneId: deliveryZoneId,
-              feeStrategy: deliveryFeeStrategy,
-            },
-          }
-        : {}),
     };
 
     const saved = await this.orders.create(order);
@@ -388,20 +416,202 @@ export class DefaultCheckoutService {
       orderNumber: saved.orderNumber,
       serviceType: saved.serviceType,
       totalMinor: saved.totalMinor,
-      deliveryFeeMinor,
     });
 
-    const subtotal = minorToMajor(itemsMinor);
     const total = minorToMajor(saved.totalMinor);
     return {
       orderId: saved.id,
-      subtotal,
+      subtotal: total,
       total,
       itemCount,
       status: "PENDING",
-      serviceType: saved.serviceType,
-      deliveryFee:
-        deliveryFeeMinor === null ? null : minorToMajor(deliveryFeeMinor),
+      serviceType: "PICKUP",
+      deliveryFee: null,
     };
+  }
+
+  private async createDeliveryDraft(
+    cartId: string,
+    input: CheckoutRequestDto,
+  ): Promise<CheckoutResponseDto> {
+    if (!input.delivery?.address) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "delivery.address is required for DELIVERY.",
+        { details: { field: "delivery.address" } },
+      );
+    }
+
+    const mode: DeliveryMode =
+      input.delivery.mode ?? "EARLIEST_AVAILABLE";
+    const deliveryAddress: DeliveryAddress = { ...input.delivery.address };
+
+    const quote = this.deliveryFees.quote({ address: deliveryAddress });
+    if (!quote.matched || quote.reason === "ZONE_INACTIVE") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "The postal / address is not available for delivery yet.",
+        {
+          details: {
+            field: "delivery.address",
+            code: quote.reason,
+          },
+        },
+      );
+    }
+    if (quote.feeMinor === null) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Delivery fee is unavailable for this address.",
+        {
+          details: {
+            field: "delivery.fee",
+            code: quote.reason,
+          },
+        },
+      );
+    }
+
+    let dateKey: string | null = null;
+    let timeSlotId: string | null = null;
+    let timeSlotLabel: string | null = null;
+    let promiseRelativeLabel: "Today" | "Tomorrow" | null = null;
+
+    if (mode === "EARLIEST_AVAILABLE") {
+      const now = new Date();
+      const basePromise = this.deliveryAvailability.resolveEarliestAvailable(now);
+      const promise = isDeliveryDemoFixtureEnabled()
+        ? resolveDemoEarliestPromise(
+            deliveryAddress.postalCode,
+            now,
+            basePromise,
+          )
+        : basePromise;
+      if (
+        !promise.available ||
+        !promise.dateKey ||
+        !promise.timeWindow
+      ) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Delivery is not available at this time.",
+          {
+            details: {
+              field: "delivery.mode",
+              code: promise.reason,
+            },
+          },
+        );
+      }
+      dateKey = promise.dateKey;
+      promiseRelativeLabel = promise.relativeLabel;
+      timeSlotId = promise.timeWindow.id;
+      timeSlotLabel = promise.timeWindow.label;
+    } else {
+      const preorderDateKey = input.delivery.dateKey;
+      if (!preorderDateKey || !isDateKey(preorderDateKey)) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "delivery.dateKey is required for PREORDER delivery.",
+          { details: { field: "delivery.dateKey" } },
+        );
+      }
+      const resolved =
+        this.deliveryAvailability.resolvePreorderWindow(preorderDateKey);
+      if (!resolved.available || !resolved.timeWindow || !resolved.dateKey) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          resolved.reason === "TODAY_OR_PAST"
+            ? "Pre-order delivery date must be a future date."
+            : "Selected delivery date is not available.",
+          {
+            details: {
+              field: "delivery.dateKey",
+              code: resolved.reason,
+            },
+          },
+        );
+      }
+      dateKey = resolved.dateKey;
+      timeSlotId = resolved.timeWindow.id;
+      timeSlotLabel = resolved.timeWindow.label;
+    }
+
+    const { items, itemsMinor, itemCount } = await this.buildCartItems(cartId);
+    const totalMinor = itemsMinor + quote.feeMinor;
+    const customerName =
+      `${input.customer.firstName} ${input.customer.lastName}`.trim();
+
+    const order: Order = {
+      id: randomUUID(),
+      orderNumber: createDraftOrderNumber(),
+      status: "pending",
+      serviceType: "DELIVERY",
+      currency: "THB",
+      createdAt: new Date().toISOString(),
+      items,
+      totalMinor,
+      termsAccepted: input.termsAccepted,
+      customer: {
+        customerName,
+        mobileNumber: input.customer.phone,
+        email: input.customer.email,
+        recipientName: deliveryAddress.recipient,
+        recipientPhone: deliveryAddress.phone,
+      },
+      delivery: {
+        mode,
+        address: deliveryAddress,
+        feeMinor: quote.feeMinor,
+        zoneId: quote.zoneId,
+        feeStrategy: quote.strategy,
+        dateKey,
+        timeSlotId,
+        timeSlotLabel,
+        promiseRelativeLabel,
+        fulfilmentBoutiqueId: quote.boutiqueId,
+      },
+    };
+
+    const saved = await this.orders.create(order);
+    logger.info("Draft checkout created", {
+      orderId: saved.id,
+      orderNumber: saved.orderNumber,
+      serviceType: saved.serviceType,
+      deliveryMode: mode,
+      totalMinor: saved.totalMinor,
+      deliveryFeeMinor: quote.feeMinor,
+    });
+
+    return {
+      orderId: saved.id,
+      subtotal: minorToMajor(itemsMinor),
+      total: minorToMajor(saved.totalMinor),
+      itemCount,
+      status: "PENDING",
+      serviceType: "DELIVERY",
+      deliveryMode: mode,
+      deliveryFee: minorToMajor(quote.feeMinor),
+      deliveryDateKey: dateKey,
+      deliveryTimeWindowLabel: timeSlotLabel,
+      deliveryPromiseRelativeLabel: promiseRelativeLabel,
+    };
+  }
+
+  async createDraftCheckout(
+    cartId: string | undefined,
+    input: CheckoutRequestDto,
+  ): Promise<CheckoutResponseDto> {
+    if (!cartId) {
+      throw new AppError("VALIDATION_ERROR", "Cart not found.", {
+        details: { field: "cart" },
+      });
+    }
+
+    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
+    if (serviceType === "DELIVERY") {
+      return this.createDeliveryDraft(cartId, input);
+    }
+    return this.createPickupDraft(cartId, input);
   }
 }

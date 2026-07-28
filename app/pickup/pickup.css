@@ -59,31 +59,52 @@
 }
 
 .pickup-modal-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
-  padding: 14px 16px;
+  padding: 16px 16px 12px;
   border-bottom: 1px solid #e5e5e5;
   background: #fff;
 }
 
 .pickup-modal-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--main-color, #84754e);
+  text-align: center;
+  color: #1a1a1a;
+  line-height: 1.35;
 }
 
-.pickup-modal-close {
+.pickup-modal-back {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--main-color, #84754e);
+  cursor: pointer;
+}
+
+.pickup-modal-back:focus-visible {
+  outline: 2px solid var(--main-color, #84754e);
+  outline-offset: 2px;
+}
+
+.pickup-modal-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -91,6 +112,12 @@
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .pickup-modal-close {
+    display: inline-flex;
+  }
 }
 
 .pickup-modal-body {
@@ -154,33 +181,200 @@
 }
 
 .pickup-service-grid {
-  display: grid;
+  display: none;
+}
+
+.service-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.service-selection__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.service-selection__heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #333;
+  text-align: left;
+}
+
+/* SG-style full-width segmented control */
+.service-segmented {
+  display: flex;
+  width: 100%;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.service-segmented__tab {
+  flex: 1 1 50%;
+  min-height: 50px;
+  padding: 12px 16px;
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.service-segmented__tab--left {
+  border-radius: 12px 0 0 12px;
+  border-right-width: 0;
+}
+
+.service-segmented__tab--right {
+  border-radius: 0 12px 12px 0;
+}
+
+.service-segmented__tab.is-active {
+  background: var(--main-color, #84754e);
+  border-color: var(--main-color, #84754e);
+  color: #fff;
+}
+
+.service-segmented__tab:focus-visible {
+  outline: 2px solid var(--main-color, #84754e);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.delivery-mode-selector {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.pickup-service-card {
+.delivery-mode-selector__option {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.delivery-mode-selector__option.is-selected {
+  border-color: var(--main-color, #84754e);
+  box-shadow: inset 0 0 0 1px var(--main-color, #84754e),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  background: #faf8f3;
+}
+
+.delivery-mode-selector__option:focus-visible {
+  outline: 2px solid var(--main-color, #84754e);
+  outline-offset: 2px;
+}
+
+.delivery-mode-selector__title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+}
+
+.pickup-outlet-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.pickup-outlet-card {
+  display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: 12px;
   width: 100%;
-  min-height: 88px;
-  padding: 16px;
-  border: 2px solid #d7d7d7;
+  padding: 14px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pickup-outlet-card.is-selected {
+  border-color: var(--main-color, #84754e);
+  box-shadow: inset 0 0 0 1px var(--main-color, #84754e),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  background: #faf8f3;
+}
+
+.pickup-outlet-card:focus-visible {
+  outline: 2px solid var(--main-color, #84754e);
+  outline-offset: 2px;
+}
+
+.pickup-outlet-card__icon {
+  flex: 0 0 auto;
+  color: var(--main-color, #84754e);
+  margin-top: 2px;
+}
+
+.pickup-outlet-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pickup-outlet-card__name {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.35;
+}
+
+.pickup-outlet-card__address {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #666;
+}
+
+.pickup-outlet-item {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #d7d7d7;
   background: #fff;
   text-align: left;
   font-family: inherit;
   cursor: pointer;
 }
 
-.pickup-service-card.is-selected {
+.pickup-outlet-item.is-selected {
   border-color: var(--main-color, #84754e);
-  background: #faf8f3;
+  box-shadow: inset 0 0 0 1px var(--main-color, #84754e);
 }
 
-.pickup-service-card:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.pickup-outlet-item__name {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .pickup-address-form {
@@ -217,6 +411,18 @@
   border-color: var(--main-color, #84754e);
 }
 
+.pickup-address-field--prominent .pickup-address-field__label {
+  font-size: 14px;
+}
+
+.pickup-address-field--prominent .pickup-address-field__input {
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  border-width: 2px;
+  border-color: var(--main-color, #84754e);
+}
+
 .pickup-service-card__title {
   font-size: 18px;
   font-weight: 700;
@@ -226,6 +432,36 @@
 .pickup-service-card__sub {
   font-size: 13px;
   color: #666;
+}
+
+.pickup-mode-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pickup-mode-options {
+  display: grid;
+  gap: 12px;
+}
+
+.pickup-mode-option {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 16px;
+  border: 2px solid #d7d7d7;
+  background: #fff;
+  text-align: left;
+  font-family: inherit;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+}
+
+.pickup-mode-option.is-selected {
+  border-color: var(--main-color, #84754e);
+  background: #faf8f3;
 }
 
 .pickup-outlet-list {
@@ -386,4 +622,69 @@
   margin-top: 6px;
   font-size: 12px;
   opacity: 0.95;
+}
+
+.cart-delivery-postal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cart-delivery-postal__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 12px;
+  /* Parent .cart-fulfillment uses white text; keep label readable on brand bg. */
+  color: inherit;
+}
+
+.cart-delivery-postal__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.3;
+  /* Do not inherit white text from .cart-fulfillment.bg-pink */
+  color: #1a1a1a;
+  caret-color: #1a1a1a;
+  -webkit-text-fill-color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+  background: #fff;
+}
+
+.cart-delivery-postal__input::placeholder {
+  color: #6b6b6b;
+  -webkit-text-fill-color: #6b6b6b;
+  opacity: 1;
+}
+
+.cart-delivery-postal__btn {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  /* Do not inherit white text from .cart-fulfillment.bg-pink */
+  color: #1a1a1a;
+  -webkit-text-fill-color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: #fff;
+  cursor: pointer;
+}
+
+.cart-delivery-postal__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cart-delivery-preorder {
+  margin-top: 10px;
 }

@@ -1,7 +1,24 @@
 /**
- * Delivery domain types for Sprint 21 foundation.
- * Fees and zone rates must come from owner-approved configuration — never invent prices.
+ * Delivery domain types for Sprint 21.
+ * Fees, zones, and availability cut-offs must be owner-approved — never invent.
+ *
+ * Top-level customer services: PICKUP | DELIVERY only.
+ * Delivery modes (inside DELIVERY): EARLIEST_AVAILABLE | PREORDER.
  */
+
+export type DeliveryMode = "EARLIEST_AVAILABLE" | "PREORDER";
+
+export const DELIVERY_MODES = ["EARLIEST_AVAILABLE", "PREORDER"] as const;
+
+export function isDeliveryMode(value: unknown): value is DeliveryMode {
+  return value === "EARLIEST_AVAILABLE" || value === "PREORDER";
+}
+
+/** Customer-facing labels for delivery modes. */
+export const DELIVERY_MODE_LABELS: Record<DeliveryMode, string> = {
+  EARLIEST_AVAILABLE: "Earliest Delivery",
+  PREORDER: "Pre-order",
+};
 
 export type DeliveryAddress = {
   recipient: string;
@@ -11,29 +28,49 @@ export type DeliveryAddress = {
   district: string;
   province: string;
   postalCode: string;
+  /** Optional building / village / unit / floor. */
+  building?: string;
+  /** Optional delivery notes / additional request. */
+  notes?: string;
 };
 
-/** Confirmed delivery window (date + time), parallel to pickup slot selection. */
-export type DeliverySlotSelection = {
-  dateKey: string;
-  timeSlotId: string;
-  timeSlotLabel: string;
+/** System-assigned delivery time window (customer never selects a slot). */
+export type DeliveryTimeWindow = {
+  id: string;
+  label: string;
+  start: string;
+  end: string;
 };
 
 /**
  * Order-level delivery snapshot.
- * Fulfilling boutique + slot remain on Order.pickup for kitchen board reuse.
+ * Customer never selects a boutique; fulfilmentBoutiqueId is internal only.
  */
 export type OrderDelivery = {
+  mode: DeliveryMode;
   address: DeliveryAddress;
   /**
    * Delivery fee in satang (minor units).
-   * Null when no owner-approved zone/flat rate matches — never invent a price.
+   * Null when unmatched or fee pending — checkout must reject null fees.
    */
   feeMinor: number | null;
-  /** Zone id that produced the fee quote, when matched. */
   zoneId?: string | null;
   feeStrategy?: DeliveryFeeStrategy | null;
+  /**
+   * System-calculated (EARLIEST_AVAILABLE) or customer-selected future date (PREORDER).
+   * YYYY-MM-DD Asia/Bangkok.
+   */
+  dateKey: string | null;
+  /** System-assigned window id — never customer-selected. */
+  timeSlotId?: string | null;
+  timeSlotLabel?: string | null;
+  /** Customer-facing relative label for earliest (Today / Tomorrow). */
+  promiseRelativeLabel?: "Today" | "Tomorrow" | null;
+  /**
+   * Internal dispatch / fulfilment boutique — never customer-selected.
+   * Null until zone/ops assignment supplies one; never hard-code a store.
+   */
+  fulfilmentBoutiqueId?: string | null;
 };
 
 export type DeliveryFeeStrategy = "FLAT_RATE" | "DISTANCE";
@@ -42,40 +79,28 @@ export type DeliveryFeeStrategy = "FLAT_RATE" | "DISTANCE";
 export type DeliveryZone = {
   id: string;
   name: string;
-  /** Matching postal codes (exact). Empty = no postal match. */
   postalCodes: string[];
-  /** Matching province names (case-insensitive trim). */
   provinces: string[];
-  /** Matching district names (case-insensitive trim). */
   districts: string[];
-  /** Preferred fulfilling boutique when this zone matches. */
+  /** Internal fulfilment boutique when this zone matches — not shown to customer. */
   boutiqueId?: string | null;
   strategy: DeliveryFeeStrategy;
-  /**
-   * Flat-rate fee in satang. Null = zone matches but fee not yet approved.
-   * Never invent a fallback price.
-   */
   flatRateMinor: number | null;
-  /**
-   * Reserved for future distance-based pricing (meters / km bands).
-   * Not used by the flat-rate engine in this sprint.
-   */
   distanceConfig?: DeliveryDistanceConfig | null;
   isActive: boolean;
 };
 
 export type DeliveryDistanceConfig = {
-  /** Base fee in satang when distance pricing is enabled. Null until approved. */
   baseFeeMinor: number | null;
-  /** Additional fee per kilometer in satang. Null until approved. */
   perKmMinor: number | null;
-  /** Maximum deliverable distance in meters. Null = unrestricted (when enabled). */
   maxDistanceMeters: number | null;
 };
 
 export type DeliveryFeeQuoteInput = {
-  address: DeliveryAddress;
-  /** Optional distance in meters for future DISTANCE strategy. */
+  address: Pick<DeliveryAddress, "postalCode"> &
+    Partial<
+      Pick<DeliveryAddress, "province" | "district" | "subdistrict" | "address">
+    >;
   distanceMeters?: number | null;
 };
 
@@ -83,10 +108,8 @@ export type DeliveryFeeQuote = {
   matched: boolean;
   zoneId: string | null;
   strategy: DeliveryFeeStrategy | null;
-  /**
-   * Fee in satang. Null when unmatched or when the matched zone has no approved rate.
-   */
   feeMinor: number | null;
+  /** Internal fulfilment boutique from zone config, if any. */
   boutiqueId: string | null;
   reason:
     | "FLAT_RATE"
@@ -94,4 +117,61 @@ export type DeliveryFeeQuote = {
     | "ZONE_FEE_PENDING"
     | "NO_ZONE_MATCH"
     | "ZONE_INACTIVE";
+};
+
+/**
+ * Owner-approved EARLIEST_AVAILABLE rule.
+ * Missing / null cut-off or window → system must not invent a promise (unavailable).
+ */
+export type DeliveryAvailabilityRule = {
+  id: string;
+  /**
+   * Asia/Bangkok HH:mm same-day cut-off.
+   * Null = cut-off not approved — earliest promise unavailable.
+   */
+  sameDayCutoffTime: string | null;
+  /** When true and past cut-off (or same-day blocked), allow next calendar day. */
+  nextDayEnabled: boolean;
+  /**
+   * System-assigned delivery window for earliest-available promises.
+   * Null = window not approved — promise unavailable.
+   */
+  earliestTimeWindow: DeliveryTimeWindow | null;
+  isActive: boolean;
+};
+
+/**
+ * Optional Pre-order catalog: future dateKey → system-assigned window.
+ * Empty map → PREORDER UI shows unavailable (do not invent dates/windows).
+ * Today and past dates must not appear.
+ */
+export type DeliveryPreorderConfig = {
+  windowByDateKey: ReadonlyMap<string, DeliveryTimeWindow>;
+};
+
+export type DeliveryPromise = {
+  available: boolean;
+  dateKey: string | null;
+  relativeLabel: "Today" | "Tomorrow" | null;
+  timeWindow: DeliveryTimeWindow | null;
+  reason:
+    | "SAME_DAY"
+    | "NEXT_DAY"
+    | "LATER_DATE"
+    | "NO_RULE"
+    | "RULE_INACTIVE"
+    | "CUTOFF_PENDING"
+    | "WINDOW_PENDING";
+};
+
+export type DeliveryPreorderResolution = {
+  available: boolean;
+  dateKey: string | null;
+  timeWindow: DeliveryTimeWindow | null;
+  reason:
+    | "OK"
+    | "NO_CATALOG"
+    | "DATE_NOT_AVAILABLE"
+    | "TODAY_OR_PAST"
+    | "WINDOW_PENDING";
 };

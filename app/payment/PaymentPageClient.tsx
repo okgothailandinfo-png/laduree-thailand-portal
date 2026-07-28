@@ -18,6 +18,7 @@ import {
   type MockPaymentMethod,
 } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
+import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import "./payment.css";
 
@@ -292,20 +293,63 @@ export default function PaymentPageClient({
               aria-labelledby="payment-pickup-summary"
             >
               <h2 id="payment-pickup-summary" className="payment-card__title">
-                Pickup Summary
+                {pickup.serviceType === "DELIVERY" ? "Delivery Summary" : "Pickup Summary"}
               </h2>
-              <p className="payment-summary-meta">
-                {pickup.boutique.name}
-                <br />
-                {pickup.boutique.address}
-              </p>
-              <p className="payment-summary-meta">
-                Pickup Time
-                <br />
-                {formatPickupDateKeyLong(pickup.dateKey)}
-                <br />
-                {pickup.timeSlot.start} To {pickup.timeSlot.end}
-              </p>
+              {pickup.serviceType === "DELIVERY" ? (
+                <>
+                  <p className="payment-summary-meta">
+                    {pickup.deliveryMode === "EARLIEST_AVAILABLE"
+                      ? "Earliest Delivery"
+                      : "Pre-order"}
+                  </p>
+                  {isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+                  pickup.deliveryQuote.deliveryDate &&
+                  pickup.deliveryQuote.deliveryWindow ? (
+                    <p className="payment-summary-meta">
+                      Delivery Time
+                      <br />
+                      {formatPickupDateKeyLong(
+                        pickup.deliveryQuote.deliveryDate,
+                      )}
+                      <br />
+                      {pickup.deliveryQuote.deliveryWindow.start} To{" "}
+                      {pickup.deliveryQuote.deliveryWindow.end}
+                    </p>
+                  ) : null}
+                  {isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+                  typeof pickup.deliveryQuote.deliveryFee === "number" ? (
+                    <p className="payment-summary-meta">
+                      Delivery Fee
+                      <br />
+                      {formatPriceThb(pickup.deliveryQuote.deliveryFee)}
+                    </p>
+                  ) : null}
+                  <p className="payment-summary-meta">
+                    {pickup.deliveryAddress.recipient}
+                    <br />
+                    {pickup.deliveryAddress.address},{" "}
+                    {pickup.deliveryAddress.subdistrict},{" "}
+                    {pickup.deliveryAddress.district},{" "}
+                    {pickup.deliveryAddress.province}{" "}
+                    {pickup.deliveryAddress.postalCode}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="payment-summary-meta">
+                    {pickup.boutique.name}
+                    <br />
+                    {pickup.boutique.address}
+                  </p>
+                  <p className="payment-summary-meta">
+                    Pickup Time
+                    <br />
+                    {formatPickupDateKeyLong(pickup.dateKey)}
+                    <br />
+                    {pickup.timeSlot.start} To {pickup.timeSlot.end}
+                  </p>
+                </>
+              )}
             </section>
 
             <section

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { formatPriceThb } from "@/lib/api/catalog";
 import { usePickup } from "../pickup/PickupContext";
@@ -19,8 +19,10 @@ export default function CartCheckoutFooter({
 }: CartCheckoutFooterProps) {
   const router = useRouter();
   const { items, itemCount, subtotalThb, status, closeDrawer } = useCart();
-  const { confirmed, confirmedSlotAvailable, openPickupSelection } =
+  const { confirmed, confirmedSlotAvailable, openPickupSelection, invalidateDeliveryQuote } =
     usePickup();
+
+  const serviceType = confirmed?.serviceType ?? "PICKUP";
 
   const eligibility = getCheckoutEligibility({
     items: items.map((item) => ({
@@ -30,35 +32,99 @@ export default function CartCheckoutFooter({
       available: item.productAvailable,
       priceAvailable: item.priceAvailable,
     })),
-    confirmed: confirmed
-      ? {
-          boutiqueId: confirmed.boutique.id,
-          dateKey: confirmed.dateKey,
-          timeSlotId: confirmed.timeSlot.id,
-        }
-      : null,
+    confirmed:
+      confirmed?.serviceType === "PICKUP"
+        ? {
+            boutiqueId: confirmed.boutique.id,
+            dateKey: confirmed.dateKey,
+            timeSlotId: confirmed.timeSlot.id,
+          }
+        : null,
     cartStatus: status,
     pickupSlotAvailable: confirmedSlotAvailable,
+    serviceType,
+    delivery:
+      confirmed?.serviceType === "DELIVERY"
+        ? {
+            address: confirmed.deliveryAddress,
+            quote: confirmed.deliveryQuote,
+          }
+        : null,
   });
 
   useEffect(() => {
     if (!eligibility.ctaVisible) return;
     logCheckoutEligibilityDiagnostics(eligibility.diagnostics);
-    // Log when eligibility inputs change, not on every object identity churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- diagnostics snapshot
   }, [
     eligibility.ctaVisible,
     eligibility.canCheckout,
     eligibility.reason,
     itemCount,
-    confirmed?.boutique.id,
-    confirmed?.dateKey,
-    confirmed?.timeSlot.id,
+    confirmed?.serviceType,
+    confirmed?.serviceType === "PICKUP" ? confirmed.boutique.id : null,
+    confirmed?.serviceType === "PICKUP" ? confirmed.dateKey : null,
+    confirmed?.serviceType === "PICKUP" ? confirmed.timeSlot.id : null,
+    confirmed?.serviceType === "DELIVERY" ? confirmed.deliveryMode : null,
   ]);
+
+  const cartSignatureRef = useRef<string | null>(null);
+  const cartSignature = `${itemCount}:${subtotalThb}`;
+
+  useEffect(() => {
+    if (confirmed?.serviceType !== "DELIVERY") return;
+    if (cartSignatureRef.current === null) {
+      cartSignatureRef.current = cartSignature;
+      return;
+    }
+    if (cartSignatureRef.current !== cartSignature) {
+      cartSignatureRef.current = cartSignature;
+      invalidateDeliveryQuote();
+    }
+  }, [cartSignature, confirmed?.serviceType, invalidateDeliveryQuote]);
 
   if (!eligibility.ctaVisible) return null;
 
   const subtotalLabel = formatPriceThb(subtotalThb);
+
+  function openSelectionForReason() {
+    if (!eligibility.reason) {
+      openPickupSelection({ step: "service" });
+      return;
+    }
+    if (
+      eligibility.reason.includes("boutique") ||
+      eligibility.reason.includes("pickup date") ||
+      eligibility.reason.includes("pickup time")
+    ) {
+      openPickupSelection({
+        step: eligibility.reason.includes("boutique") ? "boutique" : "datetime",
+      });
+      return;
+    }
+    if (
+      eligibility.reason.includes("postal") ||
+      eligibility.reason.includes("address")
+    ) {
+      openPickupSelection({ step: "address" });
+      return;
+    }
+    if (
+      eligibility.reason.includes("delivery") ||
+      eligibility.reason.includes("Delivery")
+    ) {
+      openPickupSelection({
+        step:
+          confirmed?.serviceType === "DELIVERY" &&
+          confirmed.deliveryMode === "PREORDER"
+            ? "datetime"
+            : "mode",
+        serviceType: "DELIVERY",
+      });
+      return;
+    }
+    openPickupSelection({ step: "service" });
+  }
 
   return (
     <div
@@ -84,23 +150,13 @@ export default function CartCheckoutFooter({
               data-testid="checkout-blocking-reason"
             >
               {eligibility.reason}{" "}
-              {eligibility.reason.includes("boutique") ||
-              eligibility.reason.includes("pickup date") ||
-              eligibility.reason.includes("pickup time") ? (
-                <button
-                  type="button"
-                  className="cart-pickup-gate-link"
-                  onClick={() =>
-                    openPickupSelection({
-                      step: eligibility.reason?.includes("boutique")
-                        ? "boutique"
-                        : "datetime",
-                    })
-                  }
-                >
-                  Select service, date and time
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="cart-pickup-gate-link"
+                onClick={openSelectionForReason}
+              >
+                Select service, date and time
+              </button>
             </div>
           ) : null}
           <button

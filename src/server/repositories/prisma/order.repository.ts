@@ -192,6 +192,13 @@ export class PrismaOrderRepository implements OrderRepository {
           },
         });
 
+        if (!order.pickup) {
+          throw new AppError(
+            "CONFIG_ERROR",
+            "Persisting DELIVERY orders without pickup FKs is Pending Infrastructure. Use DATA_SOURCE=mock.",
+          );
+        }
+
         const saved = await tx.order.create({
           data: {
             id: order.id,

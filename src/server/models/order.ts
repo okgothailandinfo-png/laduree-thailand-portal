@@ -62,10 +62,10 @@ export type Order = {
   items: OrderItem[];
   customer: OrderCustomer;
   /**
-   * Pickup collect details, or for DELIVERY the fulfilling boutique + delivery window
-   * (reused by kitchen board / admin which key off boutique + slot).
+   * Required for PICKUP. Omitted for DELIVERY — customers never select a boutique
+   * or pickup slot; delivery details live on `delivery`.
    */
-  pickup: OrderPickup;
+  pickup?: OrderPickup;
   /** Present when serviceType is DELIVERY. */
   delivery?: OrderDelivery;
   /** Omitted for draft checkout orders (PENDING, no payment yet). */

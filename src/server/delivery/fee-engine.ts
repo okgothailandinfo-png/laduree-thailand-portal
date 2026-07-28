@@ -22,13 +22,18 @@ function zoneMatchesAddress(
   input: DeliveryFeeQuoteInput,
 ): boolean {
   const postal = normalizePostal(input.address.postalCode);
-  const province = normalize(input.address.province);
-  const district = normalize(input.address.district);
+  const province = normalize(input.address.province ?? "");
+  const district = normalize(input.address.district ?? "");
 
   if (zone.postalCodes.length > 0) {
     if (zone.postalCodes.some((code) => normalizePostal(code) === postal)) {
       return true;
     }
+  }
+
+  // Province/district matching only when those fields are supplied (full address).
+  if (!province && !district) {
+    return false;
   }
 
   if (zone.provinces.length > 0 && zone.districts.length > 0) {
