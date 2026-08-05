@@ -17,6 +17,8 @@ import {
   useOrderFlow,
   type MockPaymentMethod,
 } from "../order/OrderFlowContext";
+import { formatFullDeliveryAddressInline } from "../checkout/delivery-address-form";
+import { computeOrderTotals, formatOrderTotalThb } from "../checkout/order-totals";
 import { usePickup } from "../pickup/PickupContext";
 import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
@@ -91,10 +93,25 @@ export default function PaymentPageClient({
   const customer = useMemo(() => checkout, [checkout]);
 
   const order = orderId ? orderQuery.data : null;
-  const trustedTotalLabel =
-    order && typeof order.totalThb === "number" && Number.isFinite(order.totalThb)
-      ? formatPriceThb(order.totalThb)
-      : "฿ —";
+  const isDelivery = pickup?.serviceType === "DELIVERY";
+  const deliveryFeeThb =
+    isDelivery &&
+    pickup &&
+    isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+    typeof pickup.deliveryQuote.deliveryFee === "number"
+      ? pickup.deliveryQuote.deliveryFee
+      : order?.delivery?.feeThb ?? null;
+  const orderTotals = computeOrderTotals({
+    serviceType: isDelivery ? "DELIVERY" : "PICKUP",
+    subtotalThb: null,
+    deliveryFeeThb,
+    trustedTotalThb:
+      order && typeof order.totalThb === "number" && Number.isFinite(order.totalThb)
+        ? order.totalThb
+        : null,
+  });
+  const trustedTotalLabel = formatOrderTotalThb(orderTotals.totalThb);
+  const trustedSubtotalLabel = formatOrderTotalThb(orderTotals.subtotalThb);
 
   function setCardField<K extends keyof CardDraft>(key: K, value: string) {
     setCard((current) => ({ ...current, [key]: value }));
@@ -264,7 +281,7 @@ export default function PaymentPageClient({
                   />
                 </div>
               ) : null}
-              <div className="payment-totals">
+              <div className="payment-totals" data-testid="payment-totals">
                 <div className="payment-totals__row">
                   <span>Item(s) Total</span>
                   <span>{itemCount}</span>
@@ -272,9 +289,18 @@ export default function PaymentPageClient({
                 <div className="payment-totals__row">
                   <span>Subtotal</span>
                   <span data-testid="payment-trusted-subtotal">
-                    {trustedTotalLabel}
+                    {trustedSubtotalLabel}
                   </span>
                 </div>
+                {isDelivery &&
+                typeof orderTotals.deliveryFeeThb === "number" ? (
+                  <div className="payment-totals__row">
+                    <span>Delivery Fee</span>
+                    <span data-testid="payment-delivery-fee">
+                      {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="payment-totals__row">
                   <span>Tax</span>
                   <span>฿ —</span>
@@ -325,14 +351,30 @@ export default function PaymentPageClient({
                     </p>
                   ) : null}
                   <p className="payment-summary-meta">
-                    {pickup.deliveryAddress.recipient}
+                    {(
+                      customer.deliveryAddress.recipient.trim() ||
+                      pickup.deliveryAddress.recipient ||
+                      customer.customerName
+                    ).trim()}
                     <br />
-                    {pickup.deliveryAddress.address},{" "}
-                    {pickup.deliveryAddress.subdistrict},{" "}
-                    {pickup.deliveryAddress.district},{" "}
-                    {pickup.deliveryAddress.province}{" "}
-                    {pickup.deliveryAddress.postalCode}
+                    {formatFullDeliveryAddressInline(
+                      customer.deliveryAddress.address.trim()
+                        ? customer.deliveryAddress
+                        : pickup.deliveryAddress,
+                    )}
                   </p>
+                  {(
+                    customer.deliveryAddress.notes ??
+                    customer.specialRequest
+                  ).trim() ? (
+                    <p className="payment-summary-meta">
+                      Delivery Notes:{" "}
+                      {(
+                        customer.deliveryAddress.notes ??
+                        customer.specialRequest
+                      ).trim()}
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <>

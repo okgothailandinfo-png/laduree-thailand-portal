@@ -284,3 +284,38 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+.checkout-totals {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e6e6e6;
+}
+
+.checkout-totals__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.checkout-totals__row.total {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.checkout-order-review {
+  margin: 16px 0;
+  padding: 14px;
+  background: #faf8f3;
+  border: 1px solid #e4dcc8;
+}
+
+.checkout-order-review__title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}

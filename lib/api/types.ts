@@ -193,6 +193,7 @@ export type CheckoutRequest = {
       province: string;
       postalCode: string;
       building?: string;
+      unitFloor?: string;
       notes?: string;
     };
     /** Required when mode is PREORDER (future date only). */
@@ -266,6 +267,7 @@ export type OrderDetail = {
       province: string;
       postalCode: string;
       building?: string;
+      unitFloor?: string;
       notes?: string;
     };
     feeThb: number | null;

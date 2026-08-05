@@ -22,7 +22,10 @@ export type DeliveryAddressDraft = {
   district: string;
   province: string;
   postalCode: string;
+  /** Building / Village / Condominium (optional). */
   building?: string;
+  /** Unit / Floor (optional) — separate from building. */
+  unitFloor?: string;
   notes?: string;
 };
 
@@ -35,6 +38,7 @@ export const EMPTY_DELIVERY_ADDRESS: DeliveryAddressDraft = {
   province: "",
   postalCode: "",
   building: "",
+  unitFloor: "",
   notes: "",
 };
 
@@ -210,6 +214,7 @@ function parseDeliveryAddress(
     province: typeof value.province === "string" ? value.province : "",
     postalCode: value.postalCode,
     building: typeof value.building === "string" ? value.building : "",
+    unitFloor: typeof value.unitFloor === "string" ? value.unitFloor : "",
     notes: typeof value.notes === "string" ? value.notes : "",
   };
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { formatPriceThb } from "@/lib/api/catalog";
 import { submitCheckout } from "@/lib/api/checkout";
 import { ApiClientError } from "@/lib/api/client";
@@ -11,14 +11,18 @@ import CatalogStatus from "../catalog/CatalogStatus";
 import { CHECKOUT_BLOCKING_MESSAGES } from "../cart/checkout-eligibility";
 import { useCart } from "../cart/CartContext";
 import { usePickup } from "../pickup/PickupContext";
-import { getCheckoutDeliveryView } from "./checkout-delivery-view";
+import {
+  DELIVERY_POSTAL_RECALCULATE_MESSAGE,
+  getCheckoutDeliveryView,
+} from "./checkout-delivery-view";
+import {
+  formatFullDeliveryAddressInline,
+} from "./delivery-address-form";
+import { computeOrderTotals, formatOrderTotalThb } from "./order-totals";
 import { PICKUP_MESSAGES, slotsContainId } from "../pickup/pickup-availability";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import { useCheckout } from "./CheckoutContext";
 import "./checkout.css";
-
-const DELIVERY_POSTAL_MISMATCH_MESSAGE =
-  "Your postal code has changed. Please recalculate delivery in cart.";
 
 function splitCustomerName(fullName: string): {
   firstName: string;
@@ -47,7 +51,7 @@ function deliveryModeLabel(
 
 export default function CheckoutPageClient() {
   const router = useRouter();
-  const { items, itemCount } = useCart();
+  const { items, itemCount, subtotalThb } = useCart();
   const {
     confirmed: fulfillment,
     isPickupComplete,
@@ -97,6 +101,16 @@ export default function CheckoutPageClient() {
     Boolean(formPostal) &&
     formPostal !== quotePostal;
 
+  const orderTotals = useMemo(
+    () =>
+      computeOrderTotals({
+        serviceType: isDelivery ? "DELIVERY" : "PICKUP",
+        subtotalThb,
+        deliveryFeeThb: deliveryView.isValid ? deliveryView.deliveryFee : null,
+      }),
+    [isDelivery, subtotalThb, deliveryView.isValid, deliveryView.deliveryFee],
+  );
+
   useEffect(() => {
     if (!quotePostal) return;
     seedDeliveryPostal(quotePostal);
@@ -110,6 +124,7 @@ export default function CheckoutPageClient() {
     if (lastInvalidatedPostalRef.current === formPostal) return;
     lastInvalidatedPostalRef.current = formPostal;
     // Invalidation clears date/window/fee — deliveryView then hides summary.
+    // Buyer + compatible address fields in CheckoutInfo are preserved.
     invalidateDeliveryQuote();
   }, [postalMismatch, formPostal, invalidateDeliveryQuote]);
 
@@ -125,8 +140,9 @@ export default function CheckoutPageClient() {
         setSubmitStatus("error");
         setSubmitError(
           postalMismatch
-            ? DELIVERY_POSTAL_MISMATCH_MESSAGE
-            : CHECKOUT_BLOCKING_MESSAGES.deliveryUnavailable,
+            ? DELIVERY_POSTAL_RECALCULATE_MESSAGE
+            : (deliveryView.bannerMessage ??
+                CHECKOUT_BLOCKING_MESSAGES.deliveryUnavailable),
         );
         return;
       }
@@ -245,6 +261,12 @@ export default function CheckoutPageClient() {
     void runCheckout();
   }
 
+  const customerDisplayName = isDelivery
+    ? `${info.firstName} ${info.lastName}`.trim() || info.customerName
+    : info.customerName;
+  const deliveryNotes =
+    (info.deliveryAddress.notes ?? "").trim() || info.specialRequest.trim();
+
   return (
     <main className="checkout-page">
       <div className="checkout-page__inner">
@@ -310,25 +332,6 @@ export default function CheckoutPageClient() {
                         {formatPriceThb(deliveryView.deliveryFee)}
                       </p>
                     ) : null}
-                    <p className="checkout-summary-meta">
-                      {fulfillment.deliveryAddress.recipient}
-                      <br />
-                      {fulfillment.deliveryAddress.address
-                        ? `${fulfillment.deliveryAddress.address}, `
-                        : null}
-                      {fulfillment.deliveryAddress.subdistrict
-                        ? `${fulfillment.deliveryAddress.subdistrict}, `
-                        : null}
-                      {fulfillment.deliveryAddress.district
-                        ? `${fulfillment.deliveryAddress.district}, `
-                        : null}
-                      {fulfillment.deliveryAddress.province
-                        ? `${fulfillment.deliveryAddress.province} `
-                        : null}
-                      {deliveryView.showSummary
-                        ? deliveryView.postalCode
-                        : fulfillment.deliveryAddress.postalCode}
-                    </p>
                   </>
                 ) : (
                   <>
@@ -372,6 +375,28 @@ export default function CheckoutPageClient() {
                   </li>
                 ))}
               </ul>
+              <div className="checkout-totals" data-testid="checkout-totals">
+                <div className="checkout-totals__row">
+                  <span>Subtotal</span>
+                  <span data-testid="checkout-subtotal">
+                    {formatOrderTotalThb(orderTotals.subtotalThb)}
+                  </span>
+                </div>
+                {isDelivery && typeof orderTotals.deliveryFeeThb === "number" ? (
+                  <div className="checkout-totals__row">
+                    <span>Delivery Fee</span>
+                    <span data-testid="checkout-delivery-fee">
+                      {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="checkout-totals__row total">
+                  <span>Total</span>
+                  <span data-testid="checkout-total">
+                    {formatOrderTotalThb(orderTotals.totalThb)}
+                  </span>
+                </div>
+              </div>
             </section>
           </>
         ) : null}
@@ -545,15 +570,15 @@ export default function CheckoutPageClient() {
                       inputMode="numeric"
                       value={info.deliveryAddress.postalCode}
                       aria-invalid={
-                        Boolean(errors.deliveryAddress) || postalMismatch
+                        Boolean(errors.deliveryPostalCode) || postalMismatch
                       }
                       aria-describedby={
-                        errors.deliveryAddress || postalMismatch
+                        errors.deliveryPostalCode || postalMismatch
                           ? "deliveryPostalCode-error"
                           : undefined
                       }
                       className={
-                        errors.deliveryAddress || postalMismatch
+                        errors.deliveryPostalCode || postalMismatch
                           ? "input-validation-error"
                           : undefined
                       }
@@ -561,16 +586,17 @@ export default function CheckoutPageClient() {
                         setDeliveryAddressField("postalCode", e.target.value)
                       }
                     />
-                    {errors.deliveryAddress || postalMismatch ? (
+                    {errors.deliveryPostalCode || postalMismatch ? (
                       <p
                         id="deliveryPostalCode-error"
                         className="field-validation-error"
                         role="alert"
                       >
                         {postalMismatch
-                          ? DELIVERY_POSTAL_MISMATCH_MESSAGE
-                          : errors.deliveryAddress}{" "}
-                        {postalMismatch ? (
+                          ? DELIVERY_POSTAL_RECALCULATE_MESSAGE
+                          : errors.deliveryPostalCode}{" "}
+                        {postalMismatch ||
+                        deliveryView.status === "INVALID" ? (
                           <button
                             type="button"
                             className="checkout-inline-action"
@@ -593,9 +619,14 @@ export default function CheckoutPageClient() {
                       type="text"
                       autoComplete="address-level1"
                       value={info.deliveryAddress.province}
-                      aria-invalid={Boolean(errors.deliveryAddress)}
+                      aria-invalid={Boolean(errors.deliveryProvince)}
+                      aria-describedby={
+                        errors.deliveryProvince
+                          ? "deliveryProvince-error"
+                          : undefined
+                      }
                       className={
-                        errors.deliveryAddress
+                        errors.deliveryProvince
                           ? "input-validation-error"
                           : undefined
                       }
@@ -603,6 +634,15 @@ export default function CheckoutPageClient() {
                         setDeliveryAddressField("province", e.target.value)
                       }
                     />
+                    {errors.deliveryProvince ? (
+                      <p
+                        id="deliveryProvince-error"
+                        className="field-validation-error"
+                        role="alert"
+                      >
+                        {errors.deliveryProvince}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="checkout-field">
@@ -613,9 +653,14 @@ export default function CheckoutPageClient() {
                       type="text"
                       autoComplete="address-level2"
                       value={info.deliveryAddress.district}
-                      aria-invalid={Boolean(errors.deliveryAddress)}
+                      aria-invalid={Boolean(errors.deliveryDistrict)}
+                      aria-describedby={
+                        errors.deliveryDistrict
+                          ? "deliveryDistrict-error"
+                          : undefined
+                      }
                       className={
-                        errors.deliveryAddress
+                        errors.deliveryDistrict
                           ? "input-validation-error"
                           : undefined
                       }
@@ -623,6 +668,15 @@ export default function CheckoutPageClient() {
                         setDeliveryAddressField("district", e.target.value)
                       }
                     />
+                    {errors.deliveryDistrict ? (
+                      <p
+                        id="deliveryDistrict-error"
+                        className="field-validation-error"
+                        role="alert"
+                      >
+                        {errors.deliveryDistrict}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="checkout-field">
@@ -632,9 +686,14 @@ export default function CheckoutPageClient() {
                       name="deliverySubdistrict"
                       type="text"
                       value={info.deliveryAddress.subdistrict}
-                      aria-invalid={Boolean(errors.deliveryAddress)}
+                      aria-invalid={Boolean(errors.deliverySubdistrict)}
+                      aria-describedby={
+                        errors.deliverySubdistrict
+                          ? "deliverySubdistrict-error"
+                          : undefined
+                      }
                       className={
-                        errors.deliveryAddress
+                        errors.deliverySubdistrict
                           ? "input-validation-error"
                           : undefined
                       }
@@ -642,19 +701,33 @@ export default function CheckoutPageClient() {
                         setDeliveryAddressField("subdistrict", e.target.value)
                       }
                     />
+                    {errors.deliverySubdistrict ? (
+                      <p
+                        id="deliverySubdistrict-error"
+                        className="field-validation-error"
+                        role="alert"
+                      >
+                        {errors.deliverySubdistrict}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="checkout-field">
-                    <label htmlFor="deliveryAddress">Street Address</label>
+                    <label htmlFor="deliveryStreetAddress">Street Address</label>
                     <input
-                      id="deliveryAddress"
-                      name="deliveryAddress"
+                      id="deliveryStreetAddress"
+                      name="deliveryStreetAddress"
                       type="text"
                       autoComplete="street-address"
                       value={info.deliveryAddress.address}
-                      aria-invalid={Boolean(errors.deliveryAddress)}
+                      aria-invalid={Boolean(errors.deliveryStreetAddress)}
+                      aria-describedby={
+                        errors.deliveryStreetAddress
+                          ? "deliveryStreetAddress-error"
+                          : undefined
+                      }
                       className={
-                        errors.deliveryAddress
+                        errors.deliveryStreetAddress
                           ? "input-validation-error"
                           : undefined
                       }
@@ -662,19 +735,45 @@ export default function CheckoutPageClient() {
                         setDeliveryAddressField("address", e.target.value)
                       }
                     />
+                    {errors.deliveryStreetAddress ? (
+                      <p
+                        id="deliveryStreetAddress-error"
+                        className="field-validation-error"
+                        role="alert"
+                      >
+                        {errors.deliveryStreetAddress}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="checkout-field">
                     <label htmlFor="deliveryBuilding">
-                      Building <span className="optional">(optional)</span>
+                      Building / Village / Condominium{" "}
+                      <span className="optional">(optional)</span>
                     </label>
                     <input
                       id="deliveryBuilding"
                       name="deliveryBuilding"
                       type="text"
-                      value={info.deliveryAddress.building}
+                      value={info.deliveryAddress.building ?? ""}
                       onChange={(e) =>
                         setDeliveryAddressField("building", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="checkout-field">
+                    <label htmlFor="deliveryUnitFloor">
+                      Unit / Floor{" "}
+                      <span className="optional">(optional)</span>
+                    </label>
+                    <input
+                      id="deliveryUnitFloor"
+                      name="deliveryUnitFloor"
+                      type="text"
+                      value={info.deliveryAddress.unitFloor ?? ""}
+                      onChange={(e) =>
+                        setDeliveryAddressField("unitFloor", e.target.value)
                       }
                     />
                   </div>
@@ -687,7 +786,7 @@ export default function CheckoutPageClient() {
                     <textarea
                       id="deliveryNotes"
                       name="deliveryNotes"
-                      value={info.deliveryAddress.notes}
+                      value={info.deliveryAddress.notes ?? ""}
                       onChange={(e) =>
                         setDeliveryAddressField("notes", e.target.value)
                       }
@@ -889,9 +988,12 @@ export default function CheckoutPageClient() {
                 </p>
               ) : null}
 
-              {isDelivery && deliveryView.showUnavailableBanner ? (
+              {isDelivery &&
+              deliveryView.showUnavailableBanner &&
+              !postalMismatch ? (
                 <div className="checkout-gate" role="alert">
-                  {CHECKOUT_BLOCKING_MESSAGES.deliveryUnavailable}{" "}
+                  {deliveryView.bannerMessage ??
+                    CHECKOUT_BLOCKING_MESSAGES.deliveryUnavailable}{" "}
                   <button
                     type="button"
                     onClick={() =>
@@ -900,13 +1002,97 @@ export default function CheckoutPageClient() {
                           fulfillment?.serviceType === "DELIVERY" &&
                           fulfillment.deliveryMode === "PREORDER"
                             ? "datetime"
-                            : "mode",
+                            : deliveryView.status === "INVALID" ||
+                                deliveryView.status === "EMPTY"
+                              ? "address"
+                              : "mode",
                       })
                     }
                   >
                     Recalculate delivery
                   </button>
                 </div>
+              ) : null}
+
+              {isDelivery &&
+              deliveryView.canContinueToPayment &&
+              customerDisplayName &&
+              info.mobileNumber.trim() &&
+              info.email.trim() &&
+              info.deliveryAddress.province.trim() &&
+              info.deliveryAddress.district.trim() &&
+              info.deliveryAddress.subdistrict.trim() &&
+              info.deliveryAddress.address.trim() ? (
+                <section
+                  className="checkout-order-review"
+                  aria-labelledby="checkout-order-review"
+                  data-testid="checkout-order-review"
+                >
+                  <h3
+                    id="checkout-order-review"
+                    className="checkout-order-review__title"
+                  >
+                    Order Review
+                  </h3>
+                  <p className="checkout-summary-meta">
+                    Customer Name: {customerDisplayName}
+                    <br />
+                    Mobile Number: {info.mobileNumber.trim()}
+                    <br />
+                    Email: {info.email.trim()}
+                  </p>
+                  <p className="checkout-summary-meta">
+                    Full Delivery Address
+                    <br />
+                    {formatFullDeliveryAddressInline({
+                      ...info.deliveryAddress,
+                      postalCode:
+                        deliveryView.postalCode ||
+                        info.deliveryAddress.postalCode,
+                    })}
+                  </p>
+                  <p className="checkout-summary-meta">
+                    Delivery Mode:{" "}
+                    {deliveryModeLabel(fulfillment!.deliveryMode)}
+                    {deliveryView.deliveryDate ? (
+                      <>
+                        <br />
+                        Delivery Date:{" "}
+                        {formatPickupDateKeyLong(deliveryView.deliveryDate)}
+                      </>
+                    ) : null}
+                    {deliveryView.deliveryWindow ? (
+                      <>
+                        <br />
+                        Delivery Window: {deliveryView.deliveryWindow.start} To{" "}
+                        {deliveryView.deliveryWindow.end}
+                      </>
+                    ) : null}
+                  </p>
+                  <div className="checkout-totals">
+                    <div className="checkout-totals__row">
+                      <span>Subtotal</span>
+                      <span>{formatOrderTotalThb(orderTotals.subtotalThb)}</span>
+                    </div>
+                    {typeof orderTotals.deliveryFeeThb === "number" ? (
+                      <div className="checkout-totals__row">
+                        <span>Delivery Fee</span>
+                        <span>
+                          {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className="checkout-totals__row total">
+                      <span>Total</span>
+                      <span>{formatOrderTotalThb(orderTotals.totalThb)}</span>
+                    </div>
+                  </div>
+                  {deliveryNotes ? (
+                    <p className="checkout-summary-meta">
+                      Delivery Notes: {deliveryNotes}
+                    </p>
+                  ) : null}
+                </section>
               ) : null}
 
               {submitStatus === "loading" || submitStatus === "error" ? (

@@ -9,11 +9,16 @@ import {
   type ReactNode,
 } from "react";
 import type { DeliveryAddressDraft } from "../pickup/pickup-availability";
+import { EMPTY_DELIVERY_ADDRESS } from "../pickup/pickup-availability";
 import {
-  EMPTY_DELIVERY_ADDRESS,
-  hasValidDeliveryPostalCode,
-  isCompleteDeliveryAddress,
-} from "../pickup/pickup-availability";
+  focusCheckoutField,
+  getFirstInvalidFieldId,
+  isValidCheckoutPhone,
+  validateBuyerFields,
+  validateDeliveryCheckoutForm,
+  type DeliveryCheckoutFieldErrorKey,
+  type DeliveryCheckoutFieldErrors,
+} from "./delivery-address-form";
 
 export type CheckoutIdentity = "guest" | null;
 
@@ -31,9 +36,7 @@ export type CheckoutInfo = {
   deliveryAddress: DeliveryAddressDraft;
 };
 
-export type CheckoutFieldErrors = Partial<
-  Record<keyof CheckoutInfo | "form" | "deliveryAddress", string>
->;
+export type CheckoutFieldErrors = DeliveryCheckoutFieldErrors;
 
 const emptyInfo: CheckoutInfo = {
   firstName: "",
@@ -64,6 +67,10 @@ type CheckoutContextValue = {
   errors: CheckoutFieldErrors;
   clearErrors: () => void;
   validate: (opts?: { requireDeliveryAddress?: boolean }) => boolean;
+  /** Focus the first invalid field after a failed validate/confirm. */
+  focusFirstInvalidField: (opts?: {
+    requireDeliveryAddress?: boolean;
+  }) => void;
   isCheckoutInfoComplete: boolean;
   confirmed: CheckoutInfo | null;
   confirmCheckoutInfo: (opts?: { requireDeliveryAddress?: boolean }) => boolean;
@@ -72,14 +79,15 @@ type CheckoutContextValue = {
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null);
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isValidPhone(value: string) {
-  const digits = value.replace(/[\s\-()]/g, "");
-  return /^\+?\d{8,15}$/.test(digits);
-}
+const ADDRESS_FIELD_TO_ERROR_KEY: Partial<
+  Record<keyof DeliveryAddressDraft, DeliveryCheckoutFieldErrorKey>
+> = {
+  postalCode: "deliveryPostalCode",
+  province: "deliveryProvince",
+  district: "deliveryDistrict",
+  subdistrict: "deliverySubdistrict",
+  address: "deliveryStreetAddress",
+};
 
 export function CheckoutProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<CheckoutIdentity>(null);
@@ -108,9 +116,10 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
         return next;
       });
       setErrors((current) => {
-        if (!current[key] && !current.form) return current;
+        const errorKey = key as DeliveryCheckoutFieldErrorKey;
+        if (!current[errorKey] && !current.form) return current;
         const next = { ...current };
-        delete next[key];
+        delete next[errorKey];
         delete next.form;
         return next;
       });
@@ -128,9 +137,10 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
         ...(key === "recipient" ? { recipientName: value } : {}),
       }));
       setErrors((current) => {
-        if (!current.deliveryAddress && !current.form) return current;
+        const errorKey = ADDRESS_FIELD_TO_ERROR_KEY[key];
+        if (!errorKey && !current.form) return current;
         const next = { ...current };
-        delete next.deliveryAddress;
+        if (errorKey) delete next[errorKey];
         delete next.form;
         return next;
       });
@@ -154,69 +164,117 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
 
   const clearErrors = useCallback(() => setErrors({}), []);
 
-  const validate = useCallback(
-    (opts?: { requireDeliveryAddress?: boolean }) => {
-      const next: CheckoutFieldErrors = {};
-      const firstName = info.firstName.trim() || info.customerName.trim();
-      const lastName = info.lastName.trim();
-      const mobile = info.mobileNumber.trim();
-      const email = info.email.trim();
-      const recipientPhone = info.recipientPhone.trim();
+  const buildErrors = useCallback(
+    (opts?: { requireDeliveryAddress?: boolean }): CheckoutFieldErrors => {
+      if (opts?.requireDeliveryAddress) {
+        return validateDeliveryCheckoutForm({
+          buyer: {
+            firstName: info.firstName,
+            lastName: info.lastName,
+            email: info.email,
+            mobileNumber: info.mobileNumber,
+            termsAccepted: info.termsAccepted,
+            customerName: info.customerName,
+          },
+          address: info.deliveryAddress,
+        });
+      }
 
-      if (!firstName) next.firstName = "First Name is required.";
-      if (!lastName && !info.customerName.trim()) {
-        next.lastName = "Last Name is required.";
-      }
-      if (!mobile) next.mobileNumber = "Mobile Number is required.";
-      else if (!isValidPhone(mobile)) {
-        next.mobileNumber = "Mobile Number is invalid.";
-      }
-      if (!email) next.email = "Email is required.";
-      else if (!isValidEmail(email)) next.email = "Email is invalid.";
-      if (recipientPhone && !isValidPhone(recipientPhone)) {
+      const next = validateBuyerFields(
+        {
+          firstName: info.firstName,
+          lastName: info.lastName,
+          email: info.email,
+          mobileNumber: info.mobileNumber,
+          termsAccepted: info.termsAccepted,
+          customerName: info.customerName,
+        },
+        { mode: "PICKUP" },
+      );
+      const recipientPhone = info.recipientPhone.trim();
+      if (recipientPhone && !isValidCheckoutPhone(recipientPhone)) {
         next.recipientPhone = "Recipient Phone is invalid.";
       }
-      if (!info.termsAccepted) {
-        next.termsAccepted = "Terms & Conditions must be accepted.";
-      }
-
-      if (opts?.requireDeliveryAddress) {
-        const address = {
-          ...info.deliveryAddress,
-          recipient:
-            info.deliveryAddress.recipient.trim() ||
-            info.recipientName.trim() ||
-            `${info.firstName} ${info.lastName}`.trim() ||
-            info.customerName.trim(),
-          phone:
-            info.deliveryAddress.phone.trim() ||
-            info.recipientPhone.trim() ||
-            mobile,
-        };
-        if (!hasValidDeliveryPostalCode(address.postalCode)) {
-          next.deliveryAddress = "The Postal Code field is required.";
-        } else if (!isCompleteDeliveryAddress(address)) {
-          next.deliveryAddress = "Wrong postal code or address";
-        }
-      }
-
-      setErrors(next);
-      return Object.keys(next).length === 0;
+      return next;
     },
     [info],
   );
 
+  const validate = useCallback(
+    (opts?: { requireDeliveryAddress?: boolean }) => {
+      const next = buildErrors(opts);
+      setErrors(next);
+      return Object.keys(next).length === 0;
+    },
+    [buildErrors],
+  );
+
+  const focusFirstInvalidField = useCallback(
+    (opts?: { requireDeliveryAddress?: boolean }) => {
+      const next = buildErrors(opts);
+      setErrors(next);
+      const order = opts?.requireDeliveryAddress
+        ? ([
+            "firstName",
+            "lastName",
+            "email",
+            "mobileNumber",
+            "deliveryPostalCode",
+            "deliveryProvince",
+            "deliveryDistrict",
+            "deliverySubdistrict",
+            "deliveryStreetAddress",
+            "termsAccepted",
+          ] as DeliveryCheckoutFieldErrorKey[])
+        : ([
+            "customerName",
+            "mobileNumber",
+            "email",
+            "recipientPhone",
+            "termsAccepted",
+          ] as DeliveryCheckoutFieldErrorKey[]);
+      focusCheckoutField(getFirstInvalidFieldId(next, order));
+    },
+    [buildErrors],
+  );
+
   const confirmCheckoutInfo = useCallback(
     (opts?: { requireDeliveryAddress?: boolean }) => {
-      if (!validate(opts)) {
+      const next = buildErrors(opts);
+      setErrors(next);
+      if (Object.keys(next).length > 0) {
         setConfirmed(null);
         setPaymentPendingNotice(false);
+        const order = opts?.requireDeliveryAddress
+          ? ([
+              "firstName",
+              "lastName",
+              "email",
+              "mobileNumber",
+              "deliveryPostalCode",
+              "deliveryProvince",
+              "deliveryDistrict",
+              "deliverySubdistrict",
+              "deliveryStreetAddress",
+              "termsAccepted",
+            ] as DeliveryCheckoutFieldErrorKey[])
+          : ([
+              "customerName",
+              "mobileNumber",
+              "email",
+              "recipientPhone",
+              "termsAccepted",
+            ] as DeliveryCheckoutFieldErrorKey[]);
+        focusCheckoutField(getFirstInvalidFieldId(next, order));
         return false;
       }
 
       const snapshot: CheckoutInfo = {
         ...info,
-        firstName: info.firstName.trim() || info.customerName.trim().split(/\s+/)[0] || "",
+        firstName:
+          info.firstName.trim() ||
+          info.customerName.trim().split(/\s+/)[0] ||
+          "",
         lastName:
           info.lastName.trim() ||
           info.customerName.trim().split(/\s+/).slice(1).join(" "),
@@ -234,7 +292,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       setPaymentPendingNotice(true);
       return true;
     },
-    [info, validate],
+    [buildErrors, info],
   );
 
   const value = useMemo<CheckoutContextValue>(
@@ -248,6 +306,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       errors,
       clearErrors,
       validate,
+      focusFirstInvalidField,
       isCheckoutInfoComplete: confirmed !== null,
       confirmed,
       confirmCheckoutInfo,
@@ -263,6 +322,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       errors,
       clearErrors,
       validate,
+      focusFirstInvalidField,
       confirmed,
       confirmCheckoutInfo,
       paymentPendingNotice,

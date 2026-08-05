@@ -155,6 +155,7 @@ export type DeliveryAddressDto = {
   province: string;
   postalCode: string;
   building?: string;
+  unitFloor?: string;
   notes?: string;
 };
 

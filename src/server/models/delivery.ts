@@ -28,8 +28,10 @@ export type DeliveryAddress = {
   district: string;
   province: string;
   postalCode: string;
-  /** Optional building / village / unit / floor. */
+  /** Optional Building / Village / Condominium. */
   building?: string;
+  /** Optional Unit / Floor — separate from building. */
+  unitFloor?: string;
   /** Optional delivery notes / additional request. */
   notes?: string;
 };
