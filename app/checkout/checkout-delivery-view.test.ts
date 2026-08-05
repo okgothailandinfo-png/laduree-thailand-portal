@@ -58,6 +58,17 @@ describe("Checkout delivery view — single source of truth", () => {
     assert.equal(view.deliveryDate, null);
     assert.equal(view.deliveryWindow, null);
     assert.equal(view.deliveryFee, null);
+    assert.match(view.bannerMessage ?? "", /recalculate delivery/i);
+  });
+
+  it("UNSUPPORTED banner is zone-specific, not a missing-field message", () => {
+    const unsupported = markDeliveryQuoteUnsupported(
+      emptyDeliveryQuote({ deliveryMode: "EARLIEST_AVAILABLE" }),
+      "00000",
+    );
+    const view = getCheckoutDeliveryView(unsupported);
+    assert.match(view.bannerMessage ?? "", /not available for delivery/i);
+    assert.doesNotMatch(view.bannerMessage ?? "", /Province is required/i);
   });
 
   it("UNSUPPORTED and EMPTY follow the same single-gate rules", () => {

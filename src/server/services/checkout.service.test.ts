@@ -498,9 +498,11 @@ describe("Delivery checkout flow (no boutique)", () => {
   });
 
   it("PREORDER mode requires future date and assigns system window", async () => {
+    // Keep far enough in the future to avoid calendar drift vs Asia/Bangkok "today".
+    const futureDateKey = "2026-12-15";
     const windows = new Map([
       [
-        "2026-08-01",
+        futureDateKey,
         {
           id: "1400-1430",
           label: "14:00–14:30",
@@ -567,12 +569,12 @@ describe("Delivery checkout flow (no boutique)", () => {
       delivery: {
         mode: "PREORDER",
         address: deliveryAddress,
-        dateKey: "2026-08-01",
+        dateKey: futureDateKey,
       },
       termsAccepted: true,
     });
     assert.equal(ok.deliveryMode, "PREORDER");
-    assert.equal(ok.deliveryDateKey, "2026-08-01");
+    assert.equal(ok.deliveryDateKey, futureDateKey);
     assert.equal(ok.deliveryTimeWindowLabel, "14:00–14:30");
   });
 

@@ -103,6 +103,7 @@ function parseDeliveryAddress(
     province: requireString(addressRaw.province, `${fieldPrefix}.province`),
     postalCode: postalCode.trim(),
     building: optionalTrimmedString(addressRaw, "building", fieldPrefix),
+    unitFloor: optionalTrimmedString(addressRaw, "unitFloor", fieldPrefix),
     notes: optionalTrimmedString(addressRaw, "notes", fieldPrefix),
   };
 }

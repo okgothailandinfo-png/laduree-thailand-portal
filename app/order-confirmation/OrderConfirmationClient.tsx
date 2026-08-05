@@ -8,21 +8,19 @@ import { rememberCustomerOrderId } from "@/lib/customer-orders";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
 import { useCart } from "../cart/CartContext";
+import { formatFullDeliveryAddressInline } from "../checkout/delivery-address-form";
+import { computeOrderTotals, formatOrderTotalThb } from "../checkout/order-totals";
 import { useCheckout } from "../checkout/CheckoutContext";
 import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
 import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
+import {
+  DEFAULT_MOCK_DELIVERY_TRACKING_STATUS,
+  getDeliveryTrackingSteps,
+} from "./delivery-tracking";
 import PickupCredentialsCard from "./PickupCredentialsCard";
 import "./order-confirmation.css";
-
-const DELIVERY_TRACKING_STATUSES = [
-  "Order received",
-  "Preparing",
-  "Ready for dispatch",
-  "Out for delivery",
-  "Delivered",
-] as const;
 
 function deliveryModeLabel(
   mode: "EARLIEST_AVAILABLE" | "PREORDER",
@@ -61,10 +59,12 @@ function deliveryTimeDetails(
 }
 
 function DeliveryTrackingSection() {
+  const steps = getDeliveryTrackingSteps(DEFAULT_MOCK_DELIVERY_TRACKING_STATUS);
   return (
     <section
       className="order-confirmation-card"
       aria-labelledby="confirmation-tracking"
+      data-testid="delivery-order-tracking"
     >
       <h2
         id="confirmation-tracking"
@@ -73,8 +73,29 @@ function DeliveryTrackingSection() {
         Order Tracking
       </h2>
       <ol className="order-confirmation-tracking">
-        {DELIVERY_TRACKING_STATUSES.map((status) => (
-          <li key={status}>{status}</li>
+        {steps.map((step) => (
+          <li
+            key={step.label}
+            className={
+              step.isCurrent
+                ? "is-current"
+                : step.isComplete
+                  ? "is-complete"
+                  : undefined
+            }
+            aria-current={step.isCurrent ? "step" : undefined}
+            data-tracking-status={step.label}
+            data-tracking-current={step.isCurrent ? "true" : "false"}
+          >
+            <span className="order-confirmation-tracking__label">
+              {step.label}
+            </span>
+            {step.isCurrent ? (
+              <span className="order-confirmation-tracking__current">
+                Current
+              </span>
+            ) : null}
+          </li>
         ))}
       </ol>
     </section>
@@ -83,23 +104,43 @@ function DeliveryTrackingSection() {
 
 function DeliveryFulfillmentSummary({
   mode,
+  recipient,
   addressLines,
   time,
   feeThb,
 }: {
   mode: "EARLIEST_AVAILABLE" | "PREORDER";
+  recipient?: string;
   addressLines: ReactNode;
   time: { dateLabel: string; windowLabel: string } | null;
   feeThb?: number | null;
 }) {
   return (
     <>
-      <p className="order-confirmation-meta">{deliveryModeLabel(mode)}</p>
+      <p className="order-confirmation-meta">
+        Delivery Mode
+        <br />
+        {deliveryModeLabel(mode)}
+      </p>
+      {recipient ? (
+        <p className="order-confirmation-meta">
+          Recipient
+          <br />
+          {recipient}
+        </p>
+      ) : null}
+      <p className="order-confirmation-meta">
+        Full Address
+        <br />
+        {addressLines}
+      </p>
       {time ? (
         <p className="order-confirmation-meta">
-          Delivery Time
+          Delivery Date
           <br />
           {time.dateLabel}
+          <br />
+          Delivery Window
           <br />
           {time.windowLabel}
         </p>
@@ -111,7 +152,6 @@ function DeliveryFulfillmentSummary({
           {formatPriceThb(feeThb)}
         </p>
       ) : null}
-      <p className="order-confirmation-meta">{addressLines}</p>
     </>
   );
 }
@@ -121,7 +161,7 @@ export default function OrderConfirmationClient({
 }: {
   orderId: string | null;
 }) {
-  const { items, itemCount } = useCart();
+  const { items, itemCount, subtotalThb } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
   const { confirmed: pickup, isPickupComplete } = usePickup();
   const { placedOrder, isOrderPlaced } = useOrderFlow();
@@ -152,6 +192,13 @@ export default function OrderConfirmationClient({
       orderQuery.status === "error" ||
       orderQuery.status === "empty";
     const isDelivery = order?.serviceType === "DELIVERY";
+    const orderTotals = computeOrderTotals({
+      serviceType: isDelivery ? "DELIVERY" : "PICKUP",
+      subtotalThb: null,
+      deliveryFeeThb: order?.delivery?.feeThb ?? null,
+      trustedTotalThb:
+        order && typeof order.totalThb === "number" ? order.totalThb : null,
+    });
 
     return (
       <main className="order-confirmation-page">
@@ -199,9 +246,12 @@ export default function OrderConfirmationClient({
                   id="confirmation-order-number"
                   className="order-confirmation-card__title"
                 >
-                  Order number
+                  Order Number
                 </h2>
-                <p className="order-confirmation-order-number">
+                <p
+                  className="order-confirmation-order-number"
+                  data-testid="confirmation-order-number"
+                >
                   {order.orderNumber}
                 </p>
               </section>
@@ -219,22 +269,15 @@ export default function OrderConfirmationClient({
                 {isDelivery && order.delivery ? (
                   <DeliveryFulfillmentSummary
                     mode={order.delivery.mode}
+                    recipient={order.delivery.address.recipient}
                     feeThb={order.delivery.feeThb}
                     time={deliveryTimeDetails(order.delivery.mode, {
                       dateKey: order.delivery.dateKey,
                       timeSlotLabel: order.delivery.timeSlotLabel,
                     })}
-                    addressLines={
-                      <>
-                        {order.delivery.address.recipient}
-                        <br />
-                        {order.delivery.address.address},{" "}
-                        {order.delivery.address.subdistrict},{" "}
-                        {order.delivery.address.district},{" "}
-                        {order.delivery.address.province}{" "}
-                        {order.delivery.address.postalCode}
-                      </>
-                    }
+                    addressLines={formatFullDeliveryAddressInline(
+                      order.delivery.address,
+                    )}
                   />
                 ) : order.pickup ? (
                   <>
@@ -307,19 +350,27 @@ export default function OrderConfirmationClient({
                     </li>
                   ))}
                 </ul>
-                <div className="order-confirmation-totals">
+                <div
+                  className="order-confirmation-totals"
+                  data-testid="confirmation-totals"
+                >
                   <div className="order-confirmation-totals__row">
                     <span>Item(s) Total</span>
                     <span>{itemCountFromOrder}</span>
                   </div>
                   <div className="order-confirmation-totals__row">
                     <span>Subtotal</span>
-                    <span>฿ —</span>
+                    <span data-testid="confirmation-subtotal">
+                      {formatOrderTotalThb(orderTotals.subtotalThb)}
+                    </span>
                   </div>
-                  {isDelivery && typeof order.delivery?.feeThb === "number" ? (
+                  {isDelivery &&
+                  typeof orderTotals.deliveryFeeThb === "number" ? (
                     <div className="order-confirmation-totals__row">
                       <span>Delivery Fee</span>
-                      <span>{formatPriceThb(order.delivery.feeThb)}</span>
+                      <span data-testid="confirmation-delivery-fee">
+                        {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
+                      </span>
                     </div>
                   ) : null}
                   <div className="order-confirmation-totals__row">
@@ -327,8 +378,10 @@ export default function OrderConfirmationClient({
                     <span>฿ —</span>
                   </div>
                   <div className="order-confirmation-totals__row total">
-                    <span>Total amount</span>
-                    <span>฿ —</span>
+                    <span>Total</span>
+                    <span data-testid="confirmation-total">
+                      {formatOrderTotalThb(orderTotals.totalThb)}
+                    </span>
                   </div>
                 </div>
               </section>
@@ -366,6 +419,17 @@ export default function OrderConfirmationClient({
     !!checkout &&
     !!placedOrder;
   const isClientDelivery = pickup?.serviceType === "DELIVERY";
+  const clientDeliveryFee =
+    isClientDelivery &&
+    isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+    typeof pickup.deliveryQuote.deliveryFee === "number"
+      ? pickup.deliveryQuote.deliveryFee
+      : null;
+  const clientTotals = computeOrderTotals({
+    serviceType: isClientDelivery ? "DELIVERY" : "PICKUP",
+    subtotalThb,
+    deliveryFeeThb: clientDeliveryFee,
+  });
 
   return (
     <main className="order-confirmation-page">
@@ -436,9 +500,12 @@ export default function OrderConfirmationClient({
                 id="confirmation-order-number"
                 className="order-confirmation-card__title"
               >
-                Order number
+                Order Number
               </h2>
-              <p className="order-confirmation-order-number">
+              <p
+                className="order-confirmation-order-number"
+                data-testid="confirmation-order-number"
+              >
                 {placedOrder.orderNumber}
               </p>
             </section>
@@ -456,11 +523,12 @@ export default function OrderConfirmationClient({
               {isClientDelivery ? (
                 <DeliveryFulfillmentSummary
                   mode={pickup.deliveryMode}
-                  feeThb={
-                    isDeliveryQuoteValidForCheckout(pickup.deliveryQuote)
-                      ? pickup.deliveryQuote.deliveryFee
-                      : null
+                  recipient={
+                    checkout.deliveryAddress.recipient.trim() ||
+                    pickup.deliveryAddress.recipient ||
+                    checkout.customerName
                   }
+                  feeThb={clientDeliveryFee}
                   time={
                     isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
                     pickup.deliveryQuote.deliveryDate &&
@@ -473,17 +541,11 @@ export default function OrderConfirmationClient({
                         }
                       : null
                   }
-                  addressLines={
-                    <>
-                      {pickup.deliveryAddress.recipient}
-                      <br />
-                      {pickup.deliveryAddress.address},{" "}
-                      {pickup.deliveryAddress.subdistrict},{" "}
-                      {pickup.deliveryAddress.district},{" "}
-                      {pickup.deliveryAddress.province}{" "}
-                      {pickup.deliveryAddress.postalCode}
-                    </>
-                  }
+                  addressLines={formatFullDeliveryAddressInline(
+                    checkout.deliveryAddress.address.trim()
+                      ? checkout.deliveryAddress
+                      : pickup.deliveryAddress,
+                  )}
                 />
               ) : (
                 <>
@@ -535,9 +597,13 @@ export default function OrderConfirmationClient({
                     : null}
                 </p>
               ) : null}
-              {checkout.specialRequest ? (
+              {(checkout.deliveryAddress.notes ?? checkout.specialRequest)
+                .trim() ? (
                 <p className="order-confirmation-meta">
-                  Special Request / Remarks: {checkout.specialRequest}
+                  Delivery Notes:{" "}
+                  {(
+                    checkout.deliveryAddress.notes ?? checkout.specialRequest
+                  ).trim()}
                 </p>
               ) : null}
             </section>
@@ -588,22 +654,26 @@ export default function OrderConfirmationClient({
                   </li>
                 ))}
               </ul>
-              <div className="order-confirmation-totals">
+              <div
+                className="order-confirmation-totals"
+                data-testid="confirmation-totals"
+              >
                 <div className="order-confirmation-totals__row">
                   <span>Item(s) Total</span>
                   <span>{itemCount}</span>
                 </div>
                 <div className="order-confirmation-totals__row">
                   <span>Subtotal</span>
-                  <span>฿ —</span>
+                  <span data-testid="confirmation-subtotal">
+                    {formatOrderTotalThb(clientTotals.subtotalThb)}
+                  </span>
                 </div>
                 {isClientDelivery &&
-                isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
-                typeof pickup.deliveryQuote.deliveryFee === "number" ? (
+                typeof clientTotals.deliveryFeeThb === "number" ? (
                   <div className="order-confirmation-totals__row">
                     <span>Delivery Fee</span>
-                    <span>
-                      {formatPriceThb(pickup.deliveryQuote.deliveryFee)}
+                    <span data-testid="confirmation-delivery-fee">
+                      {formatOrderTotalThb(clientTotals.deliveryFeeThb)}
                     </span>
                   </div>
                 ) : null}
@@ -612,8 +682,10 @@ export default function OrderConfirmationClient({
                   <span>฿ —</span>
                 </div>
                 <div className="order-confirmation-totals__row total">
-                  <span>Total amount</span>
-                  <span>฿ —</span>
+                  <span>Total</span>
+                  <span data-testid="confirmation-total">
+                    {formatOrderTotalThb(clientTotals.totalThb)}
+                  </span>
                 </div>
               </div>
             </section>

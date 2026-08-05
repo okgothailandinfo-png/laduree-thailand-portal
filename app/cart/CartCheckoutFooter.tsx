@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { formatPriceThb } from "@/lib/api/catalog";
 import { usePickup } from "../pickup/PickupContext";
 import { useCart } from "./CartContext";
+import { computeOrderTotals, formatOrderTotalThb } from "../checkout/order-totals";
+import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import {
   getCheckoutEligibility,
   logCheckoutEligibilityDiagnostics,
@@ -85,7 +86,19 @@ export default function CartCheckoutFooter({
 
   if (!eligibility.ctaVisible) return null;
 
-  const subtotalLabel = formatPriceThb(subtotalThb);
+  const deliveryFeeThb =
+    confirmed?.serviceType === "DELIVERY" &&
+    isDeliveryQuoteValidForCheckout(confirmed.deliveryQuote) &&
+    typeof confirmed.deliveryQuote.deliveryFee === "number"
+      ? confirmed.deliveryQuote.deliveryFee
+      : null;
+  const orderTotals = computeOrderTotals({
+    serviceType: serviceType === "DELIVERY" ? "DELIVERY" : "PICKUP",
+    subtotalThb,
+    deliveryFeeThb,
+  });
+  const subtotalLabel = formatOrderTotalThb(orderTotals.subtotalThb);
+  const totalLabel = formatOrderTotalThb(orderTotals.totalThb);
 
   function openSelectionForReason() {
     if (!eligibility.reason) {
@@ -133,10 +146,30 @@ export default function CartCheckoutFooter({
       data-testid="cart-checkout-footer"
     >
       <div className="block-4 total-price-block-1" id="content-cart-price">
-        <div className="summary-price-list">
+        <div className="summary-price-list" data-testid="cart-totals">
           <div className="summary-price-item total-row">
             <div className="summary-price__title">Subtotal</div>
-            <div className="summary-price__price">{subtotalLabel}</div>
+            <div className="summary-price__price" data-testid="cart-subtotal">
+              {subtotalLabel}
+            </div>
+          </div>
+          {serviceType === "DELIVERY" &&
+          typeof orderTotals.deliveryFeeThb === "number" ? (
+            <div className="summary-price-item">
+              <div className="summary-price__title">Delivery Fee</div>
+              <div
+                className="summary-price__price"
+                data-testid="cart-delivery-fee"
+              >
+                {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
+              </div>
+            </div>
+          ) : null}
+          <div className="summary-price-item total-row">
+            <div className="summary-price__title">Total</div>
+            <div className="summary-price__price" data-testid="cart-total">
+              {totalLabel}
+            </div>
           </div>
         </div>
       </div>
@@ -174,7 +207,7 @@ export default function CartCheckoutFooter({
             }}
           >
             <div className="checkout-all-content">
-              <span className="checkout-total-amount">{subtotalLabel}</span>
+              <span className="checkout-total-amount">{totalLabel}</span>
               <span id="textCheckOut" className="checkout-text">
                 {eligibility.label}
               </span>

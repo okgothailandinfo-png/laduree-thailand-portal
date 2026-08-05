@@ -126,4 +126,51 @@ describe("pickup modal reopen refetch contract", () => {
     assert.equal(parsed?.deliveryMode, "EARLIEST_AVAILABLE");
     assert.equal(parsed?.deliveryQuote?.status, "EMPTY");
   });
+
+  it("preserves compatible delivery draft fields including unitFloor on session restore", () => {
+    const parsed = parsePersistedConfirmed(
+      JSON.stringify({
+        serviceType: "DELIVERY",
+        deliveryMode: "PREORDER",
+        deliveryAddress: {
+          recipient: "Ada Lovelace",
+          phone: "0812345678",
+          address: "99 Sukhumvit",
+          subdistrict: "Khlong Toei",
+          district: "Khlong Toei",
+          province: "Bangkok",
+          postalCode: "10110",
+          building: "EmQuartier",
+          unitFloor: "5A",
+          notes: "Leave at lobby",
+        },
+        deliveryQuote: {
+          quoteId: "q1",
+          postalCode: "10110",
+          zoneId: "z1",
+          deliveryMode: "PREORDER",
+          deliveryDate: "2026-08-10",
+          deliveryWindow: {
+            id: "w1",
+            label: "12:30–15:30",
+            start: "12:30",
+            end: "15:30",
+          },
+          relativeLabel: null,
+          deliveryFee: 99,
+          status: "VALID",
+          expiresAt: null,
+          trusted: true,
+          createdAt: "2026-08-05T00:00:00.000Z",
+        },
+      }),
+    );
+    assert.equal(parsed?.serviceType, "DELIVERY");
+    assert.ok(parsed?.deliveryAddress);
+    assert.equal(parsed.deliveryAddress.unitFloor, "5A");
+    assert.equal(parsed.deliveryAddress.building, "EmQuartier");
+    assert.equal(parsed.deliveryAddress.notes, "Leave at lobby");
+    assert.equal(parsed?.deliveryQuote?.status, "VALID");
+    assert.equal(parsed?.deliveryQuote?.deliveryFee, 99);
+  });
 });
