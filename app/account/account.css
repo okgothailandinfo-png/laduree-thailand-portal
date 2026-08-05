@@ -1,0 +1,119 @@
+.account-page {
+  min-height: 100%;
+  background: #f7f4ec;
+  font-family: var(--main-font-family, var(--font-lora), Georgia, serif);
+  color: #333;
+}
+
+.account-page__inner {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.account-page__back {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--main-color, #84754e);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.account-page__back:hover {
+  text-decoration: underline;
+}
+
+.account-page__title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--main-color, #84754e);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.account-card {
+  padding: 20px 16px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+}
+
+.account-card__meta {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.account-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-card__link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--main-color, #84754e);
+  border-radius: 12px;
+}
+
+.account-card__button {
+  min-height: 44px;
+  padding: 0 16px;
+  color: #333;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.account-card__button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.saved-address-item__action {
+  margin-top: 10px;
+}
+
+.saved-address-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saved-address-item {
+  padding: 14px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.saved-address-item:last-child {
+  border-bottom: 0;
+}
+
+.saved-address-item__label {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--main-color, #84754e);
+}
+
+.saved-address-item__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #555;
+}

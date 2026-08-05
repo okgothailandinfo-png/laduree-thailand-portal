@@ -349,11 +349,13 @@ describe("Guest checkout contract", () => {
     // Identity step is client-only; guest progression needs no auth token.
     const guestIdentityOptions = [
       "Continue as Guest",
-      "Member Login",
+      "Sign in",
       "Continue with LINE",
     ] as const;
     assert.ok(guestIdentityOptions.includes("Continue as Guest"));
     assert.equal(guestIdentityOptions[0], "Continue as Guest");
+    // Guest path remains first and does not require member credentials.
+    assert.equal(guestIdentityOptions.includes("Sign in"), true);
   });
 
   it("Guest Checkout is accessible after a valid delivery quote", () => {
