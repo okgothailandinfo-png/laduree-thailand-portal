@@ -273,6 +273,31 @@
   cursor: not-allowed;
 }
 
+a.checkout-identity__secondary--link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--main-color, #84754e);
+  text-decoration: none;
+  cursor: pointer;
+  background: #fff;
+  border-color: var(--main-color, #84754e);
+}
+
+a.checkout-identity__secondary--link:hover {
+  background: #f7f4ec;
+}
+
+.checkout-field select {
+  min-height: 42px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .checkout-inline-action {
   color: var(--main-color, #84754e);
   font-family: inherit;

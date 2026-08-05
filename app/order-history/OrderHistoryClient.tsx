@@ -6,8 +6,15 @@ import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderHistory } from "@/lib/api/orders";
 import type { OrderHistoryItem } from "@/lib/api/types";
 import { listRememberedOrderIds } from "@/lib/customer-orders";
+import {
+  formatMockOrderStatus,
+  formatMockServiceType,
+  listMockMemberOrders,
+} from "@/lib/customer/mock-order-history";
+import type { MockOrderHistoryEntry } from "@/lib/customer/types";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
+import { useCustomerSession } from "../customer/CustomerSessionContext";
 import {
   formatDateTimeBangkok,
   formatStatusLabel,
@@ -24,23 +31,141 @@ function matchesFilter(item: OrderHistoryItem, filter: HistoryFilter): boolean {
   return item.status !== "completed" && item.status !== "cancelled";
 }
 
+function matchesMockFilter(
+  item: MockOrderHistoryEntry,
+  filter: HistoryFilter,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "completed") return item.status === "completed";
+  if (filter === "cancelled") return item.status === "cancelled";
+  return item.status !== "completed" && item.status !== "cancelled";
+}
+
+function formatMockDate(dateKey: string): string {
+  // DD/MM/YYYY (Thailand locale default)
+  const [year, month, day] = dateKey.split("-");
+  if (!year || !month || !day) return dateKey;
+  return `${day}/${month}/${year}`;
+}
+
 export default function OrderHistoryClient() {
   const [filter, setFilter] = useState<HistoryFilter>("all");
+  const { isAuthenticated, email, ready } = useCustomerSession();
 
-  const query = useAsyncResource(
+  const guestQuery = useAsyncResource(
     (signal) => fetchOrderHistory(listRememberedOrderIds(), { signal }),
     {
       isEmpty: (data) => data.length === 0,
+      deps: [ready, isAuthenticated],
     },
   );
 
-  const filtered = useMemo(() => {
-    if (!query.data) return [];
-    return query.data.filter((item) => matchesFilter(item, filter));
-  }, [query.data, filter]);
+  const mockOrders = useMemo(() => {
+    if (!isAuthenticated) return [];
+    return listMockMemberOrders(email);
+  }, [isAuthenticated, email]);
+
+  const filteredGuest = useMemo(() => {
+    if (!guestQuery.data) return [];
+    return guestQuery.data.filter((item) => matchesFilter(item, filter));
+  }, [guestQuery.data, filter]);
+
+  const filteredMock = useMemo(() => {
+    return mockOrders.filter((item) => matchesMockFilter(item, filter));
+  }, [mockOrders, filter]);
+
+  if (!ready) {
+    return (
+      <main className="order-history-page">
+        <div className="order-history-page__inner">
+          <h1 className="order-completed-page__title">Order History</h1>
+        </div>
+      </main>
+    );
+  }
+
+  if (isAuthenticated) {
+    return (
+      <main className="order-history-page">
+        <div className="order-history-page__inner">
+          <div className="order-completed-page__top">
+            <Link href="/" className="order-completed-page__back">
+              ← Back
+            </Link>
+          </div>
+
+          <h1 className="order-completed-page__title">Order History</h1>
+
+          <div
+            className="order-history-filters"
+            role="tablist"
+            aria-label="Filter"
+          >
+            {(
+              [
+                ["all", "All"],
+                ["completed", "Completed"],
+                ["cancelled", "Cancelled"],
+                ["active", "Active"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={filter === value}
+                className={`order-history-filter${
+                  filter === value ? " order-history-filter--active" : ""
+                }`}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {filteredMock.length === 0 ? (
+            <div className="order-history-empty" role="status">
+              No orders match this filter.
+            </div>
+          ) : (
+            <ul className="order-history-list">
+              {filteredMock.map((item) => (
+                <li key={item.orderId} className="order-history-item">
+                  <div className="order-history-item__header">
+                    <p className="order-history-item__number">
+                      {item.orderNumber}
+                    </p>
+                    <p className="order-history-item__status">
+                      {formatMockOrderStatus(item.status)}
+                    </p>
+                  </div>
+                  <p className="order-history-item__meta">
+                    Date: {formatMockDate(item.date)}
+                    <br />
+                    {formatMockServiceType(item.serviceType)}
+                    <br />
+                    {item.boutiqueName}
+                    <br />
+                    Total: {formatPriceThb(item.totalThb)}
+                  </p>
+                  <Link
+                    href={item.detailPath}
+                    className="order-history-item__link"
+                  >
+                    View Details
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </main>
+    );
+  }
 
   const showLoadState =
-    query.status === "loading" || query.status === "error";
+    guestQuery.status === "loading" || guestQuery.status === "error";
 
   return (
     <main className="order-history-page">
@@ -79,26 +204,26 @@ export default function OrderHistoryClient() {
 
         {showLoadState ? (
           <CatalogStatus
-            status={query.status === "loading" ? "loading" : "error"}
-            errorMessage={query.errorMessage}
-            onRetry={query.status === "error" ? query.reload : undefined}
+            status={guestQuery.status === "loading" ? "loading" : "error"}
+            errorMessage={guestQuery.errorMessage}
+            onRetry={guestQuery.status === "error" ? guestQuery.reload : undefined}
           />
         ) : null}
 
-        {query.status === "empty" ? (
+        {guestQuery.status === "empty" ? (
           <div className="order-history-empty" role="status">
             No orders yet. Place an order to see it here.
           </div>
         ) : null}
 
-        {query.status === "success" ? (
-          filtered.length === 0 ? (
+        {guestQuery.status === "success" ? (
+          filteredGuest.length === 0 ? (
             <div className="order-history-empty" role="status">
               No orders match this filter.
             </div>
           ) : (
             <ul className="order-history-list">
-              {filtered.map((item) => (
+              {filteredGuest.map((item) => (
                 <li key={item.orderId} className="order-history-item">
                   <div className="order-history-item__header">
                     <p className="order-history-item__number">

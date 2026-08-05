@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { CheckoutProvider } from "../checkout/CheckoutContext";
+import { CustomerSessionProvider } from "../customer/CustomerSessionContext";
 import { OrderFlowProvider } from "../order/OrderFlowContext";
 import { PickupProvider } from "../pickup/PickupContext";
 import PickupSelectionModal from "../pickup/PickupSelectionModal";
@@ -23,16 +24,18 @@ export default function CartProviderShell({
   }
 
   return (
-    <PickupProvider>
-      <CartProvider>
-        <CheckoutProvider>
-          <OrderFlowProvider>
-            {children}
-            <CartDrawer />
-            <PickupSelectionModal />
-          </OrderFlowProvider>
-        </CheckoutProvider>
-      </CartProvider>
-    </PickupProvider>
+    <CustomerSessionProvider>
+      <PickupProvider>
+        <CartProvider>
+          <CheckoutProvider>
+            <OrderFlowProvider>
+              {children}
+              <CartDrawer />
+              <PickupSelectionModal />
+            </OrderFlowProvider>
+          </CheckoutProvider>
+        </CartProvider>
+      </PickupProvider>
+    </CustomerSessionProvider>
   );
 }

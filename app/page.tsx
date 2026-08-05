@@ -6,6 +6,7 @@ import CatalogStatus from "./catalog/CatalogStatus";
 import { useAsyncResource } from "./catalog/useAsyncResource";
 import DesktopCartAside from "./cart/DesktopCartAside";
 import MobileViewCartButton from "./cart/MobileViewCartButton";
+import AccountMenu from "./customer/AccountMenu";
 import ServiceDateTimeBar from "./pickup/ServiceDateTimeBar";
 import {
   fetchCategories,
@@ -355,13 +356,7 @@ export default function Home() {
                       : brandDisplayName}
                   </h1>
                   <div className="header-member">
-                    <a
-                      href="#"
-                      className="btn-login btn-login-desktop"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      Member?
-                    </a>
+                    <AccountMenu triggerClassName="btn-login btn-login-desktop" />
                   </div>
                 </div>
 
@@ -474,13 +469,7 @@ export default function Home() {
                   <span className="icon-bar" />
                   <span className="icon-bar" />
                 </button>
-                <a
-                  href="#"
-                  className="btn-login btn-login-mobile"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  Member?
-                </a>
+                <AccountMenu triggerClassName="btn-login btn-login-mobile" />
               </div>
 
               <div className="menu__branch-name">

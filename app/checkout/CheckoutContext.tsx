@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { CheckoutPrefill } from "@/lib/customer/checkout-prefill";
 import type { DeliveryAddressDraft } from "../pickup/pickup-availability";
 import { EMPTY_DELIVERY_ADDRESS } from "../pickup/pickup-availability";
 import {
@@ -20,7 +21,7 @@ import {
   type DeliveryCheckoutFieldErrors,
 } from "./delivery-address-form";
 
-export type CheckoutIdentity = "guest" | null;
+export type CheckoutIdentity = "guest" | "member" | null;
 
 export type CheckoutInfo = {
   firstName: string;
@@ -54,6 +55,10 @@ const emptyInfo: CheckoutInfo = {
 type CheckoutContextValue = {
   identity: CheckoutIdentity;
   continueAsGuest: () => void;
+  /** Mark checkout as member and optionally prefill buyer / address fields. */
+  continueAsMember: (prefill?: CheckoutPrefill | null) => void;
+  applyMemberPrefill: (prefill: CheckoutPrefill) => void;
+  applyDeliveryAddress: (address: DeliveryAddressDraft) => void;
   info: CheckoutInfo;
   setField: <K extends keyof CheckoutInfo>(
     key: K,
@@ -98,6 +103,50 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
 
   const continueAsGuest = useCallback(() => {
     setIdentity("guest");
+  }, []);
+
+  const applyMemberPrefill = useCallback((prefill: CheckoutPrefill) => {
+    setInfo((current) => ({
+      ...current,
+      firstName: prefill.firstName,
+      lastName: prefill.lastName,
+      customerName: prefill.customerName,
+      email: prefill.email,
+      mobileNumber: prefill.mobileNumber,
+      ...(prefill.deliveryAddress
+        ? {
+            deliveryAddress: {
+              ...current.deliveryAddress,
+              ...prefill.deliveryAddress,
+            },
+            recipientName:
+              prefill.deliveryAddress.recipient || current.recipientName,
+            recipientPhone:
+              prefill.deliveryAddress.phone || current.recipientPhone,
+          }
+        : {}),
+    }));
+    setErrors({});
+    setPaymentPendingNotice(false);
+  }, []);
+
+  const continueAsMember = useCallback(
+    (prefill?: CheckoutPrefill | null) => {
+      setIdentity("member");
+      if (prefill) applyMemberPrefill(prefill);
+    },
+    [applyMemberPrefill],
+  );
+
+  const applyDeliveryAddress = useCallback((address: DeliveryAddressDraft) => {
+    setInfo((current) => ({
+      ...current,
+      deliveryAddress: { ...address },
+      recipientName: address.recipient || current.recipientName,
+      recipientPhone: address.phone || current.recipientPhone,
+    }));
+    setErrors({});
+    setPaymentPendingNotice(false);
   }, []);
 
   const setField = useCallback(
@@ -299,6 +348,9 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     () => ({
       identity,
       continueAsGuest,
+      continueAsMember,
+      applyMemberPrefill,
+      applyDeliveryAddress,
       info,
       setField,
       setDeliveryAddressField,
@@ -315,6 +367,9 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     [
       identity,
       continueAsGuest,
+      continueAsMember,
+      applyMemberPrefill,
+      applyDeliveryAddress,
       info,
       setField,
       setDeliveryAddressField,

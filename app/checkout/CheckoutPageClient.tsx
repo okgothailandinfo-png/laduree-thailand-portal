@@ -7,9 +7,12 @@ import { formatPriceThb } from "@/lib/api/catalog";
 import { submitCheckout } from "@/lib/api/checkout";
 import { ApiClientError } from "@/lib/api/client";
 import { fetchPickupAvailability } from "@/lib/api/pickup";
+import { buildCheckoutPrefillFromSession } from "@/lib/customer/checkout-prefill";
+import { savedAddressToDeliveryDraft } from "@/lib/customer/saved-addresses";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { CHECKOUT_BLOCKING_MESSAGES } from "../cart/checkout-eligibility";
 import { useCart } from "../cart/CartContext";
+import { useCustomerSession } from "../customer/CustomerSessionContext";
 import { usePickup } from "../pickup/PickupContext";
 import {
   DELIVERY_POSTAL_RECALCULATE_MESSAGE,
@@ -62,6 +65,8 @@ export default function CheckoutPageClient() {
   const {
     identity,
     continueAsGuest,
+    continueAsMember,
+    applyDeliveryAddress,
     info,
     setField,
     setDeliveryAddressField,
@@ -69,12 +74,22 @@ export default function CheckoutPageClient() {
     errors,
     confirmCheckoutInfo,
   } = useCheckout();
+  const {
+    session,
+    ready: sessionReady,
+    isAuthenticated,
+    savedAddresses,
+    selectedSavedAddressId,
+    selectSavedAddress,
+    continueAsGuest: continueAsGuestSession,
+  } = useCustomerSession();
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "loading" | "error"
   >("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   const lastInvalidatedPostalRef = useRef<string | null>(null);
+  const memberPrefillAppliedRef = useRef(false);
 
   const isEmpty = items.length === 0;
   const canProceedToForm = !isEmpty && isPickupComplete;
@@ -127,6 +142,60 @@ export default function CheckoutPageClient() {
     // Buyer + compatible address fields in CheckoutInfo are preserved.
     invalidateDeliveryQuote();
   }, [postalMismatch, formPostal, invalidateDeliveryQuote]);
+
+  /** Sync checkout identity from customer session (guest / member). */
+  useEffect(() => {
+    if (!sessionReady || !canProceedToForm) return;
+
+    if (session.customerType === "guest" && identity === null) {
+      continueAsGuest();
+      return;
+    }
+
+    if (!isAuthenticated || session.customerType !== "member") {
+      memberPrefillAppliedRef.current = false;
+      return;
+    }
+    if (identity === "member" && memberPrefillAppliedRef.current) return;
+
+    const selected =
+      savedAddresses.find((a) => a.id === selectedSavedAddressId) ??
+      savedAddresses[0] ??
+      null;
+    const prefill = buildCheckoutPrefillFromSession(
+      session,
+      isDelivery ? selected : null,
+    );
+    continueAsMember(prefill);
+    if (selected && !selectedSavedAddressId) {
+      selectSavedAddress(selected.id);
+    }
+    memberPrefillAppliedRef.current = true;
+  }, [
+    sessionReady,
+    canProceedToForm,
+    isAuthenticated,
+    session,
+    identity,
+    savedAddresses,
+    selectedSavedAddressId,
+    isDelivery,
+    continueAsGuest,
+    continueAsMember,
+    selectSavedAddress,
+  ]);
+
+  function handleContinueAsGuest() {
+    continueAsGuestSession();
+    continueAsGuest();
+  }
+
+  function handleSelectSavedAddress(addressId: string) {
+    selectSavedAddress(addressId);
+    const address = savedAddresses.find((item) => item.id === addressId);
+    if (!address) return;
+    applyDeliveryAddress(savedAddressToDeliveryDraft(address));
+  }
 
   async function runCheckout() {
     if (!canProceedToForm || !fulfillment || identity === null) return;
@@ -410,25 +479,23 @@ export default function CheckoutPageClient() {
               <button
                 type="button"
                 className="checkout-identity__primary"
-                onClick={continueAsGuest}
+                onClick={handleContinueAsGuest}
               >
                 Continue as Guest
               </button>
+              <Link
+                href="/sign-in?next=/checkout"
+                className="checkout-identity__secondary checkout-identity__secondary--link"
+              >
+                Sign in
+              </Link>
               <button
                 type="button"
                 className="checkout-identity__secondary"
                 disabled
                 aria-disabled="true"
               >
-                Member Login — [CONTENT PENDING APPROVAL]
-              </button>
-              <button
-                type="button"
-                className="checkout-identity__secondary"
-                disabled
-                aria-disabled="true"
-              >
-                Continue with LINE — [CONTENT PENDING APPROVAL]
+                Continue with LINE
               </button>
             </div>
           </section>
@@ -559,6 +626,28 @@ export default function CheckoutPageClient() {
                       </p>
                     ) : null}
                   </div>
+
+                  {identity === "member" && savedAddresses.length > 0 ? (
+                    <div className="checkout-field">
+                      <label htmlFor="savedAddress">Saved Addresses</label>
+                      <select
+                        id="savedAddress"
+                        name="savedAddress"
+                        value={selectedSavedAddressId ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (!value) return;
+                          handleSelectSavedAddress(value);
+                        }}
+                      >
+                        {savedAddresses.map((address) => (
+                          <option key={address.id} value={address.id}>
+                            {address.label} — {address.postalCode}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
 
                   <div className="checkout-field">
                     <label htmlFor="deliveryPostalCode">Postal Code</label>
