@@ -55,6 +55,23 @@ export class MockOrderRepository implements OrderRepository {
     return next;
   }
 
+  async attachPayment(
+    orderId: string,
+    payment: NonNullable<Order["payment"]>,
+  ): Promise<Order> {
+    const existing = ordersById.get(orderId);
+    if (!existing) {
+      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+    }
+    const next: Order = {
+      ...existing,
+      payment: { ...payment },
+    };
+    ordersById.set(orderId, next);
+    ordersByNumber.set(next.orderNumber, next);
+    return next;
+  }
+
   async updatePaymentStatus(
     orderId: string,
     status: "pending" | "mock_accepted" | "failed",

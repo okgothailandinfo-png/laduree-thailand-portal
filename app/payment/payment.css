@@ -320,6 +320,17 @@
   border: 1px solid #ccc;
 }
 
+.payment-order-review {
+  margin: 0;
+}
+
+.payment-order-review .checkout-order-review__title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+}
+
 .payment-success {
   margin-top: 12px;
   padding: 12px;

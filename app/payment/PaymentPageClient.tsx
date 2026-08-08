@@ -2,38 +2,50 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiClientError } from "@/lib/api/client";
-import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderById } from "@/lib/api/orders";
 import { createPayment } from "@/lib/api/payment";
+import {
+  focusFirstInvalidCardField,
+  formatCardNumberInput,
+  formatExpiryInput,
+  safeCardDisplayFromNumber,
+  validateMockCard,
+  type CardDraft,
+  type CardFieldErrors,
+} from "@/lib/payment/card-validation";
+import {
+  PAYMENT_METHOD_IDS,
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethodId,
+} from "@/lib/payment/methods";
+import {
+  paymentUiStateFromMethod,
+  preventsDuplicateSubmission,
+  type PaymentUiState,
+} from "@/lib/payment/payment-ui-state";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
 import { CHECKOUT_BLOCKING_MESSAGES } from "../cart/checkout-eligibility";
 import { useCart } from "../cart/CartContext";
 import { useCheckout } from "../checkout/CheckoutContext";
+import OrderReview from "../checkout/OrderReview";
 import {
-  MOCK_PAYMENT_METHOD_LABELS,
-  useOrderFlow,
-  type MockPaymentMethod,
-} from "../order/OrderFlowContext";
+  buildOrderReviewTotals,
+  formatModifiersLabel,
+  TRUSTED_TAX_PLACEHOLDER,
+  type OrderReviewModel,
+} from "../checkout/order-review-model";
 import { formatFullDeliveryAddressInline } from "../checkout/delivery-address-form";
-import { computeOrderTotals, formatOrderTotalThb } from "../checkout/order-totals";
+import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
 import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import "./payment.css";
 
-type CardDraft = {
-  cardholderName: string;
-  cardNumber: string;
-  expiry: string;
-  cvv: string;
-};
-
-type PaymentErrors = Partial<
-  Record<"method" | keyof CardDraft | "form", string>
->;
+type PaymentErrors = CardFieldErrors &
+  Partial<Record<"method" | "form", string>>;
 
 const emptyCard: CardDraft = {
   cardholderName: "",
@@ -48,27 +60,34 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function deliveryModeLabel(
+  mode: "EARLIEST_AVAILABLE" | "PREORDER",
+): string {
+  return mode === "EARLIEST_AVAILABLE" ? "Earliest Delivery" : "Pre-order";
+}
+
 export default function PaymentPageClient({
   orderId,
 }: {
   orderId: string | null;
 }) {
   const router = useRouter();
-  const { items, itemCount } = useCart();
+  const { items, itemCount, subtotalThb } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
   const { confirmed: pickup, isPickupComplete, openPickupSelection } =
     usePickup();
   const { selectedPaymentMethod, setSelectedPaymentMethod } = useOrderFlow();
 
-  const [method, setMethod] = useState<MockPaymentMethod | null>(
+  const [method, setMethod] = useState<PaymentMethodId | null>(
     selectedPaymentMethod,
   );
   const [card, setCard] = useState<CardDraft>(emptyCard);
   const [errors, setErrors] = useState<PaymentErrors>({});
-  const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "loading" | "error"
-  >("idle");
+  const [uiState, setUiState] = useState<PaymentUiState>(() =>
+    paymentUiStateFromMethod(selectedPaymentMethod !== null),
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const orderQuery = useAsyncResource(
     (signal) => {
@@ -82,15 +101,14 @@ export default function PaymentPageClient({
   );
 
   const isEmpty = items.length === 0;
+  const termsAccepted = checkout?.termsAccepted === true;
   const canPay =
     !isEmpty &&
     isPickupComplete &&
     isCheckoutInfoComplete &&
+    termsAccepted &&
     !!checkout &&
     !!orderId;
-  const isSubmitting = submitStatus === "loading";
-
-  const customer = useMemo(() => checkout, [checkout]);
 
   const order = orderId ? orderQuery.data : null;
   const isDelivery = pickup?.serviceType === "DELIVERY";
@@ -101,20 +119,99 @@ export default function PaymentPageClient({
     typeof pickup.deliveryQuote.deliveryFee === "number"
       ? pickup.deliveryQuote.deliveryFee
       : order?.delivery?.feeThb ?? null;
-  const orderTotals = computeOrderTotals({
+
+  const orderTotals = buildOrderReviewTotals({
     serviceType: isDelivery ? "DELIVERY" : "PICKUP",
-    subtotalThb: null,
+    subtotalThb:
+      typeof order?.totalThb === "number"
+        ? null
+        : subtotalThb,
     deliveryFeeThb,
     trustedTotalThb:
       order && typeof order.totalThb === "number" && Number.isFinite(order.totalThb)
         ? order.totalThb
         : null,
   });
-  const trustedTotalLabel = formatOrderTotalThb(orderTotals.totalThb);
-  const trustedSubtotalLabel = formatOrderTotalThb(orderTotals.subtotalThb);
+
+  const reviewModel: OrderReviewModel | null = useMemo(() => {
+    if (!pickup || !checkout) return null;
+    const customerName =
+      `${checkout.firstName} ${checkout.lastName}`.trim() ||
+      checkout.customerName;
+    const deliveryNotes =
+      (checkout.deliveryAddress.notes ?? "").trim() ||
+      checkout.specialRequest.trim() ||
+      null;
+
+    return {
+      serviceType: isDelivery ? "DELIVERY" : "PICKUP",
+      customer: {
+        customerName,
+        email: checkout.email,
+        mobileNumber: checkout.mobileNumber,
+      },
+      items: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        modifiersLabel: formatModifiersLabel(item.modifiers),
+      })),
+      totals: orderTotals,
+      taxLabel: TRUSTED_TAX_PLACEHOLDER,
+      pickup:
+        !isDelivery && pickup.serviceType === "PICKUP"
+          ? {
+              boutiqueName: pickup.boutique.name,
+              boutiqueAddress: pickup.boutique.address,
+              dateLabel: formatPickupDateKeyLong(pickup.dateKey),
+              timeLabel: `${pickup.timeSlot.start} To ${pickup.timeSlot.end}`,
+            }
+          : null,
+      delivery: isDelivery
+        ? {
+            fullAddress: formatFullDeliveryAddressInline(
+              checkout.deliveryAddress.address.trim()
+                ? checkout.deliveryAddress
+                : pickup.deliveryAddress,
+            ),
+            modeLabel: deliveryModeLabel(pickup.deliveryMode),
+            dateLabel:
+              isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+              pickup.deliveryQuote.deliveryDate
+                ? formatPickupDateKeyLong(pickup.deliveryQuote.deliveryDate)
+                : null,
+            windowLabel:
+              isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+              pickup.deliveryQuote.deliveryWindow
+                ? `${pickup.deliveryQuote.deliveryWindow.start} To ${pickup.deliveryQuote.deliveryWindow.end}`
+                : null,
+            notes: deliveryNotes,
+            deliveryFeeThb,
+          }
+        : null,
+    };
+  }, [
+    pickup,
+    checkout,
+    isDelivery,
+    items,
+    orderTotals,
+    deliveryFeeThb,
+  ]);
+
+  const placeOrderEnabled =
+    canPay &&
+    method !== null &&
+    !preventsDuplicateSubmission(uiState) &&
+    uiState !== "SUCCEEDED";
 
   function setCardField<K extends keyof CardDraft>(key: K, value: string) {
-    setCard((current) => ({ ...current, [key]: value }));
+    let nextValue = value;
+    if (key === "cardNumber") nextValue = formatCardNumberInput(value);
+    if (key === "expiry") nextValue = formatExpiryInput(value);
+    if (key === "cvv") nextValue = value.replace(/\D/g, "").slice(0, 4);
+
+    setCard((current) => ({ ...current, [key]: nextValue }));
     setErrors((current) => {
       if (!current[key] && !current.form) return current;
       const next = { ...current };
@@ -124,9 +221,10 @@ export default function PaymentPageClient({
     });
   }
 
-  function selectMethod(next: MockPaymentMethod) {
+  function selectMethod(next: PaymentMethodId) {
     setMethod(next);
     setSelectedPaymentMethod(next);
+    setUiState("READY");
     setErrors((current) => {
       if (!current.method && !current.form) return current;
       const cleared = { ...current };
@@ -134,6 +232,10 @@ export default function PaymentPageClient({
       delete cleared.form;
       return cleared;
     });
+    // Clear card secrets when leaving card method — never persist.
+    if (next !== "credit-card") {
+      setCard(emptyCard);
+    }
   }
 
   function validatePayment(): boolean {
@@ -143,48 +245,83 @@ export default function PaymentPageClient({
     }
 
     if (method === "credit-card") {
-      if (!card.cardholderName.trim()) {
-        next.cardholderName = "Cardholder name is required.";
-      }
-      if (!card.cardNumber.trim()) {
-        next.cardNumber = "Card number is required.";
-      }
-      if (!card.expiry.trim()) {
-        next.expiry = "Expiry is required.";
-      }
-      if (!card.cvv.trim()) {
-        next.cvv = "CVV is required.";
-      }
+      Object.assign(next, validateMockCard(card));
     }
 
     setErrors(next);
-    return Object.keys(next).length === 0;
+    if (Object.keys(next).length > 0) {
+      if (method === "credit-card") {
+        focusFirstInvalidCardField(next);
+      }
+      return false;
+    }
+    return true;
   }
 
   async function runCreatePayment() {
     if (!canPay || !method || !orderId) return;
     if (!validatePayment()) return;
+    if (preventsDuplicateSubmission(uiState)) return;
 
-    setSubmitStatus("loading");
+    setUiState("PROCESSING");
     setSubmitError(null);
 
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `pay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    const safeDisplay =
+      method === "credit-card"
+        ? safeCardDisplayFromNumber(card.cardNumber)
+        : null;
+
     try {
-      const result = await createPayment({ orderId });
-      setSubmitStatus("idle");
+      const result = await createPayment(
+        {
+          orderId,
+          method,
+          ...(safeDisplay ? { safeDisplay } : {}),
+        },
+        { idempotencyKey: idempotencyKeyRef.current },
+      );
+      // Never carry PAN/CVV forward.
+      setCard(emptyCard);
+      idempotencyKeyRef.current = null;
       router.push(result.paymentUrl);
     } catch (error: unknown) {
-      setSubmitStatus("error");
-      setSubmitError(
-        errorMessage(error, "Unable to start payment. Please try again."),
+      setUiState("FAILED");
+      const message = errorMessage(
+        error,
+        "Unable to start payment. Please try again.",
       );
+      if (
+        error instanceof ApiClientError &&
+        /already paid/i.test(error.message)
+      ) {
+        setSubmitError("Order already paid.");
+      } else {
+        setSubmitError(message);
+      }
     }
   }
 
   function handlePlaceOrder(event: FormEvent) {
     event.preventDefault();
-    if (!canPay || isSubmitting) return;
+    if (!placeOrderEnabled) {
+      if (!method) {
+        setErrors({ method: "Please select a payment method." });
+      } else if (!termsAccepted) {
+        setErrors({ form: "Accept Terms & Conditions before payment." });
+      }
+      return;
+    }
     void runCreatePayment();
   }
+
+  const isSubmitting = uiState === "PROCESSING";
 
   return (
     <main className="payment-page">
@@ -233,34 +370,14 @@ export default function PaymentPageClient({
           </div>
         ) : null}
 
-        {canPay && pickup && customer ? (
+        {canPay && pickup && checkout && reviewModel ? (
           <>
-            <section
-              className="payment-card"
-              aria-labelledby="payment-order-summary"
-            >
-              <h2 id="payment-order-summary" className="payment-card__title">
-                Order Summary
-              </h2>
-              <ul className="payment-summary-list">
-                {items.map((item) => (
-                  <li key={item.id}>
-                    <span>
-                      {item.name}
-                      {item.modifiers.length > 0
-                        ? ` — ${item.modifiers
-                            .map((m) =>
-                              m.quantity
-                                ? `${m.quantity}× ${m.label}`
-                                : m.label,
-                            )
-                            .join(", ")}`
-                        : ""}
-                    </span>
-                    <span>× {item.quantity}</span>
-                  </li>
-                ))}
-              </ul>
+            <section className="payment-card" aria-labelledby="payment-review">
+              <OrderReview
+                model={reviewModel}
+                testId="payment-order-review"
+                className="payment-order-review"
+              />
               {orderId &&
               (orderQuery.status === "loading" ||
                 orderQuery.status === "error") ? (
@@ -281,154 +398,9 @@ export default function PaymentPageClient({
                   />
                 </div>
               ) : null}
-              <div className="payment-totals" data-testid="payment-totals">
-                <div className="payment-totals__row">
-                  <span>Item(s) Total</span>
-                  <span>{itemCount}</span>
-                </div>
-                <div className="payment-totals__row">
-                  <span>Subtotal</span>
-                  <span data-testid="payment-trusted-subtotal">
-                    {trustedSubtotalLabel}
-                  </span>
-                </div>
-                {isDelivery &&
-                typeof orderTotals.deliveryFeeThb === "number" ? (
-                  <div className="payment-totals__row">
-                    <span>Delivery Fee</span>
-                    <span data-testid="payment-delivery-fee">
-                      {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="payment-totals__row">
-                  <span>Tax</span>
-                  <span>฿ —</span>
-                </div>
-                <div className="payment-totals__row total">
-                  <span>Total</span>
-                  <span data-testid="payment-trusted-total">
-                    {trustedTotalLabel}
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            <section
-              className="payment-card"
-              aria-labelledby="payment-pickup-summary"
-            >
-              <h2 id="payment-pickup-summary" className="payment-card__title">
-                {pickup.serviceType === "DELIVERY" ? "Delivery Summary" : "Pickup Summary"}
-              </h2>
-              {pickup.serviceType === "DELIVERY" ? (
-                <>
-                  <p className="payment-summary-meta">
-                    {pickup.deliveryMode === "EARLIEST_AVAILABLE"
-                      ? "Earliest Delivery"
-                      : "Pre-order"}
-                  </p>
-                  {isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
-                  pickup.deliveryQuote.deliveryDate &&
-                  pickup.deliveryQuote.deliveryWindow ? (
-                    <p className="payment-summary-meta">
-                      Delivery Time
-                      <br />
-                      {formatPickupDateKeyLong(
-                        pickup.deliveryQuote.deliveryDate,
-                      )}
-                      <br />
-                      {pickup.deliveryQuote.deliveryWindow.start} To{" "}
-                      {pickup.deliveryQuote.deliveryWindow.end}
-                    </p>
-                  ) : null}
-                  {isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
-                  typeof pickup.deliveryQuote.deliveryFee === "number" ? (
-                    <p className="payment-summary-meta">
-                      Delivery Fee
-                      <br />
-                      {formatPriceThb(pickup.deliveryQuote.deliveryFee)}
-                    </p>
-                  ) : null}
-                  <p className="payment-summary-meta">
-                    {(
-                      customer.deliveryAddress.recipient.trim() ||
-                      pickup.deliveryAddress.recipient ||
-                      customer.customerName
-                    ).trim()}
-                    <br />
-                    {formatFullDeliveryAddressInline(
-                      customer.deliveryAddress.address.trim()
-                        ? customer.deliveryAddress
-                        : pickup.deliveryAddress,
-                    )}
-                  </p>
-                  {(
-                    customer.deliveryAddress.notes ??
-                    customer.specialRequest
-                  ).trim() ? (
-                    <p className="payment-summary-meta">
-                      Delivery Notes:{" "}
-                      {(
-                        customer.deliveryAddress.notes ??
-                        customer.specialRequest
-                      ).trim()}
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <p className="payment-summary-meta">
-                    {pickup.boutique.name}
-                    <br />
-                    {pickup.boutique.address}
-                  </p>
-                  <p className="payment-summary-meta">
-                    Pickup Time
-                    <br />
-                    {formatPickupDateKeyLong(pickup.dateKey)}
-                    <br />
-                    {pickup.timeSlot.start} To {pickup.timeSlot.end}
-                  </p>
-                </>
-              )}
-            </section>
-
-            <section
-              className="payment-card"
-              aria-labelledby="payment-customer-summary"
-            >
-              <h2
-                id="payment-customer-summary"
-                className="payment-card__title"
-              >
-                Customer Information Summary
-              </h2>
-              <p className="payment-summary-meta">
-                Customer Name: {customer.customerName}
-                <br />
-                Mobile Number: {customer.mobileNumber}
-                <br />
-                Email: {customer.email}
+              <p className="payment-summary-meta" data-testid="payment-item-count">
+                Item(s) Total: {itemCount}
               </p>
-              {customer.recipientName || customer.recipientPhone ? (
-                <p className="payment-summary-meta">
-                  {customer.recipientName
-                    ? `Recipient Name: ${customer.recipientName}`
-                    : null}
-                  {customer.recipientName && customer.recipientPhone ? (
-                    <br />
-                  ) : null}
-                  {customer.recipientPhone
-                    ? `Recipient Phone: ${customer.recipientPhone}`
-                    : null}
-                </p>
-              ) : null}
-              {customer.specialRequest ? (
-                <p className="payment-summary-meta">
-                  Special Request / Remarks: {customer.specialRequest}
-                </p>
-              ) : null}
             </section>
 
             <section
@@ -439,8 +411,7 @@ export default function PaymentPageClient({
                 Payment Method
               </h2>
               <p className="payment-note">
-                Thailand payment methods — placeholder UI only. No real payment
-                gateway, charge, or QR is processed. [CONTENT PENDING APPROVAL]
+                Mock payment only — no real charge or QR is processed.
               </p>
 
               <form onSubmit={handlePlaceOrder} noValidate>
@@ -448,20 +419,15 @@ export default function PaymentPageClient({
                   className="payment-methods"
                   role="radiogroup"
                   aria-labelledby="payment-method-title"
+                  data-testid="payment-method-list"
                 >
-                  {(
-                    [
-                      "credit-card",
-                      "promptpay-qr",
-                      "apple-pay",
-                      "google-pay",
-                    ] as MockPaymentMethod[]
-                  ).map((id) => {
+                  {PAYMENT_METHOD_IDS.map((id) => {
                     const selected = method === id;
                     return (
                       <label
                         key={id}
                         className={`payment-method radio${selected ? " active is-selected" : ""}`}
+                        data-testid={`payment-method-${id}`}
                       >
                         <input
                           className="payment-method__radio"
@@ -473,10 +439,10 @@ export default function PaymentPageClient({
                         />
                         <span className="payment-method__body">
                           <span className="payment-method__title">
-                            {MOCK_PAYMENT_METHOD_LABELS[id]}
+                            {PAYMENT_METHOD_LABELS[id]}
                           </span>
                           <span className="payment-method__sub">
-                            Placeholder only
+                            Mock only
                           </span>
                         </span>
                       </label>
@@ -491,10 +457,13 @@ export default function PaymentPageClient({
                 ) : null}
 
                 {method === "credit-card" ? (
-                  <div className="payment-panel">
+                  <div
+                    className="payment-panel"
+                    data-testid="credit-card-payment-screen"
+                  >
                     <p className="payment-note">
-                      Credit Card fields are placeholder UI only — do not enter
-                      real card data.
+                      Credit Card fields are mock UI only — do not enter real
+                      card data.
                     </p>
                     <div className="payment-field">
                       <label htmlFor="cardholderName">Cardholder Name</label>
@@ -548,7 +517,7 @@ export default function PaymentPageClient({
                     </div>
                     <div className="payment-field-row">
                       <div className="payment-field">
-                        <label htmlFor="expiry">Expiry</label>
+                        <label htmlFor="expiry">Expiry Date</label>
                         <input
                           id="expiry"
                           name="expiry"
@@ -598,40 +567,34 @@ export default function PaymentPageClient({
                 ) : null}
 
                 {method === "promptpay-qr" ? (
-                  <div className="payment-panel">
-                    <div className="payment-qr-placeholder">
-                      <div
-                        className="payment-qr-box"
-                        role="img"
-                        aria-label="PromptPay QR placeholder"
-                      />
-                      <p>
-                        PromptPay QR placeholder — not a real QR code.
-                        <br />
-                        [CONTENT PENDING APPROVAL]
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {method === "apple-pay" || method === "google-pay" ? (
-                  <div className="payment-panel">
-                    <p className="payment-wallet-placeholder">
-                      {MOCK_PAYMENT_METHOD_LABELS[method]} placeholder only —
-                      wallet checkout is not connected. [CONTENT PENDING
-                      APPROVAL]
+                  <div
+                    className="payment-panel"
+                    data-testid="promptpay-payment-screen"
+                  >
+                    <p className="payment-note">
+                      PromptPay QR will open on the next mock authorization
+                      screen. No real QR is generated.
                     </p>
                   </div>
                 ) : null}
 
-                {submitStatus === "loading" || submitStatus === "error" ? (
+                {errors.form ? (
+                  <p className="field-validation-error" role="alert">
+                    {errors.form}
+                  </p>
+                ) : null}
+
+                {uiState === "PROCESSING" || uiState === "FAILED" ? (
                   <div className="payment-submit-status">
                     <CatalogStatus
-                      status={submitStatus === "loading" ? "loading" : "error"}
+                      status={uiState === "PROCESSING" ? "loading" : "error"}
                       errorMessage={submitError}
                       onRetry={
-                        submitStatus === "error"
-                          ? () => void runCreatePayment()
+                        uiState === "FAILED"
+                          ? () => {
+                              setUiState(method ? "READY" : "UNSELECTED");
+                              void runCreatePayment();
+                            }
                           : undefined
                       }
                     />
@@ -641,8 +604,9 @@ export default function PaymentPageClient({
                 <button
                   type="submit"
                   className="payment-submit"
-                  disabled={isSubmitting}
+                  disabled={!placeOrderEnabled}
                   aria-busy={isSubmitting}
+                  data-testid="place-order"
                 >
                   Place Order
                 </button>

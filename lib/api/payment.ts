@@ -7,12 +7,23 @@ import type {
   PaymentRecord,
 } from "@/lib/api/types";
 
-export function createPayment(input: CreatePaymentRequest, init?: RequestInit) {
+export function createPayment(
+  input: CreatePaymentRequest,
+  init?: RequestInit & { idempotencyKey?: string },
+) {
+  const { idempotencyKey, ...rest } = init ?? {};
+  const headers = new Headers(rest.headers);
+  if (idempotencyKey) {
+    headers.set("Idempotency-Key", idempotencyKey);
+  }
   return apiMutate<CreatePaymentResponse>(
     "/api/payment/create",
     "POST",
     input,
-    init,
+    {
+      ...rest,
+      headers,
+    },
   );
 }
 

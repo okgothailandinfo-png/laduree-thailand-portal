@@ -8,31 +8,30 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethodId,
+} from "@/lib/payment/methods";
 
-export type MockPaymentMethod =
-  | "credit-card"
-  | "promptpay-qr"
-  | "apple-pay"
-  | "google-pay";
+export type MockPaymentMethod = PaymentMethodId;
 
-export const MOCK_PAYMENT_METHOD_LABELS: Record<MockPaymentMethod, string> = {
-  "credit-card": "Credit Card",
-  "promptpay-qr": "PromptPay QR",
-  "apple-pay": "Apple Pay",
-  "google-pay": "Google Pay",
-};
+export const MOCK_PAYMENT_METHOD_LABELS = PAYMENT_METHOD_LABELS;
 
 export type MockPlacedOrder = {
   orderNumber: string;
   paymentMethod: MockPaymentMethod;
   paymentMethodLabel: string;
+  safeDisplay?: string | null;
 };
 
 type OrderFlowContextValue = {
   selectedPaymentMethod: MockPaymentMethod | null;
   setSelectedPaymentMethod: (method: MockPaymentMethod | null) => void;
   placedOrder: MockPlacedOrder | null;
-  placeMockOrder: (method: MockPaymentMethod) => MockPlacedOrder;
+  placeMockOrder: (
+    method: MockPaymentMethod,
+    opts?: { safeDisplay?: string | null; orderNumber?: string },
+  ) => MockPlacedOrder;
   clearPlacedOrder: () => void;
   isOrderPlaced: boolean;
 };
@@ -49,16 +48,23 @@ export function OrderFlowProvider({ children }: { children: ReactNode }) {
     useState<MockPaymentMethod | null>(null);
   const [placedOrder, setPlacedOrder] = useState<MockPlacedOrder | null>(null);
 
-  const placeMockOrder = useCallback((method: MockPaymentMethod) => {
-    const order: MockPlacedOrder = {
-      orderNumber: createMockOrderNumber(),
-      paymentMethod: method,
-      paymentMethodLabel: MOCK_PAYMENT_METHOD_LABELS[method],
-    };
-    setSelectedPaymentMethod(method);
-    setPlacedOrder(order);
-    return order;
-  }, []);
+  const placeMockOrder = useCallback(
+    (
+      method: MockPaymentMethod,
+      opts?: { safeDisplay?: string | null; orderNumber?: string },
+    ) => {
+      const order: MockPlacedOrder = {
+        orderNumber: opts?.orderNumber ?? createMockOrderNumber(),
+        paymentMethod: method,
+        paymentMethodLabel: MOCK_PAYMENT_METHOD_LABELS[method],
+        safeDisplay: opts?.safeDisplay ?? null,
+      };
+      setSelectedPaymentMethod(method);
+      setPlacedOrder(order);
+      return order;
+    },
+    [],
+  );
 
   const clearPlacedOrder = useCallback(() => {
     setPlacedOrder(null);

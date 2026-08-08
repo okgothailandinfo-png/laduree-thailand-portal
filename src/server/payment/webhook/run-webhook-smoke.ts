@@ -52,7 +52,7 @@ async function main() {
     },
   });
 
-  const created = await paymentService.createPayment(orderId);
+  const created = await paymentService.createPayment({ orderId, method: "credit-card" });
   const checks: Check[] = [];
 
   async function send(
@@ -126,7 +126,7 @@ async function main() {
       timeSlotLabel: "10:00–10:30",
     },
   });
-  const pay2 = await paymentService.createPayment(order2);
+  const pay2 = await paymentService.createPayment({ orderId: order2, method: "credit-card" });
 
   async function sendFor(
     paymentId: string,
@@ -187,7 +187,7 @@ async function main() {
       timeSlotLabel: "10:00–10:30",
     },
   });
-  const pay3 = await paymentService.createPayment(order3);
+  const pay3 = await paymentService.createPayment({ orderId: order3, method: "credit-card" });
   const cancelled = await sendFor(pay3.paymentId, "payment.cancelled");
   const orderAfterCancel = await repos.orders.findById(order3);
   checks.push({
@@ -222,7 +222,7 @@ async function main() {
       timeSlotLabel: "10:00–10:30",
     },
   });
-  const pay4 = await paymentService.createPayment(order4);
+  const pay4 = await paymentService.createPayment({ orderId: order4, method: "credit-card" });
   await sendFor(pay4.paymentId, "payment.succeeded");
   const refunded = await sendFor(pay4.paymentId, "payment.refunded");
   const orderAfterRefund = await repos.orders.findById(order4);

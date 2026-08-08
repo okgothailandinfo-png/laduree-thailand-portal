@@ -32,6 +32,11 @@ import {
   requireObject,
   requireString,
 } from "@/src/server/utils/validation";
+import {
+  isPaymentMethodId,
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethodId,
+} from "@/lib/payment/methods";
 
 const CONFIRM_RESULTS = new Set(["SUCCESS", "FAILED"]);
 
@@ -43,6 +48,14 @@ export type WebhookApplyResult = {
   paymentStatus: PaymentStatus;
   orderStatus: ReturnType<typeof toApiOrderStatus>;
 };
+
+function orderPaymentStatusFromGateway(
+  status: PaymentStatus,
+): "pending" | "mock_accepted" | "failed" {
+  if (status === "SUCCESS") return "mock_accepted";
+  if (status === "FAILED") return "failed";
+  return "pending";
+}
 
 export class PaymentService {
   private readonly provider: PaymentProvider;
@@ -62,8 +75,36 @@ export class PaymentService {
 
   parseCreatePaymentBody(raw: unknown): CreatePaymentRequestDto {
     const body = requireObject(raw, "body");
+    const methodRaw = requireString(body.method, "method");
+    if (!isPaymentMethodId(methodRaw)) {
+      throw new AppError("VALIDATION_ERROR", "payment method is invalid.", {
+        details: { field: "method" },
+      });
+    }
+    let safeDisplay: string | null = null;
+    if (body.safeDisplay !== undefined && body.safeDisplay !== null) {
+      if (typeof body.safeDisplay !== "string") {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "safeDisplay must be a string.",
+          { details: { field: "safeDisplay" } },
+        );
+      }
+      const trimmed = body.safeDisplay.trim();
+      // Reject anything that looks like a full PAN or CVV.
+      if (/\d{13,}/.test(trimmed.replace(/\s/g, ""))) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "safeDisplay must not include a full card number.",
+          { details: { field: "safeDisplay" } },
+        );
+      }
+      safeDisplay = trimmed || null;
+    }
     return {
       orderId: requireString(body.orderId, "orderId"),
+      method: methodRaw,
+      safeDisplay,
     };
   }
 
@@ -118,33 +159,61 @@ export class PaymentService {
     };
   }
 
-  async createPayment(orderId: string): Promise<CreatePaymentResult> {
-    const id = requireString(orderId, "orderId");
+  async createPayment(
+    input: CreatePaymentRequestDto,
+  ): Promise<CreatePaymentResult> {
+    const id = requireString(input.orderId, "orderId");
+    const method: PaymentMethodId = input.method;
     const order = await this.orders.findById(id);
     if (!order) {
       throw new AppError("NOT_FOUND", `Order not found: ${id}`);
     }
-    if (order.status === "confirmed") {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Order is already confirmed.",
-        { details: { field: "orderId", status: order.status } },
-      );
+    if (
+      order.status === "confirmed" ||
+      order.payment?.status === "mock_accepted"
+    ) {
+      throw new AppError("VALIDATION_ERROR", "Order is already paid.", {
+        details: { field: "orderId", status: order.status },
+      });
     }
 
     const existing = await this.payments.findByOrderId(id);
     if (existing && existing.status === "PENDING") {
-      return {
-        paymentId: existing.paymentId,
-        paymentUrl: existing.paymentUrl,
-        status: "PENDING",
-      };
+      if (existing.method === method) {
+        await this.orders.attachPayment(id, {
+          method: existing.method,
+          methodLabel: existing.methodLabel,
+          status: "pending",
+          safeDisplay: existing.safeDisplay,
+        });
+        return {
+          paymentId: existing.paymentId,
+          paymentUrl: existing.paymentUrl,
+          status: "PENDING",
+          method: existing.method,
+          methodLabel: existing.methodLabel,
+        };
+      }
+      await this.provider.applyStatus(existing.paymentId, "CANCELLED");
     }
 
-    const created = await this.provider.createPayment({ orderId: id });
+    const created = await this.provider.createPayment({
+      orderId: id,
+      method,
+      safeDisplay: input.safeDisplay ?? null,
+    });
+
+    await this.orders.attachPayment(id, {
+      method: created.method,
+      methodLabel: created.methodLabel,
+      status: "pending",
+      safeDisplay: input.safeDisplay ?? null,
+    });
+
     logger.info("Payment created", {
       paymentId: created.paymentId,
       orderId: id,
+      method: created.method,
     });
     return created;
   }
@@ -159,6 +228,7 @@ export class PaymentService {
   ): Promise<ConfirmPaymentResponseDto> {
     const id = requireString(paymentId, "paymentId");
     const payment = await this.provider.confirmPayment(id, result);
+    await this.syncOrderPaymentSnapshot(payment);
     const orderStatus = await this.syncOrderFromPayment(
       payment.orderId,
       payment.status,
@@ -183,6 +253,7 @@ export class PaymentService {
     const payment = await this.provider.cancelPayment(
       requireString(paymentId, "paymentId"),
     );
+    await this.syncOrderPaymentSnapshot(payment);
     await this.syncOrderFromPayment(payment.orderId, payment.status);
     return payment;
   }
@@ -207,7 +278,6 @@ export class PaymentService {
 
     const event = this.parseMockWebhookEvent(params.parsedBody);
 
-    // Claim first for durable idempotency under concurrency.
     const claimed = await this.webhookEvents.claimEvent(event.eventId);
     if (!claimed) {
       const payment = await this.provider.getPayment(event.paymentId);
@@ -231,6 +301,7 @@ export class PaymentService {
       event.paymentId,
       nextStatus,
     );
+    await this.syncOrderPaymentSnapshot(payment);
     const orderStatus = await this.syncOrderFromPayment(
       payment.orderId,
       payment.status,
@@ -260,6 +331,17 @@ export class PaymentService {
     };
   }
 
+  private async syncOrderPaymentSnapshot(
+    payment: PaymentRecordDto,
+  ): Promise<void> {
+    await this.orders.attachPayment(payment.orderId, {
+      method: payment.method,
+      methodLabel: payment.methodLabel || PAYMENT_METHOD_LABELS[payment.method],
+      status: orderPaymentStatusFromGateway(payment.status),
+      safeDisplay: payment.safeDisplay,
+    });
+  }
+
   private async syncOrderFromPayment(
     orderId: string,
     paymentStatus: PaymentStatus,
@@ -276,11 +358,7 @@ export class PaymentService {
       }
     }
 
-    // Do not demote fulfilment or terminal statuses (idempotent for confirmed).
-    if (
-      next &&
-      !canApplyPaymentOrderStatus(order.status, next)
-    ) {
+    if (next && !canApplyPaymentOrderStatus(order.status, next)) {
       return toApiOrderStatus(order.status);
     }
 

@@ -48,7 +48,9 @@ export type OrderPickup = {
 export type OrderPayment = {
   method: CreateOrderPaymentDto["method"];
   methodLabel: string;
-  status: "mock_accepted";
+  status: "pending" | "mock_accepted" | "failed";
+  /** Safe display only (e.g. Card ending in 4242). Never PAN/CVV. */
+  safeDisplay?: string | null;
 };
 
 export type Order = {

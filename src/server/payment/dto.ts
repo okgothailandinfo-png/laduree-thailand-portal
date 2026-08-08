@@ -1,20 +1,28 @@
 /** Payment gateway DTOs — provider-agnostic processing layer. */
 
+import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
+
 export type PaymentStatus =
   | "PENDING"
   | "SUCCESS"
   | "FAILED"
   | "CANCELLED"
-  | "REFUNDED";
+  | "REFUNDED"
+  | "EXPIRED";
 
 export type CreatePaymentInput = {
   orderId: string;
+  method: CreateOrderPaymentDto["method"];
+  /** Safe display only (e.g. Card ending in 4242). */
+  safeDisplay?: string | null;
 };
 
 export type CreatePaymentResult = {
   paymentId: string;
   paymentUrl: string;
   status: "PENDING";
+  method: CreateOrderPaymentDto["method"];
+  methodLabel: string;
 };
 
 export type PaymentRecordDto = {
@@ -22,12 +30,17 @@ export type PaymentRecordDto = {
   orderId: string;
   status: PaymentStatus;
   paymentUrl: string;
+  method: CreateOrderPaymentDto["method"];
+  methodLabel: string;
+  safeDisplay: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type CreatePaymentRequestDto = {
   orderId: string;
+  method: CreateOrderPaymentDto["method"];
+  safeDisplay?: string | null;
 };
 
 export type ConfirmPaymentRequestDto = {

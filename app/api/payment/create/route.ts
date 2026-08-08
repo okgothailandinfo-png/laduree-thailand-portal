@@ -1,5 +1,10 @@
 import { handleApi } from "@/src/server/api/handle";
-import { created } from "@/src/server/api/responses";
+import { created, ok } from "@/src/server/api/responses";
+import {
+  getIdempotentResponse,
+  readIdempotencyKey,
+  saveIdempotentResponse,
+} from "@/src/server/http/idempotency";
 import {
   assertRateLimit,
   clientSubjectFromRequest,
@@ -16,6 +21,17 @@ export async function POST(request: Request) {
       windowMs: 60_000,
     });
 
+    const idempotencyKey = readIdempotencyKey(request);
+    if (idempotencyKey) {
+      const cached = await getIdempotentResponse<unknown>(
+        "payment-create",
+        idempotencyKey,
+      );
+      if (cached) {
+        return ok(cached);
+      }
+    }
+
     let raw: unknown;
     try {
       raw = await request.json();
@@ -24,7 +40,12 @@ export async function POST(request: Request) {
     }
 
     const input = paymentService.parseCreatePaymentBody(raw);
-    const data = await paymentService.createPayment(input.orderId);
+    const data = await paymentService.createPayment(input);
+
+    if (idempotencyKey) {
+      await saveIdempotentResponse("payment-create", idempotencyKey, data);
+    }
+
     return created(data);
   }, request);
 }
