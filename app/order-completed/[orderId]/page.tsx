@@ -7,9 +7,19 @@ export const metadata: Metadata = {
 
 type PageProps = {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ token?: string }>;
 };
 
-export default async function OrderCompletedPage({ params }: PageProps) {
+export default async function OrderCompletedPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { orderId } = await params;
-  return <OrderCompletedClient orderId={orderId} />;
+  const query = await searchParams;
+  return (
+    <OrderCompletedClient
+      orderId={orderId}
+      accessToken={query.token ?? null}
+    />
+  );
 }

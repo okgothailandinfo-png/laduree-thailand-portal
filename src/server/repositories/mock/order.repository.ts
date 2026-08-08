@@ -55,6 +55,32 @@ export class MockOrderRepository implements OrderRepository {
     return next;
   }
 
+  async updateOrderNumber(id: string, orderNumber: string): Promise<Order> {
+    const existing = ordersById.get(id);
+    if (!existing) {
+      throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+    }
+    const nextNumber = orderNumber.trim();
+    if (!nextNumber) {
+      throw new AppError("VALIDATION_ERROR", "orderNumber is required.");
+    }
+    if (existing.orderNumber === nextNumber) {
+      return existing;
+    }
+    const collision = ordersByNumber.get(nextNumber);
+    if (collision && collision.id !== id) {
+      throw new AppError(
+        "CONFLICT",
+        `Order number already in use: ${nextNumber}`,
+      );
+    }
+    ordersByNumber.delete(existing.orderNumber);
+    const next: Order = { ...existing, orderNumber: nextNumber };
+    ordersById.set(id, next);
+    ordersByNumber.set(next.orderNumber, next);
+    return next;
+  }
+
   async attachPayment(
     orderId: string,
     payment: NonNullable<Order["payment"]>,

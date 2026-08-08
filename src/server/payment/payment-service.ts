@@ -22,12 +22,18 @@ import {
 } from "@/src/server/payment/webhook/types";
 import { verifyWebhookSignature } from "@/src/server/payment/webhook/verify";
 import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
+import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
+import {
+  createFinalOrderNumber,
+  isDraftOrderNumber,
+} from "@/src/server/orders/order-number";
 import type { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import type { OrderRepository } from "@/src/server/repositories/interfaces";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
+import { minorToMajor } from "@/src/server/utils/money";
 import {
   requireObject,
   requireString,
@@ -192,6 +198,8 @@ export class PaymentService {
           status: "PENDING",
           method: existing.method,
           methodLabel: existing.methodLabel,
+          accessToken: issueOrderAccessToken(id),
+          orderNumber: order.orderNumber,
         };
       }
       await this.provider.applyStatus(existing.paymentId, "CANCELLED");
@@ -215,11 +223,18 @@ export class PaymentService {
       orderId: id,
       method: created.method,
     });
-    return created;
+    return {
+      ...created,
+      accessToken: issueOrderAccessToken(id),
+      orderNumber: order.orderNumber,
+    };
   }
 
   async getPayment(paymentId: string): Promise<PaymentRecordDto> {
-    return this.provider.getPayment(requireString(paymentId, "paymentId"));
+    const payment = await this.provider.getPayment(
+      requireString(paymentId, "paymentId"),
+    );
+    return this.enrichPaymentForCustomer(payment);
   }
 
   async confirmPayment(
@@ -241,11 +256,14 @@ export class PaymentService {
       }
     }
 
+    const enriched = await this.enrichPaymentForCustomer(payment);
     return {
       paymentId: payment.paymentId,
       orderId: payment.orderId,
       status: payment.status,
       orderStatus,
+      accessToken: enriched.accessToken ?? null,
+      orderNumber: enriched.orderNumber ?? null,
     };
   }
 
@@ -255,7 +273,7 @@ export class PaymentService {
     );
     await this.syncOrderPaymentSnapshot(payment);
     await this.syncOrderFromPayment(payment.orderId, payment.status);
-    return payment;
+    return this.enrichPaymentForCustomer(payment);
   }
 
   async refundPayment(paymentId: string): Promise<PaymentRecordDto> {
@@ -358,43 +376,99 @@ export class PaymentService {
       }
     }
 
-    if (next && !canApplyPaymentOrderStatus(order.status, next)) {
-      return toApiOrderStatus(order.status);
+    let working = order;
+    let statusChanged = false;
+
+    if (next && canApplyPaymentOrderStatus(order.status, next) && next !== order.status) {
+      working = await this.orders.updateStatus(order.id, next, {
+        changedBy: "system:payment",
+        note: `Payment status: ${paymentStatus}`,
+      });
+      statusChanged = true;
+      logger.info("Order status synchronized from payment", {
+        orderId: order.id,
+        orderStatus: working.status,
+        paymentStatus,
+      });
     }
 
-    if (!next || next === order.status) {
-      return toApiOrderStatus(order.status);
+    if (paymentStatus === "SUCCESS") {
+      working = await this.promoteDraftOrderNumber(working.id);
     }
 
-    const updated = await this.orders.updateStatus(order.id, next, {
-      changedBy: "system:payment",
-      note: `Payment status: ${paymentStatus}`,
-    });
-    logger.info("Order status synchronized from payment", {
-      orderId: order.id,
-      orderStatus: updated.status,
-      paymentStatus,
-    });
-
-    if (updated.status === "confirmed" && this.pickupVerifications) {
+    if (
+      working.status === "confirmed" &&
+      working.serviceType === "PICKUP" &&
+      this.pickupVerifications
+    ) {
       try {
-        await this.pickupVerifications.ensureForOrder(updated.id);
+        await this.pickupVerifications.ensureForOrder(working.id);
       } catch (error) {
         logger.error("Failed to ensure pickup verification after confirm", {
-          orderId: updated.id,
+          orderId: working.id,
           message: error instanceof Error ? error.message : "unknown",
         });
       }
     }
 
-    if (this.notifications) {
-      if (updated.status === "confirmed") {
-        await this.notifications.onOrderConfirmed(updated);
-      } else if (updated.status === "cancelled") {
-        await this.notifications.onOrderCancelled(updated);
+    if (this.notifications && statusChanged) {
+      if (working.status === "confirmed") {
+        await this.notifications.onOrderConfirmed(working);
+      } else if (working.status === "cancelled") {
+        await this.notifications.onOrderCancelled(working);
       }
     }
 
-    return toApiOrderStatus(updated.status);
+    return toApiOrderStatus(working.status);
+  }
+
+  /**
+   * Promote DRAFT-* → final number after durable payment confirmation.
+   * Idempotent across confirm + webhook retries.
+   */
+  private async promoteDraftOrderNumber(orderId: string) {
+    const order = await this.orders.findById(orderId);
+    if (!order) {
+      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+    }
+    if (!isDraftOrderNumber(order.orderNumber)) {
+      return order;
+    }
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = createFinalOrderNumber();
+      try {
+        const updated = await this.orders.updateOrderNumber(orderId, candidate);
+        logger.info("Draft order number promoted after payment", {
+          orderId,
+          orderNumber: updated.orderNumber,
+        });
+        return updated;
+      } catch (error) {
+        if (error instanceof AppError && error.code === "CONFLICT") {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "Unable to allocate a unique final order number.",
+      { status: 500 },
+    );
+  }
+
+  private async enrichPaymentForCustomer(
+    payment: PaymentRecordDto,
+  ): Promise<PaymentRecordDto> {
+    const order = await this.orders.findById(payment.orderId);
+    return {
+      ...payment,
+      // Issued from checkout draft onward; re-issued here for payment reopen.
+      accessToken: issueOrderAccessToken(payment.orderId),
+      orderNumber: order?.orderNumber ?? null,
+      totalThb: order ? minorToMajor(order.totalMinor) : null,
+    };
   }
 }

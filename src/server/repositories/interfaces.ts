@@ -226,6 +226,11 @@ export interface OrderRepository {
     status: OrderStatus,
     options?: OrderStatusUpdateOptions,
   ): Promise<Order>;
+  /**
+   * Promote or replace customer-facing order number.
+   * Internal order id is immutable; number must stay unique.
+   */
+  updateOrderNumber(id: string, orderNumber: string): Promise<Order>;
   /** Attach or replace order payment snapshot (no PAN/CVV). */
   attachPayment(
     orderId: string,

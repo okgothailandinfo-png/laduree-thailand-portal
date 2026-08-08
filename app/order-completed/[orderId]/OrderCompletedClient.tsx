@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderCompletion } from "@/lib/api/orders";
-import { rememberCustomerOrderId } from "@/lib/customer-orders";
+import {
+  getRememberedOrderAccessToken,
+  rememberCustomerOrder,
+} from "@/lib/customer-orders";
+import { buildOrderReceiptPath } from "@/lib/orders/post-payment-session";
 import CatalogStatus from "../../catalog/CatalogStatus";
 import { useAsyncResource } from "../../catalog/useAsyncResource";
 import { formatPickupDateKeyLong } from "../../pickup/pickup-dates";
@@ -17,26 +21,48 @@ import "../order-completed.css";
 
 export default function OrderCompletedClient({
   orderId,
+  accessToken,
 }: {
   orderId: string;
+  accessToken: string | null;
 }) {
+  const resolvedAccessToken =
+    accessToken?.trim() || getRememberedOrderAccessToken(orderId);
+
   const query = useAsyncResource(
-    (signal) => fetchOrderCompletion(orderId, { signal }),
+    (signal) => {
+      if (!resolvedAccessToken) {
+        return Promise.reject(
+          new Error(
+            "Order access token is required. Open this page from Order Confirmation or Order History.",
+          ),
+        );
+      }
+      return fetchOrderCompletion(orderId, {
+        signal,
+        accessToken: resolvedAccessToken,
+      });
+    },
     {
-      deps: [orderId],
+      deps: [orderId, resolvedAccessToken],
     },
   );
 
   useEffect(() => {
-    if (query.status === "success" && query.data) {
-      rememberCustomerOrderId(query.data.orderId);
+    if (query.status === "success" && query.data && resolvedAccessToken) {
+      rememberCustomerOrder({
+        orderId: query.data.orderId,
+        accessToken: resolvedAccessToken,
+        orderNumber: query.data.orderNumber,
+      });
     }
-  }, [query.status, query.data]);
+  }, [query.status, query.data, resolvedAccessToken]);
 
   const showLoadState =
-    query.status === "loading" ||
-    query.status === "error" ||
-    query.status === "empty";
+    Boolean(resolvedAccessToken) &&
+    (query.status === "loading" ||
+      query.status === "error" ||
+      query.status === "empty");
 
   return (
     <main className="order-completed-page">
@@ -51,6 +77,18 @@ export default function OrderCompletedClient({
         </div>
 
         <h1 className="order-completed-page__title">Order Completed</h1>
+
+        {!resolvedAccessToken ? (
+          <div className="order-completed-banner" role="alert">
+            <p className="order-completed-banner__message">
+              Order access token is required.
+            </p>
+            <p className="order-completed-banner__sub">
+              Open this page from Order Confirmation or{" "}
+              <Link href="/order-history">Order History</Link>.
+            </p>
+          </div>
+        ) : null}
 
         {showLoadState ? (
           <CatalogStatus
@@ -203,12 +241,17 @@ export default function OrderCompletedClient({
             ) : null}
 
             <div className="order-completed-actions">
-              <Link
-                href={`/order-completed/${encodeURIComponent(query.data.orderId)}/receipt`}
-                className="order-completed-btn order-completed-btn--primary"
-              >
-                View Receipt
-              </Link>
+              {resolvedAccessToken ? (
+                <Link
+                  href={buildOrderReceiptPath({
+                    orderId: query.data.orderId,
+                    accessToken: resolvedAccessToken,
+                  })}
+                  className="order-completed-btn order-completed-btn--primary"
+                >
+                  View Payment Receipt
+                </Link>
+              ) : null}
               <div className="order-completed-actions__secondary">
                 <Link
                   href="/order-history"

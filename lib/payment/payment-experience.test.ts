@@ -230,10 +230,16 @@ describe("Sprint 24 payment experience", () => {
     const ok = await service.confirmPayment(created.paymentId, "SUCCESS");
     assert.equal(ok.status, "SUCCESS");
     assert.equal(ok.orderStatus, "confirmed");
+    assert.ok(ok.accessToken);
+    assert.ok(ok.orderNumber);
+    assert.equal(ok.orderNumber.startsWith("DRAFT-"), false);
+    assert.match(ok.orderNumber, /^LD-TH-[0-9A-Z]{8}$/);
     const after = await orders.findById(order.id);
     assert.equal(after?.status, "confirmed");
     assert.equal(after?.payment?.status, "mock_accepted");
     assert.equal(after?.payment?.methodLabel, "PromptPay QR");
+    assert.equal(after?.orderNumber, ok.orderNumber);
+    assert.match(after?.orderNumber ?? "", /^LD-TH-[0-9A-Z]{8}$/);
   });
 
   it("refresh of unpaid order does not mark paid (order stays pending)", async () => {
@@ -335,7 +341,11 @@ describe("Sprint 24 payment experience", () => {
     );
     assert.match(confirmation, /isConfirmationAllowed/);
     assert.match(confirmation, /confirmation-payment-required/);
+    assert.match(confirmation, /confirmation-token-required/);
     assert.match(confirmation, /PickupCredentialsCard/);
     assert.match(confirmation, /delivery-order-tracking/);
+    assert.match(confirmation, /Payment successful!/);
+    assert.match(confirmation, /Your order is good to go!/);
+    assert.match(confirmation, /View Payment Receipt/);
   });
 });

@@ -80,6 +80,8 @@ type CheckoutContextValue = {
   confirmed: CheckoutInfo | null;
   confirmCheckoutInfo: (opts?: { requireDeliveryAddress?: boolean }) => boolean;
   paymentPendingNotice: boolean;
+  /** Clear temporary checkout buyer/address state after durable payment success. */
+  resetCheckoutSession: () => void;
 };
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null);
@@ -212,6 +214,17 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearErrors = useCallback(() => setErrors({}), []);
+
+  const resetCheckoutSession = useCallback(() => {
+    setIdentity(null);
+    setInfo({
+      ...emptyInfo,
+      deliveryAddress: { ...EMPTY_DELIVERY_ADDRESS },
+    });
+    setErrors({});
+    setConfirmed(null);
+    setPaymentPendingNotice(false);
+  }, []);
 
   const buildErrors = useCallback(
     (opts?: { requireDeliveryAddress?: boolean }): CheckoutFieldErrors => {
@@ -363,6 +376,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       confirmed,
       confirmCheckoutInfo,
       paymentPendingNotice,
+      resetCheckoutSession,
     }),
     [
       identity,
@@ -381,6 +395,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       confirmed,
       confirmCheckoutInfo,
       paymentPendingNotice,
+      resetCheckoutSession,
     ],
   );
 

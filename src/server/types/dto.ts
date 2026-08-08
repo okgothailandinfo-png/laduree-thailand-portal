@@ -278,6 +278,8 @@ export type CheckoutResponseDto = {
   deliveryDateKey?: string | null;
   deliveryTimeWindowLabel?: string | null;
   deliveryPromiseRelativeLabel?: "Today" | "Tomorrow" | null;
+  /** Capability token for payment + post-payment customer order access. */
+  accessToken: string;
 };
 
 export type OrderCompletionPaymentStatus =

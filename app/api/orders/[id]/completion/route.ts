@@ -5,6 +5,7 @@ import {
   clientSubjectFromRequest,
   hashRateLimitSubject,
 } from "@/src/server/http/rate-limit";
+import { assertOrderAccess } from "@/src/server/orders/order-access-token";
 import { orderService } from "@/src/server/services/container";
 
 type RouteContext = {
@@ -14,6 +15,7 @@ type RouteContext = {
 /**
  * GET /api/orders/[id]/completion
  * Customer pickup completion + digital receipt payload.
+ * Requires capability token.
  */
 export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
@@ -24,6 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
       maxAttempts: 60,
       windowMs: 60_000,
     });
+    assertOrderAccess(request, id, "completion");
     const data = await orderService.getOrderCompletion(id);
     return ok(data);
   }, request);

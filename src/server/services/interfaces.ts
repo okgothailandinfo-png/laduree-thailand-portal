@@ -39,6 +39,10 @@ export interface OrderService {
   createOrder(input: CreateOrderRequestDto): Promise<OrderDto>;
   getOrderById(id: string): Promise<OrderDto>;
   getOrderByOrderNumber(orderNumber: string): Promise<OrderDto>;
+  /** Promote DRAFT-* → final customer number after durable payment success. */
+  promoteDraftOrderNumber(
+    id: string,
+  ): Promise<import("@/src/server/models/order").Order>;
   getOrderCompletion(id: string): Promise<OrderCompletionDto>;
   listOrderHistory(ids: string[]): Promise<OrderHistoryItemDto[]>;
 }

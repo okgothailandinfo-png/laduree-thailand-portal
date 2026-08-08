@@ -515,7 +515,6 @@ export const PRODUCTION_BLOCKERS = [
   "Persistent cart store under DATA_SOURCE=prisma",
   "Persistent gateway payment records under DATA_SOURCE=prisma",
   "Redis/Upstash rate-limit client wiring (config fail-closed; client not implemented)",
-  "Customer order access control (capability token / signed link) for IDOR hardening",
 ] as const;
 
 /**

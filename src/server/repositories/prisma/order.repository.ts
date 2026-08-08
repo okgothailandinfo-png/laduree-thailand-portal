@@ -343,6 +343,49 @@ export class PrismaOrderRepository implements OrderRepository {
     }
   }
 
+  async updateOrderNumber(id: string, orderNumber: string): Promise<Order> {
+    const nextNumber = orderNumber.trim();
+    if (!nextNumber) {
+      throw new AppError("VALIDATION_ERROR", "orderNumber is required.");
+    }
+    try {
+      const existing = await prisma.order.findUnique({
+        where: { id },
+        include: orderInclude,
+      });
+      if (!existing) {
+        throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+      }
+      if (existing.orderNumber === nextNumber) {
+        return toDomainOrder(existing as PrismaOrderWithRelations);
+      }
+      const row = await prisma.order.update({
+        where: { id },
+        data: { orderNumber: nextNumber },
+        include: orderInclude,
+      });
+      return toDomainOrder(row as PrismaOrderWithRelations);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          "CONFLICT",
+          `Order number already in use: ${nextNumber}`,
+        );
+      }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+      }
+      throw error;
+    }
+  }
+
   async attachPayment(
     orderId: string,
     payment: NonNullable<Order["payment"]>,

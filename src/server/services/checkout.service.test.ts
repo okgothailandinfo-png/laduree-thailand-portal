@@ -262,6 +262,7 @@ function createService(options?: {
       );
     },
     updateStatus: unused as OrderRepository["updateStatus"],
+    updateOrderNumber: unused as OrderRepository["updateOrderNumber"],
     attachPayment: unused as OrderRepository["attachPayment"],
     updatePaymentStatus: unused as OrderRepository["updatePaymentStatus"],
     adminList: unused as OrderRepository["adminList"],

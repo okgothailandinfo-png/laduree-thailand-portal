@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ApiClientError } from "@/lib/api/client";
 import { formatPriceThb } from "@/lib/api/catalog";
-import { fetchOrderById } from "@/lib/api/orders";
 import { cancelPayment, confirmPayment, fetchPayment } from "@/lib/api/payment";
-import type { OrderDetail, PaymentRecord, PaymentStatus } from "@/lib/api/types";
+import type { PaymentRecord, PaymentStatus } from "@/lib/api/types";
+import {
+  getRememberedOrderAccessToken,
+  rememberCustomerOrder,
+} from "@/lib/customer-orders";
 import {
   formatMockCountdown,
   mockPaymentRemainingMs,
@@ -17,8 +20,12 @@ import {
   paymentUiStateFromGateway,
   type PaymentUiState,
 } from "@/lib/payment/payment-ui-state";
+import { buildOrderConfirmationPath } from "@/lib/orders/post-payment-session";
 import CatalogStatus from "../../catalog/CatalogStatus";
+import { useCart } from "../../cart/CartContext";
+import { useCheckout } from "../../checkout/CheckoutContext";
 import { useOrderFlow } from "../../order/OrderFlowContext";
+import { usePickup } from "../../pickup/PickupContext";
 import "../payment.css";
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -51,8 +58,10 @@ export default function MockPaymentPageClient({
 }) {
   const router = useRouter();
   const { placeMockOrder } = useOrderFlow();
+  const { clearItems } = useCart();
+  const { resetSelection } = usePickup();
+  const { resetCheckoutSession } = useCheckout();
   const [payment, setPayment] = useState<PaymentRecord | null>(null);
-  const [order, setOrder] = useState<OrderDetail | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">(
     paymentId ? "loading" : "error",
   );
@@ -63,6 +72,7 @@ export default function MockPaymentPageClient({
   const [actionBusy, setActionBusy] = useState(false);
   const [remainingMs, setRemainingMs] = useState(0);
   const redirected = useRef(false);
+  const sessionCleared = useRef(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -84,15 +94,6 @@ export default function MockPaymentPageClient({
         setUiState(resolveUiState(data, remaining));
         setError(null);
         setPhase("ready");
-
-        try {
-          const orderData = await fetchOrderById(data.orderId, {
-            signal: controller.signal,
-          });
-          if (!cancelled) setOrder(orderData);
-        } catch {
-          // Order details are supplemental for mock screen totals.
-        }
       } catch (err: unknown) {
         if (cancelled) return;
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -148,15 +149,47 @@ export default function MockPaymentPageClient({
   useEffect(() => {
     if (!payment || payment.status !== "SUCCESS" || redirected.current) return;
     if (!canAccessOrderConfirmation("SUCCEEDED")) return;
+    const accessToken = payment.accessToken?.trim();
+    if (!accessToken) return;
+
     redirected.current = true;
+    const orderNumber = payment.orderNumber ?? undefined;
+    rememberCustomerOrder({
+      orderId: payment.orderId,
+      accessToken,
+      orderNumber,
+    });
     placeMockOrder(payment.method, {
       safeDisplay: payment.safeDisplay,
-      orderNumber: order?.orderNumber,
+      orderNumber,
     });
-    router.push(
-      `/order-confirmation?orderId=${encodeURIComponent(payment.orderId)}`,
-    );
-  }, [payment, order?.orderNumber, placeMockOrder, router]);
+
+    void (async () => {
+      if (!sessionCleared.current) {
+        sessionCleared.current = true;
+        try {
+          await clearItems();
+        } catch {
+          // Cart clear is best-effort after durable payment success.
+        }
+        resetSelection();
+        resetCheckoutSession();
+      }
+      router.push(
+        buildOrderConfirmationPath({
+          orderId: payment.orderId,
+          accessToken,
+        }),
+      );
+    })();
+  }, [
+    payment,
+    placeMockOrder,
+    router,
+    clearItems,
+    resetSelection,
+    resetCheckoutSession,
+  ]);
 
   async function runConfirm(result: "SUCCESS" | "FAILED"): Promise<void> {
     if (!paymentId || actionBusy) return;
@@ -175,6 +208,9 @@ export default function MockPaymentPageClient({
               paymentId: confirmed.paymentId,
               orderId: confirmed.orderId,
               updatedAt: new Date().toISOString(),
+              accessToken: confirmed.accessToken,
+              orderNumber: confirmed.orderNumber,
+              totalThb: current.totalThb,
             }
           : current,
       );
@@ -207,9 +243,20 @@ export default function MockPaymentPageClient({
           : current,
       );
       setUiState("CANCELLED");
-      router.push(
-        `/payment?orderId=${encodeURIComponent(cancelled.orderId)}`,
-      );
+      const token =
+        cancelled.accessToken?.trim() ||
+        getRememberedOrderAccessToken(cancelled.orderId);
+      if (token) {
+        rememberCustomerOrder({
+          orderId: cancelled.orderId,
+          accessToken: token,
+          orderNumber: cancelled.orderNumber,
+        });
+      }
+      const paymentReturn = token
+        ? `/payment?orderId=${encodeURIComponent(cancelled.orderId)}&token=${encodeURIComponent(token)}`
+        : `/payment?orderId=${encodeURIComponent(cancelled.orderId)}`;
+      router.push(paymentReturn);
     } catch (err: unknown) {
       setError(
         errorMessage(err, "Unable to cancel payment. Please try again."),
@@ -288,12 +335,14 @@ export default function MockPaymentPageClient({
               <br />
               Order Number:{" "}
               <span data-testid="mock-order-number">
-                {order?.orderNumber ?? "—"}
+                {payment.orderNumber ?? "—"}
               </span>
               <br />
               Total payable:{" "}
               <span data-testid="mock-total-payable">
-                {formatPriceThb(order?.totalThb ?? null)}
+                {formatPriceThb(
+                  typeof payment.totalThb === "number" ? payment.totalThb : null,
+                )}
               </span>
             </p>
 
