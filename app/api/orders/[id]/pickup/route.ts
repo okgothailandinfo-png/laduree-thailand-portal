@@ -5,6 +5,7 @@ import {
   clientSubjectFromRequest,
   hashRateLimitSubject,
 } from "@/src/server/http/rate-limit";
+import { assertOrderAccess } from "@/src/server/orders/order-access-token";
 import { pickupVerificationService } from "@/src/server/services/container";
 import { AppError } from "@/src/server/utils/errors";
 
@@ -15,8 +16,7 @@ type RouteContext = {
 /**
  * GET /api/orders/[id]/pickup
  * Customer confirmation credentials (QR payload + short pickup code).
- * Never logs raw tokens or codes.
- * Production Blocker: add capability-token / signed-link access control.
+ * Requires capability token. Never logs raw tokens or codes.
  */
 export async function GET(request: Request, context: RouteContext) {
   return handleApi(async () => {
@@ -27,6 +27,7 @@ export async function GET(request: Request, context: RouteContext) {
       maxAttempts: 30,
       windowMs: 60_000,
     });
+    assertOrderAccess(request, id, "pickup");
     const data = await pickupVerificationService.getCustomerCredentials(id);
     if (!data) {
       throw new AppError(

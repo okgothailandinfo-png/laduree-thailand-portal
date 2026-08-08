@@ -23,6 +23,9 @@ export type CreatePaymentResult = {
   status: "PENDING";
   method: CreateOrderPaymentDto["method"];
   methodLabel: string;
+  /** Added by PaymentService for customer order access. */
+  accessToken?: string;
+  orderNumber?: string | null;
 };
 
 export type PaymentRecordDto = {
@@ -35,6 +38,12 @@ export type PaymentRecordDto = {
   safeDisplay: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Present after SUCCESS — capability token for confirmation/pickup/history. */
+  accessToken?: string | null;
+  /** Customer-facing order number (draft before pay; final after SUCCESS). */
+  orderNumber?: string | null;
+  /** Order total in THB major units for payment review UI. */
+  totalThb?: number | null;
 };
 
 export type CreatePaymentRequestDto = {
@@ -60,4 +69,8 @@ export type ConfirmPaymentResponseDto = {
     | "completed"
     | "cancelled"
     | "mock_placed";
+  /** Capability token for post-payment customer routes (SUCCESS only). */
+  accessToken: string | null;
+  /** Final customer-facing order number after promotion (SUCCESS). */
+  orderNumber: string | null;
 };

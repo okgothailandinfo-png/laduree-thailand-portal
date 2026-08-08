@@ -5,6 +5,7 @@ import {
   clientSubjectFromRequest,
   hashRateLimitSubject,
 } from "@/src/server/http/rate-limit";
+import { assertOrderAccess } from "@/src/server/orders/order-access-token";
 import { orderService } from "@/src/server/services/container";
 
 type RouteContext = {
@@ -20,6 +21,7 @@ export async function GET(request: Request, context: RouteContext) {
       maxAttempts: 60,
       windowMs: 60_000,
     });
+    assertOrderAccess(request, id, "order");
     const data = await orderService.getOrderById(id);
     return ok(data);
   }, request);

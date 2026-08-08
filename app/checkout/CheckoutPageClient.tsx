@@ -7,6 +7,7 @@ import { formatPriceThb } from "@/lib/api/catalog";
 import { submitCheckout } from "@/lib/api/checkout";
 import { ApiClientError } from "@/lib/api/client";
 import { fetchPickupAvailability } from "@/lib/api/pickup";
+import { rememberCustomerOrder } from "@/lib/customer-orders";
 import { buildCheckoutPrefillFromSession } from "@/lib/customer/checkout-prefill";
 import { savedAddressToDeliveryDraft } from "@/lib/customer/saved-addresses";
 import CatalogStatus from "../catalog/CatalogStatus";
@@ -309,7 +310,13 @@ export default function CheckoutPageClient() {
       });
       idempotencyKeyRef.current = null;
       setSubmitStatus("idle");
-      router.push(`/payment?orderId=${encodeURIComponent(result.orderId)}`);
+      rememberCustomerOrder({
+        orderId: result.orderId,
+        accessToken: result.accessToken,
+      });
+      router.push(
+        `/payment?orderId=${encodeURIComponent(result.orderId)}&token=${encodeURIComponent(result.accessToken)}`,
+      );
     } catch (error: unknown) {
       setSubmitStatus("error");
       const message = errorMessage(

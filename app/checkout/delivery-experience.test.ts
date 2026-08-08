@@ -331,8 +331,9 @@ describe("Sprint 22 — confirmation and tracking UI contracts", () => {
     const current = steps.find((step) => step.isCurrent);
     assert.equal(current?.label, "Preparing");
     assert.equal(steps[0]?.isComplete, true);
-    assert.equal(steps[0]?.label, "Order received");
-    assert.equal(steps.at(-1)?.label, "Delivered");
+    assert.equal(steps[0]?.label, "Submitted");
+    assert.equal(steps[1]?.label, "Accepted");
+    assert.equal(steps.at(-1)?.label, "Completed");
     assert.equal(steps.at(-1)?.isComplete, false);
   });
 
@@ -341,10 +342,10 @@ describe("Sprint 22 — confirmation and tracking UI contracts", () => {
       join(process.cwd(), "app/order-confirmation/OrderConfirmationClient.tsx"),
       "utf8",
     );
-    assert.match(source, /isDelivery \? <DeliveryTrackingSection/);
+    assert.match(source, /isDelivery \? \(\s*<DeliveryTrackingSection/);
     assert.match(
       source,
-      /\{!isDelivery \? \(\s*<PickupCredentialsCard/,
+      /\{!isDelivery && resolvedAccessToken \? \(\s*<PickupCredentialsCard/,
     );
     // Only one JSX render site — gated behind !isDelivery.
     assert.equal(

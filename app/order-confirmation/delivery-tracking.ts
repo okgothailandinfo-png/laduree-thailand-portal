@@ -1,20 +1,23 @@
 /**
  * Mock delivery tracking UI — no courier integration.
- * Default current state for Sprint 22: Preparing.
+ * Labels use Singapore-verified Order Tracker status samples only.
+ *
+ * Default current state after payment success: Preparing (Sprint 22 contract).
  */
 
-export const DELIVERY_TRACKING_STATUSES = [
-  "Order received",
-  "Preparing",
-  "Ready for dispatch",
-  "Out for delivery",
-  "Delivered",
-] as const;
+import {
+  DELIVERY_FULFILLMENT_STATUSES,
+  getFulfillmentTrackingSteps,
+  mapOrderStatusToFulfillmentLabel,
+  type DeliveryFulfillmentStatus,
+  type OrderStatusLike,
+} from "@/lib/orders/fulfillment-status";
 
-export type DeliveryTrackingStatus =
-  (typeof DELIVERY_TRACKING_STATUSES)[number];
+export const DELIVERY_TRACKING_STATUSES = DELIVERY_FULFILLMENT_STATUSES;
 
-/** Approved Sprint 22 default mock current state. */
+export type DeliveryTrackingStatus = DeliveryFulfillmentStatus;
+
+/** Approved Sprint 22 default mock current state (SG label). */
 export const DEFAULT_MOCK_DELIVERY_TRACKING_STATUS: DeliveryTrackingStatus =
   "Preparing";
 
@@ -28,13 +31,22 @@ export type DeliveryTrackingStep = {
 export function getDeliveryTrackingSteps(
   currentStatus: DeliveryTrackingStatus = DEFAULT_MOCK_DELIVERY_TRACKING_STATUS,
 ): DeliveryTrackingStep[] {
-  const currentIndex = DELIVERY_TRACKING_STATUSES.indexOf(currentStatus);
-  const activeIndex = currentIndex >= 0 ? currentIndex : 1;
+  return getFulfillmentTrackingSteps("DELIVERY", currentStatus).map(
+    (step) => ({
+      label: step.label as DeliveryTrackingStatus,
+      index: step.index,
+      isCurrent: step.isCurrent,
+      isComplete: step.isComplete,
+    }),
+  );
+}
 
-  return DELIVERY_TRACKING_STATUSES.map((label, index) => ({
-    label,
-    index,
-    isCurrent: index === activeIndex,
-    isComplete: index < activeIndex,
-  }));
+/** Map durable order status → mock delivery tracking current step. */
+export function deliveryTrackingStatusFromOrderStatus(
+  status: OrderStatusLike,
+): DeliveryTrackingStatus {
+  return mapOrderStatusToFulfillmentLabel(
+    status,
+    "DELIVERY",
+  ) as DeliveryTrackingStatus;
 }

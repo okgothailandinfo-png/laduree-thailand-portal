@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts lib/product/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/delivery/*.test.ts",
+    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts lib/product/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts lib/orders/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/delivery/*.test.ts src/server/orders/*.test.ts",
     "prisma:format": "prisma format",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",

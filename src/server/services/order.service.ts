@@ -3,6 +3,10 @@ import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import type { Order } from "@/src/server/models/order";
+import {
+  createFinalOrderNumber,
+  isDraftOrderNumber,
+} from "@/src/server/orders/order-number";
 import type {
   BoutiqueRepository,
   CustomerOrderCompletionRecord,
@@ -362,6 +366,44 @@ export class DefaultOrderService implements OrderService {
       throw new AppError("NOT_FOUND", `Order not found: ${value}`);
     }
     return toOrderDto(order);
+  }
+
+  /**
+   * Promote DRAFT-* to a stable final customer-facing number after payment.
+   * Idempotent: non-draft numbers are left unchanged. Internal order id never changes.
+   */
+  async promoteDraftOrderNumber(id: string): Promise<Order> {
+    const orderId = requireString(id, "id");
+    const order = await this.orders.findById(orderId);
+    if (!order) {
+      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+    }
+    if (!isDraftOrderNumber(order.orderNumber)) {
+      return order;
+    }
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = createFinalOrderNumber();
+      try {
+        const updated = await this.orders.updateOrderNumber(orderId, candidate);
+        logger.info("Draft order number promoted", {
+          orderId,
+          orderNumber: updated.orderNumber,
+        });
+        return updated;
+      } catch (error) {
+        if (error instanceof AppError && error.code === "CONFLICT") {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "Unable to allocate a unique final order number.",
+      { status: 500 },
+    );
   }
 
   async getOrderCompletion(id: string): Promise<OrderCompletionDto> {

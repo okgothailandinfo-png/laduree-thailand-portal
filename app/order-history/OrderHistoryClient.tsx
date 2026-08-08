@@ -5,13 +5,17 @@ import { useMemo, useState } from "react";
 import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderHistory } from "@/lib/api/orders";
 import type { OrderHistoryItem } from "@/lib/api/types";
-import { listRememberedOrderIds } from "@/lib/customer-orders";
+import { listRememberedOrders } from "@/lib/customer-orders";
 import {
   formatMockOrderStatus,
   formatMockServiceType,
   listMockMemberOrders,
 } from "@/lib/customer/mock-order-history";
 import type { MockOrderHistoryEntry } from "@/lib/customer/types";
+import {
+  buildOrderCompletedPath,
+  buildOrderConfirmationPath,
+} from "@/lib/orders/post-payment-session";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
 import { useCustomerSession } from "../customer/CustomerSessionContext";
@@ -52,11 +56,20 @@ export default function OrderHistoryClient() {
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const { isAuthenticated, email, ready } = useCustomerSession();
 
+  const rememberedOrders = ready ? listRememberedOrders() : [];
+
   const guestQuery = useAsyncResource(
-    (signal) => fetchOrderHistory(listRememberedOrderIds(), { signal }),
+    (signal) =>
+      fetchOrderHistory(
+        rememberedOrders.map((entry) => ({
+          orderId: entry.orderId,
+          accessToken: entry.accessToken,
+        })),
+        { signal },
+      ),
     {
       isEmpty: (data) => data.length === 0,
-      deps: [ready, isAuthenticated],
+      deps: [ready, isAuthenticated, rememberedOrders.length],
     },
   );
 
@@ -268,16 +281,30 @@ export default function OrderHistoryClient() {
                       </>
                     ) : null}
                   </p>
-                  <Link
-                    href={
-                      item.status === "completed"
-                        ? `/order-completed/${encodeURIComponent(item.orderId)}`
-                        : `/order-confirmation?orderId=${encodeURIComponent(item.orderId)}`
-                    }
-                    className="order-history-item__link"
-                  >
-                    View Details
-                  </Link>
+                  {(() => {
+                    const token = rememberedOrders.find(
+                      (entry) => entry.orderId === item.orderId,
+                    )?.accessToken;
+                    if (!token) return null;
+                    return (
+                      <Link
+                        href={
+                          item.status === "completed"
+                            ? buildOrderCompletedPath({
+                                orderId: item.orderId,
+                                accessToken: token,
+                              })
+                            : buildOrderConfirmationPath({
+                                orderId: item.orderId,
+                                accessToken: token,
+                              })
+                        }
+                        className="order-history-item__link"
+                      >
+                        View Order Details
+                      </Link>
+                    );
+                  })()}
                 </li>
               ))}
             </ul>

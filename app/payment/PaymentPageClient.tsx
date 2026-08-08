@@ -7,6 +7,10 @@ import { ApiClientError } from "@/lib/api/client";
 import { fetchOrderById } from "@/lib/api/orders";
 import { createPayment } from "@/lib/api/payment";
 import {
+  getRememberedOrderAccessToken,
+  rememberCustomerOrder,
+} from "@/lib/customer-orders";
+import {
   focusFirstInvalidCardField,
   formatCardNumberInput,
   formatExpiryInput,
@@ -68,8 +72,10 @@ function deliveryModeLabel(
 
 export default function PaymentPageClient({
   orderId,
+  accessToken,
 }: {
   orderId: string | null;
+  accessToken: string | null;
 }) {
   const router = useRouter();
   const { items, itemCount, subtotalThb } = useCart();
@@ -89,13 +95,27 @@ export default function PaymentPageClient({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
+  const resolvedAccessToken =
+    accessToken?.trim() ||
+    (orderId ? getRememberedOrderAccessToken(orderId) : null);
+
   const orderQuery = useAsyncResource(
     (signal) => {
       if (!orderId) return Promise.resolve(null);
-      return fetchOrderById(orderId, { signal });
+      if (!resolvedAccessToken) {
+        return Promise.reject(
+          new Error(
+            "Order access token is required. Return to checkout to continue payment.",
+          ),
+        );
+      }
+      return fetchOrderById(orderId, {
+        signal,
+        accessToken: resolvedAccessToken,
+      });
     },
     {
-      deps: [orderId],
+      deps: [orderId, resolvedAccessToken],
       isEmpty: (data) => data === null,
     },
   );
@@ -290,6 +310,13 @@ export default function PaymentPageClient({
       // Never carry PAN/CVV forward.
       setCard(emptyCard);
       idempotencyKeyRef.current = null;
+      if (result.accessToken) {
+        rememberCustomerOrder({
+          orderId,
+          accessToken: result.accessToken,
+          orderNumber: result.orderNumber,
+        });
+      }
       router.push(result.paymentUrl);
     } catch (error: unknown) {
       setUiState("FAILED");

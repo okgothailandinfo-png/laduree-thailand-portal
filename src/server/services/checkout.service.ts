@@ -31,6 +31,7 @@ import type {
   CheckoutResponseDto,
   DeliveryAddressDto,
 } from "@/src/server/types/dto";
+import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
 import {
@@ -428,6 +429,7 @@ export class DefaultCheckoutService {
       status: "PENDING",
       serviceType: "PICKUP",
       deliveryFee: null,
+      accessToken: issueOrderAccessToken(saved.id),
     };
   }
 
@@ -596,6 +598,7 @@ export class DefaultCheckoutService {
       deliveryDateKey: dateKey,
       deliveryTimeWindowLabel: timeSlotLabel,
       deliveryPromiseRelativeLabel: promiseRelativeLabel,
+      accessToken: issueOrderAccessToken(saved.id),
     };
   }
 

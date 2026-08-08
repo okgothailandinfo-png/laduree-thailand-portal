@@ -6,10 +6,15 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams: Promise<{ orderId?: string }>;
+  searchParams: Promise<{ orderId?: string; token?: string }>;
 };
 
 export default async function OrderConfirmationPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  return <OrderConfirmationClient orderId={params.orderId ?? null} />;
+  return (
+    <OrderConfirmationClient
+      orderId={params.orderId ?? null}
+      accessToken={params.token ?? null}
+    />
+  );
 }

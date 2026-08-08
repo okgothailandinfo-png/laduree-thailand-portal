@@ -7,9 +7,13 @@ import CatalogStatus from "../catalog/CatalogStatus";
 
 type Props = {
   orderId: string;
+  accessToken: string;
 };
 
-export default function PickupCredentialsCard({ orderId }: Props) {
+export default function PickupCredentialsCard({
+  orderId,
+  accessToken,
+}: Props) {
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading",
   );
@@ -31,6 +35,7 @@ export default function PickupCredentialsCard({ orderId }: Props) {
       try {
         const data = await fetchOrderPickupCredentials(orderId, {
           signal: controller.signal,
+          accessToken,
         });
         if (cancelled) return;
 
@@ -64,7 +69,7 @@ export default function PickupCredentialsCard({ orderId }: Props) {
       cancelled = true;
       controller.abort();
     };
-  }, [orderId, reloadKey]);
+  }, [orderId, accessToken, reloadKey]);
 
   return (
     <section

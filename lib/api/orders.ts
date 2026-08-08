@@ -6,30 +6,65 @@ import type {
   OrderPickupCredentials,
 } from "@/lib/api/types";
 
-export function fetchOrderById(id: string, init?: RequestInit) {
-  return apiGet<OrderDetail>(`/api/orders/${encodeURIComponent(id)}`, init);
+function withAccessToken(
+  path: string,
+  accessToken: string | null | undefined,
+): string {
+  const token = accessToken?.trim();
+  if (!token) return path;
+  const join = path.includes("?") ? "&" : "?";
+  return `${path}${join}token=${encodeURIComponent(token)}`;
 }
 
-export function fetchOrderPickupCredentials(id: string, init?: RequestInit) {
+export function fetchOrderById(
+  id: string,
+  init?: RequestInit & { accessToken?: string | null },
+) {
+  const { accessToken, ...rest } = init ?? {};
+  return apiGet<OrderDetail>(
+    withAccessToken(`/api/orders/${encodeURIComponent(id)}`, accessToken),
+    rest,
+  );
+}
+
+export function fetchOrderPickupCredentials(
+  id: string,
+  init?: RequestInit & { accessToken?: string | null },
+) {
+  const { accessToken, ...rest } = init ?? {};
   return apiGet<OrderPickupCredentials>(
-    `/api/orders/${encodeURIComponent(id)}/pickup`,
-    init,
+    withAccessToken(
+      `/api/orders/${encodeURIComponent(id)}/pickup`,
+      accessToken,
+    ),
+    rest,
   );
 }
 
-export function fetchOrderCompletion(id: string, init?: RequestInit) {
+export function fetchOrderCompletion(
+  id: string,
+  init?: RequestInit & { accessToken?: string | null },
+) {
+  const { accessToken, ...rest } = init ?? {};
   return apiGet<OrderCompletion>(
-    `/api/orders/${encodeURIComponent(id)}/completion`,
-    init,
+    withAccessToken(
+      `/api/orders/${encodeURIComponent(id)}/completion`,
+      accessToken,
+    ),
+    rest,
   );
 }
 
-export function fetchOrderHistory(ids: string[], init?: RequestInit) {
-  if (ids.length === 0) {
+export function fetchOrderHistory(
+  entries: Array<{ orderId: string; accessToken: string }>,
+  init?: RequestInit,
+) {
+  if (entries.length === 0) {
     return Promise.resolve([] as OrderHistoryItem[]);
   }
   const params = new URLSearchParams({
-    ids: ids.join(","),
+    ids: entries.map((entry) => entry.orderId).join(","),
+    tokens: entries.map((entry) => entry.accessToken).join(","),
   });
   return apiGet<OrderHistoryItem[]>(`/api/orders/history?${params}`, init);
 }

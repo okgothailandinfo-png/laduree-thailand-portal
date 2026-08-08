@@ -129,10 +129,23 @@ export class PickupVerificationService {
   ) {}
 
   /**
-   * Ensure pickup credentials exist for a confirmed order.
+   * Ensure pickup credentials exist for a confirmed Pickup order.
    * Idempotent — does not regenerate on refresh / repeat calls.
+   * Delivery orders never receive pickup credentials.
    */
   async ensureForOrder(orderId: string): Promise<PickupVerificationRecord> {
+    const order = await this.orders.findById(orderId);
+    if (!order) {
+      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+    }
+    if (order.serviceType === "DELIVERY") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Pickup credentials are not issued for delivery orders.",
+        { details: { field: "serviceType" } },
+      );
+    }
+
     const existing = await this.verifications.findByOrderId(orderId);
     if (existing) return existing;
 
@@ -160,6 +173,9 @@ export class PickupVerificationService {
   ): Promise<CustomerPickupCredentialsDto | null> {
     const order = await this.orders.findById(orderId);
     if (!order) return null;
+    if (order.serviceType === "DELIVERY") {
+      return null;
+    }
     if (
       order.status === "cancelled" ||
       order.status === "pending" ||

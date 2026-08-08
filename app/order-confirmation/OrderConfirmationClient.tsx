@@ -5,7 +5,14 @@ import { useEffect, type ReactNode } from "react";
 import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderById } from "@/lib/api/orders";
 import type { OrderDetail } from "@/lib/api/types";
-import { rememberCustomerOrderId } from "@/lib/customer-orders";
+import {
+  getRememberedOrderAccessToken,
+  rememberCustomerOrder,
+} from "@/lib/customer-orders";
+import {
+  buildOrderCompletedPath,
+  buildOrderReceiptPath,
+} from "@/lib/orders/post-payment-session";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
 import { useCart } from "../cart/CartContext";
@@ -18,7 +25,9 @@ import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 import {
   DEFAULT_MOCK_DELIVERY_TRACKING_STATUS,
+  deliveryTrackingStatusFromOrderStatus,
   getDeliveryTrackingSteps,
+  type DeliveryTrackingStatus,
 } from "./delivery-tracking";
 import PickupCredentialsCard from "./PickupCredentialsCard";
 import "./order-confirmation.css";
@@ -65,8 +74,12 @@ function deliveryTimeDetails(
   return null;
 }
 
-function DeliveryTrackingSection() {
-  const steps = getDeliveryTrackingSteps(DEFAULT_MOCK_DELIVERY_TRACKING_STATUS);
+function DeliveryTrackingSection({
+  currentStatus = DEFAULT_MOCK_DELIVERY_TRACKING_STATUS,
+}: {
+  currentStatus?: DeliveryTrackingStatus;
+}) {
+  const steps = getDeliveryTrackingSteps(currentStatus);
   return (
     <section
       className="order-confirmation-card"
@@ -77,7 +90,7 @@ function DeliveryTrackingSection() {
         id="confirmation-tracking"
         className="order-confirmation-card__title"
       >
-        Order Tracking
+        Track your order status
       </h2>
       <ol className="order-confirmation-tracking">
         {steps.map((step) => (
@@ -165,30 +178,55 @@ function DeliveryFulfillmentSummary({
 
 export default function OrderConfirmationClient({
   orderId,
+  accessToken,
 }: {
   orderId: string | null;
+  accessToken: string | null;
 }) {
   const { items, itemCount, subtotalThb } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
   const { confirmed: pickup, isPickupComplete } = usePickup();
   const { placedOrder, isOrderPlaced } = useOrderFlow();
 
+  const resolvedAccessToken =
+    accessToken?.trim() ||
+    (orderId ? getRememberedOrderAccessToken(orderId) : null);
+
   const orderQuery = useAsyncResource(
     (signal) => {
       if (!orderId) return Promise.resolve(null);
-      return fetchOrderById(orderId, { signal });
+      if (!resolvedAccessToken) {
+        return Promise.reject(
+          new Error(
+            "Order access token is required. Open this page from your payment confirmation or Order History link.",
+          ),
+        );
+      }
+      return fetchOrderById(orderId, {
+        signal,
+        accessToken: resolvedAccessToken,
+      });
     },
     {
-      deps: [orderId],
+      deps: [orderId, resolvedAccessToken],
       isEmpty: (data) => data === null,
     },
   );
 
   useEffect(() => {
-    if (orderQuery.status === "success" && orderQuery.data) {
-      rememberCustomerOrderId(orderQuery.data.id);
+    if (
+      orderQuery.status === "success" &&
+      orderQuery.data &&
+      resolvedAccessToken &&
+      isConfirmationAllowed(orderQuery.data)
+    ) {
+      rememberCustomerOrder({
+        orderId: orderQuery.data.id,
+        accessToken: resolvedAccessToken,
+        orderNumber: orderQuery.data.orderNumber,
+      });
     }
-  }, [orderQuery.status, orderQuery.data]);
+  }, [orderQuery.status, orderQuery.data, resolvedAccessToken]);
 
   if (orderId) {
     const order = orderQuery.data;
@@ -206,6 +244,9 @@ export default function OrderConfirmationClient({
       trustedTotalThb:
         order && typeof order.totalThb === "number" ? order.totalThb : null,
     });
+    const deliveryTrackingStatus = order
+      ? deliveryTrackingStatusFromOrderStatus(order.status)
+      : DEFAULT_MOCK_DELIVERY_TRACKING_STATUS;
 
     return (
       <main className="order-confirmation-page">
@@ -218,7 +259,19 @@ export default function OrderConfirmationClient({
 
           <h1 className="order-confirmation-page__title">Order Confirmation</h1>
 
-          {showLoadState ? (
+          {!resolvedAccessToken ? (
+            <div
+              className="order-confirmation-gate"
+              role="alert"
+              data-testid="confirmation-token-required"
+            >
+              Order access token is required. Open this page from your payment
+              confirmation or Order History link.{" "}
+              <Link href="/order-history">Order History</Link>
+            </div>
+          ) : null}
+
+          {resolvedAccessToken && showLoadState ? (
             <CatalogStatus
               status={
                 orderQuery.status === "loading"
@@ -237,7 +290,9 @@ export default function OrderConfirmationClient({
             />
           ) : null}
 
-          {orderQuery.status === "success" && order ? (
+          {resolvedAccessToken &&
+          orderQuery.status === "success" &&
+          order ? (
             !isConfirmationAllowed(order) ? (
               <div
                 className="order-confirmation-gate"
@@ -257,6 +312,9 @@ export default function OrderConfirmationClient({
             <>
               <section className="order-confirmation-banner" aria-live="polite">
                 <p className="order-confirmation-banner__message">
+                  Payment successful!
+                </p>
+                <p className="order-confirmation-banner__sub">
                   Your order is good to go!
                 </p>
               </section>
@@ -350,9 +408,16 @@ export default function OrderConfirmationClient({
                 ) : null}
               </section>
 
-              {isDelivery ? <DeliveryTrackingSection /> : null}
-              {!isDelivery ? (
-                <PickupCredentialsCard orderId={order.id} />
+              {isDelivery ? (
+                <DeliveryTrackingSection
+                  currentStatus={deliveryTrackingStatus}
+                />
+              ) : null}
+              {!isDelivery && resolvedAccessToken ? (
+                <PickupCredentialsCard
+                  orderId={order.id}
+                  accessToken={resolvedAccessToken}
+                />
               ) : null}
 
               <section
@@ -440,12 +505,27 @@ export default function OrderConfirmationClient({
               </section>
 
               <div className="order-confirmation-actions">
-                {order.status === "completed" ? (
+                {resolvedAccessToken ? (
                   <Link
-                    href={`/order-completed/${encodeURIComponent(order.id)}`}
+                    href={buildOrderReceiptPath({
+                      orderId: order.id,
+                      accessToken: resolvedAccessToken,
+                    })}
+                    className="order-confirmation-continue"
+                    data-testid="view-payment-receipt"
+                  >
+                    View Payment Receipt
+                  </Link>
+                ) : null}
+                {order.status === "completed" && resolvedAccessToken ? (
+                  <Link
+                    href={buildOrderCompletedPath({
+                      orderId: order.id,
+                      accessToken: resolvedAccessToken,
+                    })}
                     className="order-confirmation-continue"
                   >
-                    View Completion
+                    View Order Details
                   </Link>
                 ) : null}
                 <Link href="/order-history" className="order-confirmation-continue">

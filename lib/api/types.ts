@@ -214,6 +214,7 @@ export type CheckoutResponse = {
   deliveryDateKey?: string | null;
   deliveryTimeWindowLabel?: string | null;
   deliveryPromiseRelativeLabel?: "Today" | "Tomorrow" | null;
+  accessToken: string;
 };
 
 export type OrderDetail = {
@@ -397,6 +398,8 @@ export type CreatePaymentResponse = {
   status: "PENDING";
   method: "credit-card" | "promptpay-qr";
   methodLabel: string;
+  accessToken?: string;
+  orderNumber?: string | null;
 };
 
 export type PaymentRecord = {
@@ -409,6 +412,9 @@ export type PaymentRecord = {
   safeDisplay: string | null;
   createdAt: string;
   updatedAt: string;
+  accessToken?: string | null;
+  orderNumber?: string | null;
+  totalThb?: number | null;
 };
 
 export type ConfirmPaymentRequest = {
@@ -428,4 +434,6 @@ export type ConfirmPaymentResponse = {
     | "completed"
     | "cancelled"
     | "mock_placed";
+  accessToken: string | null;
+  orderNumber: string | null;
 };
