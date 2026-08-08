@@ -24,8 +24,11 @@ export function orderStatusFromPaymentStatus(
     case "FAILED":
       return null;
     case "CANCELLED":
-      return "cancelled";
+      // Leave order pending so the customer can return to Payment / Order Review.
+      return null;
     case "REFUNDED":
+      return null;
+    case "EXPIRED":
       return null;
     default: {
       const _exhaustive: never = paymentStatus;

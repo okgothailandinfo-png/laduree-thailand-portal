@@ -212,8 +212,9 @@ const METHOD_TO_DOMAIN: Record<
 > = {
   CREDIT_CARD: "credit-card",
   PROMPTPAY_QR: "promptpay-qr",
-  APPLE_PAY: "apple-pay",
-  GOOGLE_PAY: "google-pay",
+  // Legacy Prisma enum values — not creatable in Sprint 24 storefront.
+  APPLE_PAY: "credit-card",
+  GOOGLE_PAY: "credit-card",
 };
 
 const METHOD_TO_PRISMA: Record<
@@ -222,15 +223,11 @@ const METHOD_TO_PRISMA: Record<
 > = {
   "credit-card": "CREDIT_CARD",
   "promptpay-qr": "PROMPTPAY_QR",
-  "apple-pay": "APPLE_PAY",
-  "google-pay": "GOOGLE_PAY",
 };
 
 const METHOD_LABELS: Record<CreateOrderPaymentDto["method"], string> = {
   "credit-card": "Credit Card",
   "promptpay-qr": "PromptPay QR",
-  "apple-pay": "Apple Pay",
-  "google-pay": "Google Pay",
 };
 
 export function toPrismaPaymentMethod(
@@ -273,10 +270,16 @@ function toDomainPayment(
   if (!payment) return undefined;
 
   const method = toDomainPaymentMethod(payment.method);
+  const status =
+    payment.status === "MOCK_ACCEPTED"
+      ? "mock_accepted"
+      : payment.status === "FAILED"
+        ? "failed"
+        : "pending";
   return {
     method,
     methodLabel: METHOD_LABELS[method],
-    status: "mock_accepted",
+    status,
   };
 }
 

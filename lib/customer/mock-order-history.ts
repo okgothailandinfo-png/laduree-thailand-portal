@@ -14,6 +14,9 @@ const MOCK_MEMBER_ORDERS: MockOrderHistoryEntry[] = [
     serviceType: "PICKUP",
     totalThb: 1290,
     boutiqueName: "Ladurée Thailand",
+    paymentMethodLabel: "Credit Card",
+    paymentStatus: "Succeeded",
+    fulfilmentStatus: "Completed",
     detailPath: "/order-history",
   },
   {
@@ -24,6 +27,9 @@ const MOCK_MEMBER_ORDERS: MockOrderHistoryEntry[] = [
     serviceType: "DELIVERY",
     totalThb: 2450,
     boutiqueName: "Ladurée Thailand",
+    paymentMethodLabel: "PromptPay QR",
+    paymentStatus: "Succeeded",
+    fulfilmentStatus: "Out for delivery",
     detailPath: "/order-history",
   },
   {
@@ -34,6 +40,9 @@ const MOCK_MEMBER_ORDERS: MockOrderHistoryEntry[] = [
     serviceType: "PICKUP",
     totalThb: 890,
     boutiqueName: "Ladurée Thailand",
+    paymentMethodLabel: "Credit Card",
+    paymentStatus: "Succeeded",
+    fulfilmentStatus: "Preparing",
     detailPath: "/order-history",
   },
 ];
@@ -68,4 +77,8 @@ export function formatMockServiceType(
   serviceType: MockOrderHistoryEntry["serviceType"],
 ): string {
   return serviceType === "DELIVERY" ? "Delivery" : "Pick-up";
+}
+
+export function formatMockPaymentStatus(status: string): string {
+  return status;
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
 import { formatPriceThb } from "@/lib/api/catalog";
 import { fetchOrderById } from "@/lib/api/orders";
+import type { OrderDetail } from "@/lib/api/types";
 import { rememberCustomerOrderId } from "@/lib/customer-orders";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
@@ -21,6 +22,12 @@ import {
 } from "./delivery-tracking";
 import PickupCredentialsCard from "./PickupCredentialsCard";
 import "./order-confirmation.css";
+
+function isConfirmationAllowed(order: OrderDetail): boolean {
+  if (order.payment?.status === "mock_accepted") return true;
+  if (order.status === "pending" || order.status === "cancelled") return false;
+  return true;
+}
 
 function deliveryModeLabel(
   mode: "EARLIEST_AVAILABLE" | "PREORDER",
@@ -231,6 +238,22 @@ export default function OrderConfirmationClient({
           ) : null}
 
           {orderQuery.status === "success" && order ? (
+            !isConfirmationAllowed(order) ? (
+              <div
+                className="order-confirmation-gate"
+                role="alert"
+                data-testid="confirmation-payment-required"
+              >
+                {order.payment?.status === "failed"
+                  ? "Payment failed. Complete payment before viewing confirmation."
+                  : "Payment required. Order confirmation is available after payment succeeds."}{" "}
+                <Link
+                  href={`/payment?orderId=${encodeURIComponent(order.id)}`}
+                >
+                  Payment
+                </Link>
+              </div>
+            ) : (
             <>
               <section className="order-confirmation-banner" aria-live="polite">
                 <p className="order-confirmation-banner__message">
@@ -253,6 +276,34 @@ export default function OrderConfirmationClient({
                   data-testid="confirmation-order-number"
                 >
                   {order.orderNumber}
+                </p>
+              </section>
+
+              <section
+                className="order-confirmation-card"
+                aria-labelledby="confirmation-payment"
+                data-testid="confirmation-payment"
+              >
+                <h2
+                  id="confirmation-payment"
+                  className="order-confirmation-card__title"
+                >
+                  Payment summary
+                </h2>
+                <p className="order-confirmation-meta">
+                  Payment Status:{" "}
+                  {order.payment?.status === "mock_accepted"
+                    ? "Succeeded"
+                    : order.payment?.status ?? "Succeeded"}
+                  <br />
+                  Payment Method:{" "}
+                  {order.payment?.methodLabel ?? "—"}
+                  {order.payment?.safeDisplay ? (
+                    <>
+                      <br />
+                      {order.payment.safeDisplay}
+                    </>
+                  ) : null}
                 </p>
               </section>
 
@@ -287,9 +338,11 @@ export default function OrderConfirmationClient({
                       {order.pickup.address}
                     </p>
                     <p className="order-confirmation-meta">
-                      Pickup date &amp; time
+                      Pickup Date
                       <br />
                       {formatPickupDateKeyLong(order.pickup.dateKey)}
+                      <br />
+                      Pickup Time
                       <br />
                       {order.pickup.timeSlotLabel}
                     </p>
@@ -310,7 +363,7 @@ export default function OrderConfirmationClient({
                   id="confirmation-customer"
                   className="order-confirmation-card__title"
                 >
-                  Customer information summary
+                  Customer Information
                 </h2>
                 <p className="order-confirmation-meta">
                   Customer Name: {order.customer.customerName}
@@ -403,6 +456,7 @@ export default function OrderConfirmationClient({
                 </Link>
               </div>
             </>
+            )
           ) : null}
         </div>
       </main>

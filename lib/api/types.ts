@@ -282,6 +282,7 @@ export type OrderDetail = {
     method: string;
     methodLabel: string;
     status: string;
+    safeDisplay?: string | null;
   };
 };
 
@@ -362,9 +363,13 @@ export type OrderHistoryItem = {
   orderNumber: string;
   status: OrderDetail["status"];
   pickupStatus: OrderDetail["status"];
+  serviceType: "PICKUP" | "DELIVERY";
   boutiqueName: string;
   pickupDateKey: string;
   pickupTimeSlotLabel: string;
+  paymentMethodLabel: string | null;
+  paymentStatus: "pending" | "mock_accepted" | "failed" | "none";
+  fulfilmentStatus: OrderDetail["status"];
   totalThb: number;
   currency: "THB";
   completedAt: string | null;
@@ -376,16 +381,22 @@ export type PaymentStatus =
   | "SUCCESS"
   | "FAILED"
   | "CANCELLED"
-  | "REFUNDED";
+  | "REFUNDED"
+  | "EXPIRED";
 
 export type CreatePaymentRequest = {
   orderId: string;
+  method: "credit-card" | "promptpay-qr";
+  /** Safe display only (e.g. Card ending in 4242). Never send PAN/CVV. */
+  safeDisplay?: string | null;
 };
 
 export type CreatePaymentResponse = {
   paymentId: string;
   paymentUrl: string;
   status: "PENDING";
+  method: "credit-card" | "promptpay-qr";
+  methodLabel: string;
 };
 
 export type PaymentRecord = {
@@ -393,6 +404,9 @@ export type PaymentRecord = {
   orderId: string;
   status: PaymentStatus;
   paymentUrl: string;
+  method: "credit-card" | "promptpay-qr";
+  methodLabel: string;
+  safeDisplay: string | null;
   createdAt: string;
   updatedAt: string;
 };

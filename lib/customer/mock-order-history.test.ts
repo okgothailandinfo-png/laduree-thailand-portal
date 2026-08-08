@@ -27,8 +27,12 @@ describe("Order history rendering (mock member)", () => {
         formatMockServiceType(order.serviceType) === "Pick-up" ||
           formatMockServiceType(order.serviceType) === "Delivery",
       );
+      assert.ok(order.paymentMethodLabel);
+      assert.ok(order.paymentStatus);
+      assert.ok(order.fulfilmentStatus);
       assert.ok(typeof order.totalThb === "number");
       assert.ok(order.detailPath);
+      assert.equal(/4242\s*4242\s*4242/.test(JSON.stringify(order)), false);
     }
   });
 

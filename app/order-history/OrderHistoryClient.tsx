@@ -145,7 +145,11 @@ export default function OrderHistoryClient() {
                     <br />
                     {formatMockServiceType(item.serviceType)}
                     <br />
-                    {item.boutiqueName}
+                    Payment Method: {item.paymentMethodLabel}
+                    <br />
+                    Payment Status: {item.paymentStatus}
+                    <br />
+                    Fulfilment Status: {item.fulfilmentStatus}
                     <br />
                     Total: {formatPriceThb(item.totalThb)}
                   </p>
@@ -234,10 +238,26 @@ export default function OrderHistoryClient() {
                     </p>
                   </div>
                   <p className="order-history-item__meta">
+                    Date: {formatDateTimeBangkok(item.createdAt)}
+                    <br />
+                    {item.serviceType === "DELIVERY" ? "Delivery" : "Pick-up"}
+                    <br />
+                    Payment Method: {item.paymentMethodLabel ?? "—"}
+                    <br />
+                    Payment Status:{" "}
+                    {item.paymentStatus === "mock_accepted"
+                      ? "Succeeded"
+                      : item.paymentStatus === "none"
+                        ? "—"
+                        : item.paymentStatus}
+                    <br />
+                    Fulfilment Status: {formatStatusLabel(item.fulfilmentStatus)}
+                    <br />
                     {item.boutiqueName}
                     <br />
-                    {formatPickupDateKeyLong(item.pickupDateKey)} —{" "}
-                    {item.pickupTimeSlotLabel}
+                    {item.pickupDateKey
+                      ? `${formatPickupDateKeyLong(item.pickupDateKey)} — ${item.pickupTimeSlotLabel}`
+                      : null}
                     <br />
                     Total: {formatPriceThb(item.totalThb)}
                     {item.completedAt ? (
@@ -256,9 +276,7 @@ export default function OrderHistoryClient() {
                     }
                     className="order-history-item__link"
                   >
-                    {item.status === "completed"
-                      ? "View completion"
-                      : "View order"}
+                    View Details
                   </Link>
                 </li>
               ))}

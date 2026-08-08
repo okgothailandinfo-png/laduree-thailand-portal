@@ -21,6 +21,12 @@ import {
 import {
   formatFullDeliveryAddressInline,
 } from "./delivery-address-form";
+import OrderReview from "./OrderReview";
+import {
+  formatModifiersLabel,
+  TRUSTED_TAX_PLACEHOLDER,
+  type OrderReviewModel,
+} from "./order-review-model";
 import { computeOrderTotals, formatOrderTotalThb } from "./order-totals";
 import { PICKUP_MESSAGES, slotsContainId } from "../pickup/pickup-availability";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
@@ -335,6 +341,80 @@ export default function CheckoutPageClient() {
     : info.customerName;
   const deliveryNotes =
     (info.deliveryAddress.notes ?? "").trim() || info.specialRequest.trim();
+
+  const checkoutReviewModel: OrderReviewModel | null = useMemo(() => {
+    if (!fulfillment || !showCheckoutForm) return null;
+    if (!customerDisplayName || !info.email.trim() || !info.mobileNumber.trim()) {
+      return null;
+    }
+    if (isDelivery) {
+      if (
+        !deliveryView.canContinueToPayment ||
+        !info.deliveryAddress.province.trim() ||
+        !info.deliveryAddress.district.trim() ||
+        !info.deliveryAddress.subdistrict.trim() ||
+        !info.deliveryAddress.address.trim()
+      ) {
+        return null;
+      }
+    }
+
+    return {
+      serviceType: isDelivery ? "DELIVERY" : "PICKUP",
+      customer: {
+        customerName: customerDisplayName,
+        email: info.email.trim(),
+        mobileNumber: info.mobileNumber.trim(),
+      },
+      items: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        modifiersLabel: formatModifiersLabel(item.modifiers),
+      })),
+      totals: orderTotals,
+      taxLabel: TRUSTED_TAX_PLACEHOLDER,
+      pickup:
+        !isDelivery && fulfillment.serviceType === "PICKUP"
+          ? {
+              boutiqueName: fulfillment.boutique.name,
+              boutiqueAddress: fulfillment.boutique.address,
+              dateLabel: formatPickupDateKeyLong(fulfillment.dateKey),
+              timeLabel: `${fulfillment.timeSlot.start} To ${fulfillment.timeSlot.end}`,
+            }
+          : null,
+      delivery: isDelivery
+        ? {
+            fullAddress: formatFullDeliveryAddressInline({
+              ...info.deliveryAddress,
+              postalCode:
+                deliveryView.postalCode || info.deliveryAddress.postalCode,
+            }),
+            modeLabel: deliveryModeLabel(fulfillment.deliveryMode),
+            dateLabel: deliveryView.deliveryDate
+              ? formatPickupDateKeyLong(deliveryView.deliveryDate)
+              : null,
+            windowLabel: deliveryView.deliveryWindow
+              ? `${deliveryView.deliveryWindow.start} To ${deliveryView.deliveryWindow.end}`
+              : null,
+            notes: deliveryNotes || null,
+            deliveryFeeThb: orderTotals.deliveryFeeThb,
+          }
+        : null,
+    };
+  }, [
+    fulfillment,
+    showCheckoutForm,
+    customerDisplayName,
+    info.email,
+    info.mobileNumber,
+    info.deliveryAddress,
+    isDelivery,
+    deliveryView,
+    items,
+    orderTotals,
+    deliveryNotes,
+  ]);
 
   return (
     <main className="checkout-page">
@@ -1103,85 +1183,11 @@ export default function CheckoutPageClient() {
                 </div>
               ) : null}
 
-              {isDelivery &&
-              deliveryView.canContinueToPayment &&
-              customerDisplayName &&
-              info.mobileNumber.trim() &&
-              info.email.trim() &&
-              info.deliveryAddress.province.trim() &&
-              info.deliveryAddress.district.trim() &&
-              info.deliveryAddress.subdistrict.trim() &&
-              info.deliveryAddress.address.trim() ? (
-                <section
-                  className="checkout-order-review"
-                  aria-labelledby="checkout-order-review"
-                  data-testid="checkout-order-review"
-                >
-                  <h3
-                    id="checkout-order-review"
-                    className="checkout-order-review__title"
-                  >
-                    Order Review
-                  </h3>
-                  <p className="checkout-summary-meta">
-                    Customer Name: {customerDisplayName}
-                    <br />
-                    Mobile Number: {info.mobileNumber.trim()}
-                    <br />
-                    Email: {info.email.trim()}
-                  </p>
-                  <p className="checkout-summary-meta">
-                    Full Delivery Address
-                    <br />
-                    {formatFullDeliveryAddressInline({
-                      ...info.deliveryAddress,
-                      postalCode:
-                        deliveryView.postalCode ||
-                        info.deliveryAddress.postalCode,
-                    })}
-                  </p>
-                  <p className="checkout-summary-meta">
-                    Delivery Mode:{" "}
-                    {deliveryModeLabel(fulfillment!.deliveryMode)}
-                    {deliveryView.deliveryDate ? (
-                      <>
-                        <br />
-                        Delivery Date:{" "}
-                        {formatPickupDateKeyLong(deliveryView.deliveryDate)}
-                      </>
-                    ) : null}
-                    {deliveryView.deliveryWindow ? (
-                      <>
-                        <br />
-                        Delivery Window: {deliveryView.deliveryWindow.start} To{" "}
-                        {deliveryView.deliveryWindow.end}
-                      </>
-                    ) : null}
-                  </p>
-                  <div className="checkout-totals">
-                    <div className="checkout-totals__row">
-                      <span>Subtotal</span>
-                      <span>{formatOrderTotalThb(orderTotals.subtotalThb)}</span>
-                    </div>
-                    {typeof orderTotals.deliveryFeeThb === "number" ? (
-                      <div className="checkout-totals__row">
-                        <span>Delivery Fee</span>
-                        <span>
-                          {formatOrderTotalThb(orderTotals.deliveryFeeThb)}
-                        </span>
-                      </div>
-                    ) : null}
-                    <div className="checkout-totals__row total">
-                      <span>Total</span>
-                      <span>{formatOrderTotalThb(orderTotals.totalThb)}</span>
-                    </div>
-                  </div>
-                  {deliveryNotes ? (
-                    <p className="checkout-summary-meta">
-                      Delivery Notes: {deliveryNotes}
-                    </p>
-                  ) : null}
-                </section>
+              {checkoutReviewModel ? (
+                <OrderReview
+                  model={checkoutReviewModel}
+                  testId="checkout-order-review"
+                />
               ) : null}
 
               {submitStatus === "loading" || submitStatus === "error" ? (

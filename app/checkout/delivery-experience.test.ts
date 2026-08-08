@@ -358,9 +358,15 @@ describe("Sprint 22 — confirmation and tracking UI contracts", () => {
       join(process.cwd(), "app/checkout/CheckoutPageClient.tsx"),
       "utf8",
     );
+    const reviewSource = readFileSync(
+      join(process.cwd(), "app/checkout/OrderReview.tsx"),
+      "utf8",
+    );
     assert.match(source, /seedDeliveryPostal\(quotePostal\)/);
     assert.match(source, /Unit \/ Floor/);
     assert.match(source, /Building \/ Village \/ Condominium/);
-    assert.match(source, /Order Review/);
+    assert.match(source, /OrderReview/);
+    assert.match(source, /checkout-order-review/);
+    assert.match(reviewSource, /Order Review/);
   });
 });

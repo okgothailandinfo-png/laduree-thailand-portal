@@ -140,7 +140,7 @@ export type CreateOrderPickupDto = {
 };
 
 export type CreateOrderPaymentDto = {
-  method: "credit-card" | "promptpay-qr" | "apple-pay" | "google-pay";
+  method: "credit-card" | "promptpay-qr";
 };
 
 export type ServiceTypeDto = "PICKUP" | "DELIVERY";
@@ -226,7 +226,9 @@ export type OrderDto = {
   payment?: {
     method: CreateOrderPaymentDto["method"];
     methodLabel: string;
-    status: "mock_accepted";
+    status: "pending" | "mock_accepted" | "failed";
+    /** Safe display only (e.g. Card ending in 4242). Never PAN/CVV. */
+    safeDisplay?: string | null;
   };
 };
 
@@ -351,9 +353,13 @@ export type OrderHistoryItemDto = {
   status: OrderDto["status"];
   /** Pickup workflow status (same domain status; surfaced for UX). */
   pickupStatus: OrderDto["status"];
+  serviceType: ServiceTypeDto;
   boutiqueName: string;
   pickupDateKey: string;
   pickupTimeSlotLabel: string;
+  paymentMethodLabel: string | null;
+  paymentStatus: "pending" | "mock_accepted" | "failed" | "none";
+  fulfilmentStatus: OrderDto["status"];
   totalThb: number;
   currency: "THB";
   completedAt: string | null;

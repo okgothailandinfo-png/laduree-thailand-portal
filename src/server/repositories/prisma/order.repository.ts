@@ -343,6 +343,61 @@ export class PrismaOrderRepository implements OrderRepository {
     }
   }
 
+  async attachPayment(
+    orderId: string,
+    payment: NonNullable<Order["payment"]>,
+  ): Promise<Order> {
+    try {
+      const prismaStatus =
+        payment.status === "mock_accepted"
+          ? "MOCK_ACCEPTED"
+          : payment.status === "failed"
+            ? "FAILED"
+            : "PENDING";
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const existing = await tx.order.findUnique({
+          where: { id: orderId },
+          include: orderInclude,
+        });
+        if (!existing) {
+          throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+        }
+
+        await tx.paymentRecord.upsert({
+          where: { orderId },
+          create: {
+            orderId,
+            method: toPrismaPaymentMethod(payment.method),
+            status: prismaStatus,
+            amountMinor: existing.totalMinor,
+            currency: "THB",
+          },
+          update: {
+            method: toPrismaPaymentMethod(payment.method),
+            status: prismaStatus,
+          },
+        });
+
+        return tx.order.findUniqueOrThrow({
+          where: { id: orderId },
+          include: orderInclude,
+        });
+      });
+
+      return toDomainOrder(updated as PrismaOrderWithRelations);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+      }
+      throw error;
+    }
+  }
+
   async updatePaymentStatus(
     orderId: string,
     status: "pending" | "mock_accepted" | "failed",

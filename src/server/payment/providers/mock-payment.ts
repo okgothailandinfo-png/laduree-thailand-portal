@@ -9,6 +9,9 @@ import type {
 import type { PaymentProvider } from "@/src/server/payment/interfaces";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import { AppError } from "@/src/server/utils/errors";
+import {
+  PAYMENT_METHOD_LABELS,
+} from "@/lib/payment/methods";
 
 function toDto(payment: Payment): PaymentRecordDto {
   return {
@@ -16,6 +19,9 @@ function toDto(payment: Payment): PaymentRecordDto {
     orderId: payment.orderId,
     status: payment.status,
     paymentUrl: payment.paymentUrl,
+    method: payment.method,
+    methodLabel: payment.methodLabel,
+    safeDisplay: payment.safeDisplay,
     createdAt: payment.createdAt,
     updatedAt: payment.updatedAt,
   };
@@ -28,11 +34,15 @@ export class MockPaymentProvider implements PaymentProvider {
     const paymentId = randomUUID();
     const now = new Date().toISOString();
     const paymentUrl = `/payment/mock?paymentId=${encodeURIComponent(paymentId)}`;
+    const methodLabel = PAYMENT_METHOD_LABELS[input.method];
     const record: Payment = {
       paymentId,
       orderId: input.orderId,
       status: "PENDING",
       paymentUrl,
+      method: input.method,
+      methodLabel,
+      safeDisplay: input.safeDisplay?.trim() || null,
       createdAt: now,
       updatedAt: now,
     };
@@ -41,6 +51,8 @@ export class MockPaymentProvider implements PaymentProvider {
       paymentId: record.paymentId,
       paymentUrl: record.paymentUrl,
       status: "PENDING",
+      method: record.method,
+      methodLabel: record.methodLabel,
     };
   }
 
@@ -65,6 +77,13 @@ export class MockPaymentProvider implements PaymentProvider {
 
   async cancelPayment(paymentId: string): Promise<PaymentRecordDto> {
     const current = await this.requirePayment(paymentId);
+    if (current.status !== "PENDING") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Only pending payments can be cancelled.",
+        { details: { field: "paymentId", status: current.status } },
+      );
+    }
     return toDto(await this.setStatus(current, "CANCELLED"));
   }
 

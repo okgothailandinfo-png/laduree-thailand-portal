@@ -41,6 +41,9 @@ export type MockOrderHistoryEntry = {
   serviceType: "PICKUP" | "DELIVERY";
   totalThb: number;
   boutiqueName: string;
+  paymentMethodLabel: string;
+  paymentStatus: string;
+  fulfilmentStatus: string;
   detailPath: string;
 };
 

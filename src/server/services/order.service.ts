@@ -40,15 +40,11 @@ const MAX_HISTORY_IDS = 50;
 const PAYMENT_LABELS: Record<CreateOrderPaymentDto["method"], string> = {
   "credit-card": "Credit Card",
   "promptpay-qr": "PromptPay QR",
-  "apple-pay": "Apple Pay",
-  "google-pay": "Google Pay",
 };
 
 const PAYMENT_METHODS = new Set<CreateOrderPaymentDto["method"]>([
   "credit-card",
   "promptpay-qr",
-  "apple-pay",
-  "google-pay",
 ]);
 
 function createOrderNumber() {
@@ -511,6 +507,7 @@ function toHistoryItemDto(
     orderNumber: order.orderNumber,
     status: order.status,
     pickupStatus: order.status,
+    serviceType: order.serviceType,
     boutiqueName: order.pickup?.boutiqueName ?? "Delivery",
     pickupDateKey: order.pickup?.dateKey ?? order.delivery?.dateKey ?? "",
     pickupTimeSlotLabel:
@@ -518,6 +515,9 @@ function toHistoryItemDto(
       order.delivery?.timeSlotLabel ??
       order.delivery?.promiseRelativeLabel ??
       "",
+    paymentMethodLabel: order.payment?.methodLabel ?? null,
+    paymentStatus: record.paymentStatus,
+    fulfilmentStatus: order.status,
     totalThb: minorToThb(order.totalMinor),
     currency: "THB",
     completedAt: resolveCompletedAt(record),

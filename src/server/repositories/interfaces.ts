@@ -226,6 +226,11 @@ export interface OrderRepository {
     status: OrderStatus,
     options?: OrderStatusUpdateOptions,
   ): Promise<Order>;
+  /** Attach or replace order payment snapshot (no PAN/CVV). */
+  attachPayment(
+    orderId: string,
+    payment: NonNullable<Order["payment"]>,
+  ): Promise<Order>;
   updatePaymentStatus(
     orderId: string,
     status: "pending" | "mock_accepted" | "failed",
