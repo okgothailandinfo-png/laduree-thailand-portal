@@ -14,11 +14,21 @@ Storefront DTOs and mock catalog now support configuration-driven modifier group
 - Product-level quantity (outer box qty, independent of flavour total)
 - Availability (`available`, `isActive` on product)
 
+## Persistence status (Sprint 29)
+
+Prisma now persists:
+
+- `Product.modifierGroupsJson` (JSON array mirroring mock/SG `ProductModifierGroup`)
+- `Product.allergenLabel` / `Product.allergenText`
+- Admin create/update API fields for the above (repository + parse)
+
+Seed attaches mock Napoleon modifier/allergen structure to the DEV macaron placeholder only.
+
 ## Admin gaps (later sprint)
 
-1. Prisma tables/JSON for modifier groups and option details (currently `modifierGroups: []` on Prisma mapper).
-2. Admin product create/update DTOs and UI for modifier groups.
-3. Admin fields for allergen label/text (domain fields exist; Prisma columns do not).
+1. ~~Prisma tables/JSON for modifier groups~~ — done via `modifierGroupsJson` (Sprint 29).
+2. Admin product **UI** for modifier groups (API accepts JSON; no CMS editor yet).
+3. ~~Admin fields for allergen label/text~~ — API/DTO/repository done; UI still pending.
 4. Validation UI for exact-selection quantity vs option counts.
 5. Preview of Pickup-appropriate acknowledgement copy (never ship delivery-only wording for Pickup SKUs).
 6. Price approval workflow so add-on `priceMinor` cannot be invented in Admin without owner sign-off.

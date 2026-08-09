@@ -75,12 +75,11 @@ npm run smoke:notifications
 
 | Item | Notes |
 |------|-------|
-| Prisma `modifierGroups: []` | Blocker only if staging is switched to `DATA_SOURCE=prisma` without CMS modifier persistence |
-| Prisma `Order.sourceCartId` | Cart clear after SUCCESS is durable on `DATA_SOURCE=mock`; prisma path needs a schema column before prisma-only UAT |
+| Prisma modifiers / `sourceCartId` | Addressed in Sprint 29 (`docs/sprint-29-prisma-parity.md`) — schema + mapper + seed; prisma UAT still needs approved Postgres |
 | Real Thailand PSP / OIDC / Redis / cloud storage | External production blockers (see `docs/production-hardening.md`) |
 | Orphan draft orders on repeated checkout | Accepted residual for RC1; reopen uses latest tokenized draft |
 | Concurrent dual PENDING payments | Residual race under prisma; mock UAT uses single-tab flows |
-| `smoke:repos` / `smoke:api` order-create checks | Pre-existing fixture gap: direct `/api/orders` create omits exact-selection modifiers for the 8pc macaron box. Cart → checkout path (covered by `test:pickup`) remains the UAT storefront path |
+| `smoke:repos` / `smoke:api` order-create checks | Sprint 29 builds valid exact-selection + acknowledgement modifiers from product config |
 
 ## RC1 decision
 

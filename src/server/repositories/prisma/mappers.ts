@@ -36,6 +36,7 @@ import type {
 } from "@/src/server/models/order";
 import type { PickupAvailability, PickupTimeSlot } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
+import { parseProductModifierGroups } from "@/src/server/repositories/prisma/product-modifiers";
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
 const DEFAULT_IMAGE = "/product-placeholder.svg";
@@ -167,9 +168,8 @@ export function toDomainProduct(
     title: row.title,
     categoryId: row.categoryId,
     description: [...row.description],
-    // Allergen / modifier groups are not persisted in the current Prisma schema.
-    allergenLabel: "",
-    allergenText: "",
+    allergenLabel: row.allergenLabel ?? "",
+    allergenText: row.allergenText ?? "",
     storageLabel: row.storageLabel ?? "",
     storageText: row.storageText ?? "",
     priceMinor,
@@ -180,7 +180,7 @@ export function toDomainProduct(
     isActive: row.isActive,
     available: row.available,
     sortOrder: row.sortOrder,
-    modifierGroups: [],
+    modifierGroups: parseProductModifierGroups(row.modifierGroupsJson),
   };
 }
 
@@ -414,6 +414,7 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
     createdAt: row.createdAt.toISOString(),
     totalMinor: row.totalMinor,
     termsAccepted: row.termsAccepted,
+    ...(row.sourceCartId ? { sourceCartId: row.sourceCartId } : {}),
     items: row.items.map((item) => ({
       productId: item.productId,
       name: item.productName,

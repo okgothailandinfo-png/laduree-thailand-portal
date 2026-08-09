@@ -113,6 +113,7 @@ Admin Product/Category CRUD uses Prisma repositories when `DATA_SOURCE=prisma`.
 - Admin writes refuse mock mode (`CONFIG_ERROR`) — never silently write to mock data
 - Mock admin session cookie remains a non-production placeholder
 - Cart / gateway payment / webhook event stores use Prisma models when `DATA_SOURCE=prisma` (Sprint 26); mock repositories remain for `DATA_SOURCE=mock`
+- Sprint 29: `Order.sourceCartId` + `Product.modifierGroupsJson` / allergen columns enable pickup parity with mock (see `docs/sprint-29-prisma-parity.md`)
 
 ### Useful scripts
 

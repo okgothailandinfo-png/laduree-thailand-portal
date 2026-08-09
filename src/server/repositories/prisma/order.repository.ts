@@ -208,6 +208,7 @@ export class PrismaOrderRepository implements OrderRepository {
             customerId: customer.id,
             boutiqueId: order.pickup.boutiqueId,
             pickupSlotId: order.pickup.timeSlotId,
+            sourceCartId: order.sourceCartId?.trim() || null,
             currency: "THB",
             totalMinor: order.totalMinor,
             specialRequest: order.customer.specialRequest,

@@ -9,6 +9,7 @@
 
 import { getDataSource } from "@/src/server/config/env";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
+import { buildValidModifiersForProduct } from "@/src/server/repositories/smoke/order-modifiers";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
 import { DefaultCategoryService } from "@/src/server/services/category.service";
 import { DefaultOrderService } from "@/src/server/services/order.service";
@@ -53,13 +54,16 @@ async function run(): Promise<void> {
   });
 
   const lookupSlug = products[0]?.slug;
+  let productDetail: Awaited<
+    ReturnType<DefaultProductService["getProductBySlug"]>
+  > | null = null;
   if (lookupSlug) {
     try {
-      const product = await productService.getProductBySlug(lookupSlug);
+      productDetail = await productService.getProductBySlug(lookupSlug);
       results.push({
         name: "product lookup by slug",
-        ok: product.slug === lookupSlug,
-        detail: product.title,
+        ok: productDetail.slug === lookupSlug,
+        detail: productDetail.title,
       });
     } catch (error) {
       results.push({
@@ -161,14 +165,14 @@ async function run(): Promise<void> {
     });
   }
 
-  if (boutique && slotId && products[0]) {
+  if (boutique && slotId && productDetail) {
     try {
       const created = await orderService.createOrder({
         items: [
           {
-            productId: products[0].id,
+            productId: productDetail.id,
             quantity: 1,
-            modifiers: [{ label: "Placeholder modifier", quantity: 1 }],
+            modifiers: buildValidModifiersForProduct(productDetail),
           },
         ],
         customer: {

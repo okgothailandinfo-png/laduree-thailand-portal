@@ -16,6 +16,9 @@ import { GET as getPickupAvailability } from "@/app/api/pickup/availability/rout
 import { GET as getProductBySlug } from "@/app/api/products/[slug]/route";
 import { GET as getProducts } from "@/app/api/products/route";
 import { getDataSource } from "@/src/server/config/env";
+import type { ProductModifierGroup } from "@/src/server/models/product";
+import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
+import { buildValidModifiersForProduct } from "@/src/server/repositories/smoke/order-modifiers";
 
 type CheckResult = { name: string; ok: boolean; detail?: string };
 
@@ -102,6 +105,11 @@ async function run(): Promise<void> {
       ? firstProduct.slug
       : null;
 
+  let productDetail: {
+    id: string;
+    modifierGroups: ProductModifierGroup[];
+  } | null = null;
+
   if (slug) {
     const productRes = await getProductBySlug(new Request("http://local/api"), {
       params: Promise.resolve({ slug }),
@@ -116,6 +124,16 @@ async function run(): Promise<void> {
       "priceThb" in productData &&
       "imagePlaceholder" in productData &&
       !("priceMinor" in productData);
+    if (
+      isPlainObject(productData) &&
+      typeof productData.id === "string" &&
+      Array.isArray(productData.modifierGroups)
+    ) {
+      productDetail = {
+        id: productData.id,
+        modifierGroups: productData.modifierGroups as ProductModifierGroup[],
+      };
+    }
     results.push({
       name: "GET /api/products/[slug]",
       ok: productRes.status === 200 && productEnvelope.ok && hasDtoShape,
@@ -205,9 +223,10 @@ async function run(): Promise<void> {
   });
 
   const productId =
-    firstProduct && typeof firstProduct.id === "string" ? firstProduct.id : null;
+    productDetail?.id ??
+    (firstProduct && typeof firstProduct.id === "string" ? firstProduct.id : null);
 
-  if (boutiqueId && slotId && productId) {
+  if (boutiqueId && slotId && productId && productDetail) {
     const createRes = await postOrder(
       new Request("http://local/api/orders", {
         method: "POST",
@@ -217,13 +236,7 @@ async function run(): Promise<void> {
             {
               productId,
               quantity: 1,
-              // Fixed-size box exact selection: flavour quantities must total 8.
-              modifiers: [
-                { label: "Almond", quantity: 2 },
-                { label: "Chocolate", quantity: 2 },
-                { label: "Coffee", quantity: 2 },
-                { label: "Lemon", quantity: 2 },
-              ],
+              modifiers: buildValidModifiersForProduct(productDetail),
             },
           ],
           customer: {
@@ -261,7 +274,10 @@ async function run(): Promise<void> {
     });
 
     if (orderId) {
-      const getRes = await getOrderById(new Request("http://local/api"), {
+      const token = issueOrderAccessToken(orderId);
+      const getUrl = new URL("http://local/api/orders/" + orderId);
+      getUrl.searchParams.set("token", token);
+      const getRes = await getOrderById(new Request(getUrl), {
         params: Promise.resolve({ id: orderId }),
       });
       const getJson: unknown = await getRes.json();
