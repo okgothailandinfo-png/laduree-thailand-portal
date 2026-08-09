@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   env,
   getEnvReadiness,
+  isPrototypeEnvironment,
   PRODUCTION_BLOCKERS,
 } from "@/src/server/config/env";
 import { prisma } from "@/src/server/database/prisma";
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
   const body = {
     status: ready ? "ready" : "not_ready",
     environment: env.appEnv,
+    prototypeMode: isPrototypeEnvironment(),
     timestamp: new Date().toISOString(),
     requestId,
     checks: {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { env } from "@/src/server/config/env";
 import OrderConfirmationClient from "./OrderConfirmationClient";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
     <OrderConfirmationClient
       orderId={params.orderId ?? null}
       accessToken={params.token ?? null}
+      isMockPaymentMode={env.paymentProvider === "mock"}
     />
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { env } from "@/src/server/config/env";
+import { env, isPrototypeEnvironment } from "@/src/server/config/env";
 import {
   createRequestId,
   REQUEST_ID_HEADER,
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
       status: "ok",
       version: process.env.npm_package_version ?? "0.1.0",
       environment: env.appEnv,
+      prototypeMode: isPrototypeEnvironment(),
       timestamp: new Date().toISOString(),
       requestId,
     },

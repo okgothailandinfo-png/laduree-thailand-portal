@@ -586,9 +586,20 @@ export function getDataSource(): DataSource {
 }
 
 /**
- * Production blockers remaining after Sprint 26 architecture work.
+ * True when this process is a non-production prototype/staging candidate.
+ * Mock payment and other mock providers are allowed; real PSP is not required.
+ */
+export function isPrototypeEnvironment(config: ServerEnv = env): boolean {
+  return config.allowsMockProviders && !config.isStrictProduction;
+}
+
+/**
+ * Production blockers remaining after Sprint 26–27 architecture work.
  * Persistence + Redis client + provider/OIDC boundaries are in place;
  * real vendor adapters and credentials remain external dependencies.
+ *
+ * Absence of a real Thailand PSP is an external production dependency —
+ * not a prototype/staging blocker when PAYMENT_PROVIDER=mock.
  */
 export const PRODUCTION_BLOCKERS = [
   "Register real Thailand PSP adapter behind PAYMENT_PROVIDER=external (credentials + webhook)",

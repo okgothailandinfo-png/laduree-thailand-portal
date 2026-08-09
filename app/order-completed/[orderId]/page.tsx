@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { env } from "@/src/server/config/env";
 import OrderCompletedClient from "./OrderCompletedClient";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default async function OrderCompletedPage({
     <OrderCompletedClient
       orderId={orderId}
       accessToken={query.token ?? null}
+      isMockPaymentMode={env.paymentProvider === "mock"}
     />
   );
 }

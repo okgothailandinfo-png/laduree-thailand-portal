@@ -13,6 +13,7 @@ import {
   buildOrderCompletedPath,
   buildOrderReceiptPath,
 } from "@/lib/orders/post-payment-session";
+import { MockPaymentModeNotice } from "@/lib/payment/mock-mode-notice";
 import CatalogStatus from "../catalog/CatalogStatus";
 import { useAsyncResource } from "../catalog/useAsyncResource";
 import { useCart } from "../cart/CartContext";
@@ -179,9 +180,11 @@ function DeliveryFulfillmentSummary({
 export default function OrderConfirmationClient({
   orderId,
   accessToken,
+  isMockPaymentMode = false,
 }: {
   orderId: string | null;
   accessToken: string | null;
+  isMockPaymentMode?: boolean;
 }) {
   const { items, itemCount, subtotalThb } = useCart();
   const { confirmed: checkout, isCheckoutInfoComplete } = useCheckout();
@@ -279,12 +282,21 @@ export default function OrderConfirmationClient({
                   : "error"
               }
               errorMessage={
-                orderQuery.errorMessage ??
-                (orderQuery.status === "empty" ? "Order not found." : null)
+                orderQuery.errorMessage
+                  ? /access token has expired/i.test(orderQuery.errorMessage)
+                    ? "Order access has expired. Open the order again from Order History, or return to checkout if payment is still pending."
+                    : /access token/i.test(orderQuery.errorMessage)
+                      ? "Order access token is invalid. Open this page from Order History or your payment confirmation link."
+                      : orderQuery.errorMessage
+                  : orderQuery.status === "empty"
+                    ? "Order not found."
+                    : null
               }
               onRetry={
                 orderQuery.status === "error" || orderQuery.status === "empty"
-                  ? orderQuery.reload
+                  ? /access token/i.test(orderQuery.errorMessage ?? "")
+                    ? undefined
+                    : orderQuery.reload
                   : undefined
               }
             />
@@ -303,7 +315,11 @@ export default function OrderConfirmationClient({
                   ? "Payment failed. Complete payment before viewing confirmation."
                   : "Payment required. Order confirmation is available after payment succeeds."}{" "}
                 <Link
-                  href={`/payment?orderId=${encodeURIComponent(order.id)}`}
+                  href={
+                    resolvedAccessToken
+                      ? `/payment?orderId=${encodeURIComponent(order.id)}&token=${encodeURIComponent(resolvedAccessToken)}`
+                      : `/payment?orderId=${encodeURIComponent(order.id)}`
+                  }
                 >
                   Payment
                 </Link>
@@ -317,6 +333,9 @@ export default function OrderConfirmationClient({
                 <p className="order-confirmation-banner__sub">
                   Your order is good to go!
                 </p>
+                {isMockPaymentMode ? (
+                  <MockPaymentModeNotice className="order-confirmation-banner__mock-note" />
+                ) : null}
               </section>
 
               <section
@@ -351,7 +370,9 @@ export default function OrderConfirmationClient({
                 <p className="order-confirmation-meta">
                   Payment Status:{" "}
                   {order.payment?.status === "mock_accepted"
-                    ? "Succeeded"
+                    ? isMockPaymentMode
+                      ? "Succeeded (mock)"
+                      : "Succeeded"
                     : order.payment?.status ?? "Succeeded"}
                   <br />
                   Payment Method:{" "}
@@ -619,6 +640,9 @@ export default function OrderConfirmationClient({
               <p className="order-confirmation-banner__sub">
                 Your order is good to go!
               </p>
+              {isMockPaymentMode ? (
+                <MockPaymentModeNotice className="order-confirmation-banner__mock-note" />
+              ) : null}
             </section>
 
             <p className="order-confirmation-note">

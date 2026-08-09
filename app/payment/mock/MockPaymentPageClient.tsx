@@ -34,6 +34,17 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function isAccessTokenError(error: unknown): boolean {
+  if (!(error instanceof ApiClientError)) return false;
+  if (error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN") return true;
+  return /access token/i.test(error.message);
+}
+
+function paymentReturnHref(orderId: string, token: string | null): string {
+  const base = `/payment?orderId=${encodeURIComponent(orderId)}`;
+  return token ? `${base}&token=${encodeURIComponent(token)}` : base;
+}
+
 const TERMINAL: ReadonlySet<PaymentStatus> = new Set([
   "SUCCESS",
   "FAILED",
@@ -127,7 +138,14 @@ export default function MockPaymentPageClient({
       } catch (err: unknown) {
         if (cancelled) return;
         if (err instanceof DOMException && err.name === "AbortError") return;
-        setError(errorMessage(err, "Unable to load payment."));
+        setError(
+          isAccessTokenError(err)
+            ? errorMessage(
+                err,
+                "Order access token is required. Return to checkout to continue payment.",
+              )
+            : errorMessage(err, "Unable to load payment."),
+        );
         setPhase("error");
       }
     }
@@ -338,7 +356,7 @@ export default function MockPaymentPageClient({
           <Link
             href={
               payment
-                ? `/payment?orderId=${encodeURIComponent(payment.orderId)}`
+                ? paymentReturnHref(payment.orderId, resolveToken(payment.orderId))
                 : "/payment"
             }
             className="payment-page__back"
@@ -517,7 +535,10 @@ export default function MockPaymentPageClient({
             {(uiState === "FAILED" || uiState === "EXPIRED") && payment ? (
               <p className="payment-summary-meta">
                 <Link
-                  href={`/payment?orderId=${encodeURIComponent(payment.orderId)}`}
+                  href={paymentReturnHref(
+                    payment.orderId,
+                    resolveToken(payment.orderId),
+                  )}
                 >
                   Return to Payment
                 </Link>

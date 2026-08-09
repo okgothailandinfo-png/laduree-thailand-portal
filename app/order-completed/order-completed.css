@@ -61,6 +61,14 @@
   line-height: 1.45;
 }
 
+.order-completed-banner__mock-note,
+.order-receipt-sheet__mock-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6a5f45;
+}
+
 .order-completed-card {
   margin-bottom: 16px;
   padding: 16px;

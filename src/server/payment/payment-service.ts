@@ -42,6 +42,7 @@ import {
   requireObject,
   requireString,
 } from "@/src/server/utils/validation";
+import { MOCK_PAYMENT_EXPIRY_MS } from "@/lib/payment/mock-config";
 import {
   isPaymentMethodId,
   PAYMENT_METHOD_LABELS,
@@ -49,6 +50,12 @@ import {
 } from "@/lib/payment/methods";
 
 const CONFIRM_RESULTS = new Set(["SUCCESS", "FAILED"]);
+
+function paymentAccessDenied(): AppError {
+  return new AppError("UNAUTHORIZED", "Invalid order access token.", {
+    status: 401,
+  });
+}
 
 export type WebhookApplyResult = {
   eventId: string;
@@ -211,7 +218,7 @@ export class PaymentService {
     const method: PaymentMethodId = input.method;
     const order = await this.orders.findById(id);
     if (!order) {
-      throw new AppError("NOT_FOUND", `Order not found: ${id}`);
+      throw new AppError("NOT_FOUND", "Order not found.");
     }
     if (
       order.status === "confirmed" ||
@@ -274,11 +281,12 @@ export class PaymentService {
     paymentId: string,
     accessToken: string,
   ): Promise<PaymentRecordDto> {
-    const payment = await this.provider.getPayment(
-      requireString(paymentId, "paymentId"),
+    const { payment, token } = await this.requireAuthorizedPayment(
+      paymentId,
+      accessToken,
     );
-    const token = this.assertOrderAccessToken(payment.orderId, accessToken);
-    return this.enrichPaymentForCustomer(payment, token);
+    const current = await this.expirePendingIfNeeded(payment);
+    return this.enrichPaymentForCustomer(current, token);
   }
 
   async confirmPayment(
@@ -287,11 +295,34 @@ export class PaymentService {
     accessToken?: string | null,
   ): Promise<ConfirmPaymentResponseDto> {
     const id = requireString(paymentId, "paymentId");
-    const existing = await this.provider.getPayment(id);
-    const token = this.assertOrderAccessToken(
-      existing.orderId,
+    const { payment: existing, token } = await this.requireAuthorizedPayment(
+      id,
       accessToken ?? "",
     );
+    const current = await this.expirePendingIfNeeded(existing);
+
+    // Idempotent success/failure: return the durable state when already applied.
+    if (current.status === result) {
+      const order = await this.orders.findById(current.orderId);
+      const enriched = await this.enrichPaymentForCustomer(current, token);
+      return {
+        paymentId: current.paymentId,
+        orderId: current.orderId,
+        status: current.status,
+        orderStatus: toApiOrderStatus(order?.status ?? "pending"),
+        accessToken: enriched.accessToken ?? null,
+        orderNumber: enriched.orderNumber ?? null,
+      };
+    }
+
+    if (current.status !== "PENDING") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Only pending payments can be confirmed.",
+        { details: { field: "paymentId", status: current.status } },
+      );
+    }
+
     const payment = await this.provider.confirmPayment(id, result);
     await this.syncOrderPaymentSnapshot(payment);
     const orderStatus = await this.syncOrderFromPayment(
@@ -321,14 +352,22 @@ export class PaymentService {
     paymentId: string,
     accessToken?: string | null,
   ): Promise<PaymentRecordDto> {
-    const current = await this.provider.getPayment(
+    const { payment: current, token } = await this.requireAuthorizedPayment(
       requireString(paymentId, "paymentId"),
-    );
-    const token = this.assertOrderAccessToken(
-      current.orderId,
       accessToken ?? "",
     );
-    const payment = await this.provider.cancelPayment(current.paymentId);
+    const active = await this.expirePendingIfNeeded(current);
+    if (active.status === "CANCELLED") {
+      return this.enrichPaymentForCustomer(active, token);
+    }
+    if (active.status !== "PENDING") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Only pending payments can be cancelled.",
+        { details: { field: "paymentId", status: active.status } },
+      );
+    }
+    const payment = await this.provider.cancelPayment(active.paymentId);
     await this.syncOrderPaymentSnapshot(payment);
     await this.syncOrderFromPayment(payment.orderId, payment.status);
     return this.enrichPaymentForCustomer(payment, token);
@@ -338,11 +377,8 @@ export class PaymentService {
     paymentId: string,
     accessToken?: string | null,
   ): Promise<PaymentRecordDto> {
-    const current = await this.provider.getPayment(
+    const { payment: current, token } = await this.requireAuthorizedPayment(
       requireString(paymentId, "paymentId"),
-    );
-    const token = this.assertOrderAccessToken(
-      current.orderId,
       accessToken ?? "",
     );
     const payment = await this.provider.refundPayment(current.paymentId);
@@ -420,6 +456,46 @@ export class PaymentService {
     };
   }
 
+  /**
+   * Load payment then bind capability token. Missing payment and invalid token
+   * use the same unauthorized response to avoid payment-id existence oracles.
+   */
+  private async requireAuthorizedPayment(
+    paymentId: string,
+    accessToken: string,
+  ): Promise<{ payment: PaymentRecordDto; token: string }> {
+    const id = requireString(paymentId, "paymentId");
+    let payment: PaymentRecordDto;
+    try {
+      payment = await this.provider.getPayment(id);
+    } catch (error) {
+      if (error instanceof AppError && error.code === "NOT_FOUND") {
+        throw paymentAccessDenied();
+      }
+      throw error;
+    }
+    try {
+      const token = this.assertOrderAccessToken(payment.orderId, accessToken);
+      return { payment, token };
+    } catch {
+      throw paymentAccessDenied();
+    }
+  }
+
+  /** Align mock UI expiry with server state for PENDING payments. */
+  private async expirePendingIfNeeded(
+    payment: PaymentRecordDto,
+  ): Promise<PaymentRecordDto> {
+    if (payment.status !== "PENDING") return payment;
+    const created = Date.parse(payment.createdAt);
+    if (!Number.isFinite(created)) return payment;
+    if (Date.now() - created < MOCK_PAYMENT_EXPIRY_MS) return payment;
+    const expired = await this.provider.applyStatus(payment.paymentId, "EXPIRED");
+    await this.syncOrderPaymentSnapshot(expired);
+    await this.syncOrderFromPayment(expired.orderId, expired.status);
+    return expired;
+  }
+
   private async syncOrderPaymentSnapshot(
     payment: PaymentRecordDto,
   ): Promise<void> {
@@ -437,7 +513,7 @@ export class PaymentService {
   ): Promise<ReturnType<typeof toApiOrderStatus>> {
     const order = await this.orders.findById(orderId);
     if (!order) {
-      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+      throw new AppError("NOT_FOUND", "Order not found.");
     }
 
     let next = orderStatusFromPaymentStatus(paymentStatus);
@@ -500,7 +576,7 @@ export class PaymentService {
   private async promoteDraftOrderNumber(orderId: string) {
     const order = await this.orders.findById(orderId);
     if (!order) {
-      throw new AppError("NOT_FOUND", `Order not found: ${orderId}`);
+      throw new AppError("NOT_FOUND", "Order not found.");
     }
     if (!isDraftOrderNumber(order.orderNumber)) {
       return order;

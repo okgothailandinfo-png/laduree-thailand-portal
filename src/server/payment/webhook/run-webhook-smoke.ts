@@ -193,9 +193,10 @@ async function main() {
   const orderAfterCancel = await repos.orders.findById(order3);
   checks.push({
     name: "valid cancelled event",
+    // Cancel keeps the order pending so the customer can retry payment.
     ok:
       cancelled.paymentStatus === "CANCELLED" &&
-      orderAfterCancel?.status === "cancelled",
+      orderAfterCancel?.status === "pending",
   });
 
   const order4 = randomUUID();

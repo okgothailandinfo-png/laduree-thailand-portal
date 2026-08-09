@@ -1,4 +1,4 @@
-# Production Hardening (Sprint 20B)
+# Production Hardening (Sprint 20B / Sprint 27)
 
 ## Fail-closed production rules
 
@@ -16,11 +16,38 @@ Mock providers are allowed only in `development`, `test`, and explicitly configu
 
 There is **no** production bypass flag such as `ALLOW_MOCK_PAYMENT_IN_PRODUCTION`.
 
-## Production Blockers (remaining after Sprint 26)
+## Prototype / staging (Sprint 27)
+
+There is no separate `APP_ENV=prototype` value. Use:
+
+| Mode | `APP_ENV` | Typical providers |
+|------|-----------|-------------------|
+| Local development | `development` | mock payment, mock notifications, `DATA_SOURCE=mock` |
+| Prototype / staging candidate | `staging` | mock payment allowed; secrets still required |
+| Production | `production` | fail-closed external/oidc/prisma/redis |
+
+Prototype/staging must keep `PAYMENT_PROVIDER=mock` until a client-approved Thailand PSP
+adapter is registered. Mock mutation routes and the mock webhook require
+`PAYMENT_PROVIDER=mock` and refuse production.
+
+`GET /api/health` and `GET /api/ready` expose `prototypeMode: true` when mock providers
+are intentionally allowed (non-production).
+
+Optional durable prototype DB (not required locally):
+
+1. `docker compose up -d`
+2. Set `DATABASE_URL` + `DATA_SOURCE=prisma`
+3. `npm run prisma:generate && npm run db:deploy`
+
+## Production Blockers (remaining after Sprint 26–27)
 
 Sprint 26 delivered persistence (cart + gateway payments), Redis rate-limit client,
 provider abstractions (`mock|external`), admin OIDC boundary, and payment IDOR hardening
 (capability token required on payment create/get/mutate).
+
+Sprint 27 hardened the prototype/staging candidate: mock payment idempotency/expiry,
+token-preserving payment recovery links, rate limits on history/deprecated payment,
+and mock-mode notices on post-payment UI.
 
 Still required before Go-Live (external accounts + adapter registration):
 
@@ -36,6 +63,9 @@ Still required before Go-Live (external accounts + adapter registration):
 
 Customer order capability tokens (Sprint 25) remain required; payment endpoints no longer
 mint tokens without a prior checkout token.
+
+The absence of a real Thailand PSP is a **production external dependency**, not a
+prototype blocker, while `PAYMENT_PROVIDER=mock` works correctly.
 
 ## Pending Infrastructure (does not block mock feature work)
 
