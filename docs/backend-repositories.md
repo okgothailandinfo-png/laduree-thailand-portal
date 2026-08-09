@@ -112,7 +112,7 @@ Admin Product/Category CRUD uses Prisma repositories when `DATA_SOURCE=prisma`.
 - Updates accept **PUT** and **PATCH** on `/api/admin/products/[id]` and `/api/admin/categories/[id]`
 - Admin writes refuse mock mode (`CONFIG_ERROR`) — never silently write to mock data
 - Mock admin session cookie remains a non-production placeholder
-- Cart / gateway payment / webhook event stores stay in-memory until dedicated Prisma models exist
+- Cart / gateway payment / webhook event stores use Prisma models when `DATA_SOURCE=prisma` (Sprint 26); mock repositories remain for `DATA_SOURCE=mock`
 
 ### Useful scripts
 
@@ -215,8 +215,8 @@ See also [production-hardening.md](./production-hardening.md) for fail-closed ru
 - Replace development seed with owner-approved Thailand catalog, prices, boutique ops, and hours
 - Product modifier groups not persisted in Prisma yet
 - Real admin authentication provider not implemented (mock session only — refused in production)
-- Cart / gateway payment persistence still in-memory under `DATA_SOURCE=prisma`
-- Webhook event persistence is now Prisma-backed (`WebhookEvent`); cart/gateway payments remain in-memory
+- Cart (`Cart`), gateway payment (`GatewayPayment`), and webhook event (`WebhookEvent`) persistence are Prisma-backed under `DATA_SOURCE=prisma` (Sprint 26)
+- `DATA_SOURCE=mock` keeps in-memory repositories for local prototype runs without PostgreSQL
 - Pickup reservation counts not decremented on order create
 - Payment gateway not implemented (mock payment refused in production)
 - Production must set `DATA_SOURCE=prisma` (mock refused)

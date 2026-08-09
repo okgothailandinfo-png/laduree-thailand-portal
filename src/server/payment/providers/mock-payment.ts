@@ -13,6 +13,14 @@ import {
   PAYMENT_METHOD_LABELS,
 } from "@/lib/payment/methods";
 
+const TERMINAL_STATUSES: ReadonlySet<PaymentStatus> = new Set([
+  "SUCCESS",
+  "FAILED",
+  "CANCELLED",
+  "REFUNDED",
+  "EXPIRED",
+]);
+
 function toDto(payment: Payment): PaymentRecordDto {
   return {
     paymentId: payment.paymentId,
@@ -25,6 +33,16 @@ function toDto(payment: Payment): PaymentRecordDto {
     createdAt: payment.createdAt,
     updatedAt: payment.updatedAt,
   };
+}
+
+function canTransition(
+  current: PaymentStatus,
+  next: PaymentStatus,
+): boolean {
+  if (current === next) return true;
+  if (current === "PENDING") return true;
+  if (current === "SUCCESS" && next === "REFUNDED") return true;
+  return false;
 }
 
 export class MockPaymentProvider implements PaymentProvider {
@@ -65,6 +83,10 @@ export class MockPaymentProvider implements PaymentProvider {
     result: Extract<PaymentStatus, "SUCCESS" | "FAILED">,
   ): Promise<PaymentRecordDto> {
     const current = await this.requirePayment(paymentId);
+    // Idempotent: repeating the same terminal confirm returns the current record.
+    if (current.status === result) {
+      return toDto(current);
+    }
     if (current.status !== "PENDING") {
       throw new AppError(
         "VALIDATION_ERROR",
@@ -77,6 +99,9 @@ export class MockPaymentProvider implements PaymentProvider {
 
   async cancelPayment(paymentId: string): Promise<PaymentRecordDto> {
     const current = await this.requirePayment(paymentId);
+    if (current.status === "CANCELLED") {
+      return toDto(current);
+    }
     if (current.status !== "PENDING") {
       throw new AppError(
         "VALIDATION_ERROR",
@@ -89,6 +114,9 @@ export class MockPaymentProvider implements PaymentProvider {
 
   async refundPayment(paymentId: string): Promise<PaymentRecordDto> {
     const current = await this.requirePayment(paymentId);
+    if (current.status === "REFUNDED") {
+      return toDto(current);
+    }
     if (current.status !== "SUCCESS") {
       throw new AppError(
         "VALIDATION_ERROR",
@@ -106,6 +134,20 @@ export class MockPaymentProvider implements PaymentProvider {
     const current = await this.requirePayment(paymentId);
     if (current.status === status) {
       return toDto(current);
+    }
+    if (!canTransition(current.status, status)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        `Cannot transition payment from ${current.status} to ${status}.`,
+        {
+          details: {
+            field: "paymentId",
+            status: current.status,
+            nextStatus: status,
+            terminal: TERMINAL_STATUSES.has(current.status),
+          },
+        },
+      );
     }
     return toDto(await this.setStatus(current, status));
   }
@@ -125,7 +167,7 @@ export class MockPaymentProvider implements PaymentProvider {
   private async requirePayment(paymentId: string): Promise<Payment> {
     const record = await this.payments.findById(paymentId);
     if (!record) {
-      throw new AppError("NOT_FOUND", `Payment not found: ${paymentId}`);
+      throw new AppError("NOT_FOUND", "Payment not found.");
     }
     return record;
   }

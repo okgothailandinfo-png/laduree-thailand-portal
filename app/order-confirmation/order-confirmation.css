@@ -61,6 +61,13 @@
   line-height: 1.45;
 }
 
+.order-confirmation-banner__mock-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6a5f45;
+}
+
 .order-confirmation-note {
   margin: 0 0 16px;
   padding: 8px 10px;

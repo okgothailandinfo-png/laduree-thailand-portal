@@ -9,6 +9,7 @@ import {
   rememberCustomerOrder,
 } from "@/lib/customer-orders";
 import { buildOrderCompletedPath } from "@/lib/orders/post-payment-session";
+import { MockPaymentModeNotice } from "@/lib/payment/mock-mode-notice";
 import CatalogStatus from "../../../catalog/CatalogStatus";
 import { useAsyncResource } from "../../../catalog/useAsyncResource";
 import { formatPickupDateKeyLong } from "../../../pickup/pickup-dates";
@@ -21,9 +22,11 @@ import "../../order-completed.css";
 export default function OrderReceiptClient({
   orderId,
   accessToken,
+  isMockPaymentMode = false,
 }: {
   orderId: string;
   accessToken: string | null;
+  isMockPaymentMode?: boolean;
 }) {
   const resolvedAccessToken =
     accessToken?.trim() || getRememberedOrderAccessToken(orderId);
@@ -127,6 +130,9 @@ export default function OrderReceiptClient({
             />
             <p className="order-receipt-sheet__brand">Ladurée Thailand</p>
             <p className="order-receipt-sheet__subtitle">Receipt</p>
+            {isMockPaymentMode ? (
+              <MockPaymentModeNotice className="order-receipt-sheet__mock-note" />
+            ) : null}
 
             <p className="order-receipt-sheet__meta">
               Order number: {query.data.receipt.orderNumber}

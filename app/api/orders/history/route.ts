@@ -1,5 +1,9 @@
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
+import {
+  assertRateLimit,
+  clientSubjectFromRequest,
+} from "@/src/server/http/rate-limit";
 import { verifyOrderAccessToken } from "@/src/server/orders/order-access-token";
 import { orderService } from "@/src/server/services/container";
 import { AppError } from "@/src/server/utils/errors";
@@ -10,6 +14,13 @@ import { AppError } from "@/src/server/utils/errors";
  */
 export async function GET(request: Request) {
   return handleApi(async () => {
+    await assertRateLimit({
+      bucket: "orders-history",
+      subject: clientSubjectFromRequest(request),
+      maxAttempts: 60,
+      windowMs: 60_000,
+    });
+
     const url = new URL(request.url);
     const rawIds = url.searchParams.get("ids")?.trim() ?? "";
     const rawTokens = url.searchParams.get("tokens")?.trim() ?? "";
