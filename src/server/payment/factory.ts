@@ -1,12 +1,15 @@
 import type { PaymentProvider } from "@/src/server/payment/interfaces";
+import { ExternalPaymentProvider } from "@/src/server/payment/providers/external-payment";
 import { MockPaymentProvider } from "@/src/server/payment/providers/mock-payment";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
+import { AppError } from "@/src/server/utils/errors";
 
-export type PaymentProviderKind = "mock";
+/** mock = local/dev; external = production adapter boundary (real PSP module TBD). */
+export type PaymentProviderKind = "mock" | "external";
 
 /**
  * Selects a payment provider implementation.
- * Real gateways (Omise, Stripe, etc.) are intentionally not wired yet.
+ * Domain/checkout logic talks only to PaymentProvider — never a vendor SDK.
  */
 export function createPaymentProvider(
   payments: PaymentRepository,
@@ -15,9 +18,14 @@ export function createPaymentProvider(
   switch (kind) {
     case "mock":
       return new MockPaymentProvider(payments);
+    case "external":
+      return new ExternalPaymentProvider();
     default: {
       const _exhaustive: never = kind;
-      return _exhaustive;
+      throw new AppError(
+        "CONFIG_ERROR",
+        `Unsupported payment provider: ${String(_exhaustive)}`,
+      );
     }
   }
 }

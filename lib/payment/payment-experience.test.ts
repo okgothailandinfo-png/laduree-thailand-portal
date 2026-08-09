@@ -6,6 +6,7 @@ import { MockOrderRepository } from "@/src/server/repositories/mock/order.reposi
 import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 import { PaymentService } from "@/src/server/payment/payment-service";
+import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
 import type { Order } from "@/src/server/models/order";
 import { randomUUID } from "crypto";
 
@@ -80,6 +81,7 @@ describe("Sprint 24 payment experience", () => {
       orderId: order.id,
       method: "credit-card",
       safeDisplay: "Card ending in 4242",
+      accessToken: issueOrderAccessToken(order.id),
     });
     assert.equal(card.method, "credit-card");
     assert.equal(card.methodLabel, "Credit Card");
@@ -146,10 +148,12 @@ describe("Sprint 24 payment experience", () => {
     const first = await service.createPayment({
       orderId: order.id,
       method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
     });
     const second = await service.createPayment({
       orderId: order.id,
       method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
     });
     assert.equal(first.paymentId, second.paymentId);
   });
@@ -178,9 +182,10 @@ describe("Sprint 24 payment experience", () => {
     const created = await service.createPayment({
       orderId: order.id,
       method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
     });
 
-    const failed = await service.confirmPayment(created.paymentId, "FAILED");
+    const failed = await service.confirmPayment(created.paymentId, "FAILED", issueOrderAccessToken(order.id));
     assert.equal(failed.status, "FAILED");
     assert.equal(failed.orderStatus, "pending");
     const afterFail = await orders.findById(order.id);
@@ -204,8 +209,9 @@ describe("Sprint 24 payment experience", () => {
       orderId: order.id,
       method: "credit-card",
       safeDisplay: "Card ending in 4242",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    await service.cancelPayment(created.paymentId);
+    await service.cancelPayment(created.paymentId, issueOrderAccessToken(order.id));
     const after = await orders.findById(order.id);
     assert.equal(after?.status, "pending");
     assert.notEqual(after?.payment?.status, "mock_accepted");
@@ -226,8 +232,9 @@ describe("Sprint 24 payment experience", () => {
     const created = await service.createPayment({
       orderId: order.id,
       method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    const ok = await service.confirmPayment(created.paymentId, "SUCCESS");
+    const ok = await service.confirmPayment(created.paymentId, "SUCCESS", issueOrderAccessToken(order.id));
     assert.equal(ok.status, "SUCCESS");
     assert.equal(ok.orderStatus, "confirmed");
     assert.ok(ok.accessToken);
@@ -258,8 +265,9 @@ describe("Sprint 24 payment experience", () => {
       orderId: order.id,
       method: "credit-card",
       safeDisplay: "Card ending in 1111",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    const fetched = await service.getPayment(created.paymentId);
+    const fetched = await service.getPayment(created.paymentId, issueOrderAccessToken(order.id));
     assert.equal(fetched.status, "PENDING");
     const still = await orders.findById(order.id);
     assert.equal(still?.status, "pending");
@@ -282,15 +290,58 @@ describe("Sprint 24 payment experience", () => {
       orderId: order.id,
       method: "credit-card",
       safeDisplay: "Card ending in 4242",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    await service.confirmPayment(created.paymentId, "SUCCESS");
+    await service.confirmPayment(created.paymentId, "SUCCESS", issueOrderAccessToken(order.id));
     await assert.rejects(
       () =>
         service.createPayment({
           orderId: order.id,
           method: "promptpay-qr",
+          accessToken: issueOrderAccessToken(order.id),
         }),
       /already paid/i,
+    );
+  });
+
+  it("refuses payment create/get without a valid order access token", async () => {
+    const orders = new MockOrderRepository();
+    const payments = new MockPaymentRepository();
+    const service = new PaymentService(
+      orders,
+      payments,
+      createWebhookRepo(),
+      "test-secret",
+      300,
+    );
+    const order = draftOrder();
+    await orders.create(order);
+
+    assert.throws(() =>
+      service.parseCreatePaymentBody({
+        orderId: order.id,
+        method: "credit-card",
+      }),
+    );
+
+    await assert.rejects(
+      () =>
+        service.createPayment({
+          orderId: order.id,
+          method: "credit-card",
+          accessToken: "not-a-valid-token",
+        }),
+      /access token/i,
+    );
+
+    const created = await service.createPayment({
+      orderId: order.id,
+      method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
+    });
+    await assert.rejects(
+      () => service.getPayment(created.paymentId, "not-a-valid-token"),
+      /access token/i,
     );
   });
 

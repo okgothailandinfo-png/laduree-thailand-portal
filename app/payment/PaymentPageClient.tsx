@@ -299,13 +299,22 @@ export default function PaymentPageClient({
         : null;
 
     try {
+      if (!resolvedAccessToken) {
+        throw new Error(
+          "Order access token is required. Return to checkout to continue payment.",
+        );
+      }
       const result = await createPayment(
         {
           orderId,
           method,
+          accessToken: resolvedAccessToken,
           ...(safeDisplay ? { safeDisplay } : {}),
         },
-        { idempotencyKey: idempotencyKeyRef.current },
+        {
+          idempotencyKey: idempotencyKeyRef.current,
+          accessToken: resolvedAccessToken,
+        },
       );
       // Never carry PAN/CVV forward.
       setCard(emptyCard);

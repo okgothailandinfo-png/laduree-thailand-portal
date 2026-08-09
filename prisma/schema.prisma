@@ -384,6 +384,53 @@ model PaymentRecord {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
+/// Guest cart persistence (cookie cart id). Items stored as JSON snapshot.
+model Cart {
+  id        String   @id @db.Uuid
+  currency  String   @default("THB") @db.Char(3)
+  /// CartItem[] JSON — modifiers/notes only; never payment credentials.
+  itemsJson Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+/// Gateway payment processing record (separate from checkout PaymentRecord snapshot).
+enum GatewayPaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+  EXPIRED
+}
+
+model GatewayPayment {
+  id          String               @id @default(uuid()) @db.Uuid
+  /// Public payment id returned to the client / PSP correlation.
+  paymentId   String               @unique
+  orderId     String               @db.Uuid
+  status      GatewayPaymentStatus @default(PENDING)
+  paymentUrl  String
+  /// Storefront method id (e.g. credit-card, promptpay-qr).
+  method      String
+  methodLabel String
+  /// Safe display only — never PAN/CVV.
+  safeDisplay String?
+  /// Provider adapter name (mock | external). Never store secrets.
+  provider    String               @default("mock")
+  /// External PSP reference when a real adapter is wired (null for mock).
+  providerRef String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+}
+
 enum NotificationChannel {
   EMAIL
   LINE

@@ -6,12 +6,15 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  searchParams: Promise<{ paymentId?: string }>;
+  searchParams: Promise<{ paymentId?: string; token?: string }>;
 };
 
 export default async function MockPaymentPage({ searchParams }: PageProps) {
   const params = await searchParams;
   return (
-    <MockPaymentPageClient paymentId={params.paymentId ?? null} />
+    <MockPaymentPageClient
+      paymentId={params.paymentId ?? null}
+      accessToken={params.token ?? null}
+    />
   );
 }

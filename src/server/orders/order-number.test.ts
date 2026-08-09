@@ -10,6 +10,7 @@ import {
   isFinalOrderNumber,
 } from "@/src/server/orders/order-number";
 import { PaymentService } from "@/src/server/payment/payment-service";
+import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
 import { MockOrderRepository } from "@/src/server/repositories/mock/order.repository";
 import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
@@ -111,13 +112,14 @@ describe("Sprint 25 — draft to final order number", () => {
       orderId: order.id,
       method: "credit-card",
       safeDisplay: "Card ending in 4242",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    const first = await service.confirmPayment(created.paymentId, "SUCCESS");
+    const first = await service.confirmPayment(created.paymentId, "SUCCESS", issueOrderAccessToken(order.id));
     assert.ok(first.orderNumber);
     assert.equal(isDraftOrderNumber(first.orderNumber), false);
     assert.match(first.orderNumber, FINAL_ORDER_NUMBER_PATTERN);
 
-    const again = await service.getPayment(created.paymentId);
+    const again = await service.getPayment(created.paymentId, issueOrderAccessToken(order.id));
     assert.equal(again.orderNumber, first.orderNumber);
     assert.ok(again.accessToken);
 
@@ -142,8 +144,9 @@ describe("Sprint 25 — draft to final order number", () => {
     const created = await service.createPayment({
       orderId: order.id,
       method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    const ok = await service.confirmPayment(created.paymentId, "SUCCESS");
+    const ok = await service.confirmPayment(created.paymentId, "SUCCESS", issueOrderAccessToken(order.id));
     assert.equal(ok.orderNumber, existingFinal);
     const persisted = await orders.findById(order.id);
     assert.equal(persisted?.orderNumber, existingFinal);
@@ -185,8 +188,9 @@ describe("Sprint 25 — draft to final order number", () => {
     const created = await service.createPayment({
       orderId: order.id,
       method: "promptpay-qr",
+      accessToken: issueOrderAccessToken(order.id),
     });
-    const ok = await service.confirmPayment(created.paymentId, "SUCCESS");
+    const ok = await service.confirmPayment(created.paymentId, "SUCCESS", issueOrderAccessToken(order.id));
     assert.equal(ok.orderStatus, "confirmed");
     assert.match(ok.orderNumber ?? "", FINAL_ORDER_NUMBER_PATTERN);
   });

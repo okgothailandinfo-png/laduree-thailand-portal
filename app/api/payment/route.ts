@@ -13,8 +13,15 @@ export async function POST(request: Request) {
       throw new AppError("BAD_REQUEST", "Request body must be valid JSON.");
     }
 
-    const input = paymentService.parseCreatePaymentBody(raw);
-    const data = await paymentService.createPayment(input);
+    const parsed = paymentService.parseCreatePaymentBody(raw);
+    const accessToken = paymentService.resolveAccessToken(
+      request,
+      parsed.accessToken,
+    );
+    const data = await paymentService.createPayment({
+      ...parsed,
+      accessToken,
+    });
     return created(data);
   }, request);
 }

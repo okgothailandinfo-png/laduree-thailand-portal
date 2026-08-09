@@ -8,10 +8,12 @@
 
 export type DataSource = "mock" | "prisma";
 export type AppEnvName = "development" | "staging" | "production" | "test";
-export type PaymentProviderName = "mock";
-export type StorageProviderName = "local";
-export type NotificationProviderName = "mock";
+/** mock = local/dev; external = production adapter boundary (real vendor module TBD). */
+export type PaymentProviderName = "mock" | "external";
+export type StorageProviderName = "local" | "external";
+export type NotificationProviderName = "mock" | "external";
 export type RateLimitStoreName = "memory" | "redis";
+export type AdminAuthProviderName = "mock" | "oidc";
 
 export type ServerEnv = {
   nodeEnv: "development" | "production" | "test";
@@ -36,8 +38,16 @@ export type ServerEnv = {
   notificationBaseUrl: string;
   notificationMockForceFailure: boolean;
   pickupRevealSecret: string;
+  orderAccessSecret: string | null;
   rateLimitStore: RateLimitStoreName;
   redisUrl: string | null;
+  adminAuthProvider: AdminAuthProviderName;
+  oidcIssuer: string | null;
+  oidcClientId: string | null;
+  oidcClientSecret: string | null;
+  oidcRedirectUri: string | null;
+  oidcScopes: string;
+  adminSessionSecret: string | null;
   allowsMockProviders: boolean;
   isStrictProduction: boolean;
 };
@@ -127,22 +137,25 @@ function resolveWebhookTolerance(value: string | undefined): number {
   return parsed;
 }
 
-function resolveMockOnlyProvider(
+function resolveProviderKind(
   value: string | undefined,
   name: string,
   allowsMock: boolean,
-): "mock" {
+): "mock" | "external" {
   const raw = value?.trim().toLowerCase();
   if (!raw || raw === "mock") {
     if (!allowsMock) {
       throw new EnvValidationError(
-        `${name}=mock is not allowed in production. Configure a real provider (Production Blocker).`,
+        `${name}=mock is not allowed in production. Set ${name}=external and register a production adapter.`,
       );
     }
     return "mock";
   }
+  if (raw === "external") {
+    return "external";
+  }
   throw new EnvValidationError(
-    `${name}="${raw}" is not implemented. This is a Production Blocker.`,
+    `${name}="${raw}" is unsupported. Expected mock|external.`,
   );
 }
 
@@ -154,13 +167,37 @@ function resolveStorageProvider(
   if (raw === "local") {
     if (!allowsLocal) {
       throw new EnvValidationError(
-        "STORAGE_PROVIDER=local is not allowed in production. Configure cloud storage (Production Blocker).",
+        "STORAGE_PROVIDER=local is not allowed in production. Set STORAGE_PROVIDER=external and register a cloud adapter.",
       );
     }
     return "local";
   }
+  if (raw === "external") {
+    return "external";
+  }
   throw new EnvValidationError(
-    `STORAGE_PROVIDER="${raw}" is not implemented. Cloud storage is a Production Blocker.`,
+    `STORAGE_PROVIDER="${raw}" is unsupported. Expected local|external.`,
+  );
+}
+
+function resolveAdminAuthProvider(
+  value: string | undefined,
+  allowsMock: boolean,
+): AdminAuthProviderName {
+  const raw = (value ?? (allowsMock ? "mock" : "oidc")).trim().toLowerCase();
+  if (raw === "mock") {
+    if (!allowsMock) {
+      throw new EnvValidationError(
+        "ADMIN_AUTH_PROVIDER=mock is not allowed in production. Set ADMIN_AUTH_PROVIDER=oidc.",
+      );
+    }
+    return "mock";
+  }
+  if (raw === "oidc") {
+    return "oidc";
+  }
+  throw new EnvValidationError(
+    `ADMIN_AUTH_PROVIDER="${raw}" is unsupported. Expected mock|oidc.`,
   );
 }
 
@@ -289,7 +326,7 @@ function loadEnv(): ServerEnv {
     buildPhase,
   });
 
-  const paymentProvider = resolveMockOnlyProvider(
+  const paymentProvider = resolveProviderKind(
     process.env.PAYMENT_PROVIDER,
     "PAYMENT_PROVIDER",
     allowsMockProviders,
@@ -298,14 +335,18 @@ function loadEnv(): ServerEnv {
     process.env.STORAGE_PROVIDER,
     allowsMockProviders,
   );
-  const notificationEmailProvider = resolveMockOnlyProvider(
+  const notificationEmailProvider = resolveProviderKind(
     process.env.NOTIFICATION_EMAIL_PROVIDER,
     "NOTIFICATION_EMAIL_PROVIDER",
     allowsMockProviders,
   );
-  const notificationLineProvider = resolveMockOnlyProvider(
+  const notificationLineProvider = resolveProviderKind(
     process.env.NOTIFICATION_LINE_PROVIDER,
     "NOTIFICATION_LINE_PROVIDER",
+    allowsMockProviders,
+  );
+  const adminAuthProvider = resolveAdminAuthProvider(
+    process.env.ADMIN_AUTH_PROVIDER,
     allowsMockProviders,
   );
 
@@ -362,8 +403,17 @@ function loadEnv(): ServerEnv {
       process.env.NOTIFICATION_MOCK_FORCE_FAILURE?.trim().toLowerCase() ===
       "true",
     pickupRevealSecret: process.env.PICKUP_REVEAL_SECRET?.trim() || "",
+    orderAccessSecret: process.env.ORDER_ACCESS_SECRET?.trim() || null,
     rateLimitStore,
     redisUrl: process.env.REDIS_URL?.trim() || null,
+    adminAuthProvider,
+    oidcIssuer: process.env.OIDC_ISSUER?.trim() || null,
+    oidcClientId: process.env.OIDC_CLIENT_ID?.trim() || null,
+    oidcClientSecret: process.env.OIDC_CLIENT_SECRET?.trim() || null,
+    oidcRedirectUri: process.env.OIDC_REDIRECT_URI?.trim() || null,
+    oidcScopes:
+      process.env.OIDC_SCOPES?.trim() || "openid email profile",
+    adminSessionSecret: process.env.ADMIN_SESSION_SECRET?.trim() || null,
     allowsMockProviders,
     isStrictProduction,
   };
@@ -392,11 +442,20 @@ function assertStrictProductionEnv(config: ServerEnv): void {
     config.notificationBaseUrl,
     "NOTIFICATION_BASE_URL",
   );
-  requireSecret(config.mockPaymentWebhookSecret, "MOCK_PAYMENT_WEBHOOK_SECRET");
   config.pickupRevealSecret = requireSecret(
     config.pickupRevealSecret || undefined,
     "PICKUP_REVEAL_SECRET",
   );
+  // Prefer dedicated order-access secret; fall back to pickup reveal secret.
+  if (config.orderAccessSecret) {
+    requireSecret(config.orderAccessSecret, "ORDER_ACCESS_SECRET");
+  }
+  if (config.paymentProvider === "mock") {
+    requireSecret(
+      config.mockPaymentWebhookSecret || undefined,
+      "MOCK_PAYMENT_WEBHOOK_SECRET",
+    );
+  }
   if (config.rateLimitStore === "memory") {
     throw new EnvValidationError(
       "RATE_LIMIT_STORE=memory is not allowed in production. Set RATE_LIMIT_STORE=redis and REDIS_URL.",
@@ -407,6 +466,26 @@ function assertStrictProductionEnv(config: ServerEnv): void {
       "REDIS_URL is required when RATE_LIMIT_STORE=redis.",
     );
   }
+  if (config.adminAuthProvider !== "oidc") {
+    throw new EnvValidationError(
+      "ADMIN_AUTH_PROVIDER must be oidc in production.",
+    );
+  }
+  if (
+    !config.oidcIssuer ||
+    !config.oidcClientId ||
+    !config.oidcClientSecret ||
+    !config.oidcRedirectUri
+  ) {
+    throw new EnvValidationError(
+      "Production OIDC admin auth requires OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URI.",
+    );
+  }
+  requireHttpsBaseUrl(config.oidcIssuer, "OIDC_ISSUER");
+  requireSecret(
+    config.adminSessionSecret || config.pickupRevealSecret,
+    "ADMIN_SESSION_SECRET",
+  );
 }
 
 function assertStagingEnv(config: ServerEnv): void {
@@ -462,6 +541,7 @@ export function getEnvReadiness(): {
   storageProvider: string;
   notificationEmailProvider: string;
   notificationLineProvider: string;
+  adminAuthProvider: AdminAuthProviderName;
   rateLimitStore: RateLimitStoreName;
   appBaseUrlConfigured: boolean;
   databaseConfigured: boolean;
@@ -476,9 +556,8 @@ export function getEnvReadiness(): {
   }
 
   const secretsConfigured = Boolean(
-    env.mockPaymentWebhookSecret.length >= MIN_SECRET_LENGTH &&
-      (env.pickupRevealSecret.length >= MIN_SECRET_LENGTH ||
-        !env.isStrictProduction),
+    env.pickupRevealSecret.length >= MIN_SECRET_LENGTH ||
+      !env.isStrictProduction,
   );
 
   return {
@@ -489,6 +568,7 @@ export function getEnvReadiness(): {
     storageProvider: env.storageProvider,
     notificationEmailProvider: env.notificationEmailProvider,
     notificationLineProvider: env.notificationLineProvider,
+    adminAuthProvider: env.adminAuthProvider,
     rateLimitStore: env.rateLimitStore,
     appBaseUrlConfigured: Boolean(env.appBaseUrl),
     databaseConfigured: Boolean(env.databaseUrl),
@@ -505,16 +585,21 @@ export function getDataSource(): DataSource {
   });
 }
 
-/** Production blockers that remain after this hardening sprint. */
+/**
+ * Production blockers remaining after Sprint 26 architecture work.
+ * Persistence + Redis client + provider/OIDC boundaries are in place;
+ * real vendor adapters and credentials remain external dependencies.
+ */
 export const PRODUCTION_BLOCKERS = [
-  "Real admin authentication provider (replace mock session cookie)",
-  "Real payment provider (Omise/Stripe/etc.) — mock payment refused in production",
-  "Cloud storage provider (S3/GCS/etc.) — local storage refused in production",
-  "Real notification email provider (SendGrid/SES/SMTP)",
-  "Real LINE Messaging API provider",
-  "Persistent cart store under DATA_SOURCE=prisma",
-  "Persistent gateway payment records under DATA_SOURCE=prisma",
-  "Redis/Upstash rate-limit client wiring (config fail-closed; client not implemented)",
+  "Register real Thailand PSP adapter behind PAYMENT_PROVIDER=external (credentials + webhook)",
+  "Register real email adapter behind NOTIFICATION_EMAIL_PROVIDER=external",
+  "Register cloud storage adapter behind STORAGE_PROVIDER=external (CMS binary upload)",
+  "Configure production OIDC IdP (ADMIN_AUTH_PROVIDER=oidc + OIDC_* secrets)",
+  "Provision managed PostgreSQL and apply migrations (incl. cart/gateway payment)",
+  "Provision Redis and set REDIS_URL for production rate limiting",
+  "Owner-approved notification templates and Thailand catalog/pricing content",
+  "LINE Login / LINE Messaging (deferred from pickup MVP — architecture preserved)",
+  "Real courier dispatch (deferred — delivery code preserved, not Go-Live blocker)",
 ] as const;
 
 /**

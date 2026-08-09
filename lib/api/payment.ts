@@ -7,19 +7,39 @@ import type {
   PaymentRecord,
 } from "@/lib/api/types";
 
+function withAccessTokenHeaders(
+  accessToken: string | null | undefined,
+  init?: RequestInit,
+): Headers {
+  const headers = new Headers(init?.headers);
+  const token = accessToken?.trim();
+  if (token) {
+    headers.set("X-Order-Access-Token", token);
+  }
+  return headers;
+}
+
 export function createPayment(
   input: CreatePaymentRequest,
-  init?: RequestInit & { idempotencyKey?: string },
+  init?: RequestInit & { idempotencyKey?: string; accessToken?: string | null },
 ) {
-  const { idempotencyKey, ...rest } = init ?? {};
-  const headers = new Headers(rest.headers);
+  const { idempotencyKey, accessToken, ...rest } = init ?? {};
+  const headers = withAccessTokenHeaders(
+    accessToken ?? input.accessToken,
+    rest,
+  );
   if (idempotencyKey) {
     headers.set("Idempotency-Key", idempotencyKey);
   }
   return apiMutate<CreatePaymentResponse>(
     "/api/payment/create",
     "POST",
-    input,
+    {
+      ...input,
+      ...(accessToken?.trim()
+        ? { accessToken: accessToken.trim() }
+        : {}),
+    },
     {
       ...rest,
       headers,
@@ -29,37 +49,62 @@ export function createPayment(
 
 export function confirmPayment(
   input: ConfirmPaymentRequest,
-  init?: RequestInit,
+  init?: RequestInit & { accessToken?: string | null },
 ) {
+  const { accessToken, ...rest } = init ?? {};
   return apiMutate<ConfirmPaymentResponse>(
     "/api/payment/confirm",
     "POST",
     input,
-    init,
+    {
+      ...rest,
+      headers: withAccessTokenHeaders(accessToken, rest),
+    },
   );
 }
 
-export function fetchPayment(paymentId: string, init?: RequestInit) {
+export function fetchPayment(
+  paymentId: string,
+  init?: RequestInit & { accessToken?: string | null },
+) {
+  const { accessToken, ...rest } = init ?? {};
   return apiGet<PaymentRecord>(
     `/api/payment/${encodeURIComponent(paymentId)}`,
-    init,
+    {
+      ...rest,
+      headers: withAccessTokenHeaders(accessToken, rest),
+    },
   );
 }
 
-export function cancelPayment(paymentId: string, init?: RequestInit) {
+export function cancelPayment(
+  paymentId: string,
+  init?: RequestInit & { accessToken?: string | null },
+) {
+  const { accessToken, ...rest } = init ?? {};
   return apiMutate<PaymentRecord>(
     `/api/payment/${encodeURIComponent(paymentId)}/cancel`,
     "POST",
     undefined,
-    init,
+    {
+      ...rest,
+      headers: withAccessTokenHeaders(accessToken, rest),
+    },
   );
 }
 
-export function refundPayment(paymentId: string, init?: RequestInit) {
+export function refundPayment(
+  paymentId: string,
+  init?: RequestInit & { accessToken?: string | null },
+) {
+  const { accessToken, ...rest } = init ?? {};
   return apiMutate<PaymentRecord>(
     `/api/payment/${encodeURIComponent(paymentId)}/refund`,
     "POST",
     undefined,
-    init,
+    {
+      ...rest,
+      headers: withAccessTokenHeaders(accessToken, rest),
+    },
   );
 }

@@ -19,18 +19,12 @@ export async function GET(request: Request) {
     configuration: config.ok ? "ok" : "fail",
     database: "skip",
     prisma: "skip",
-    storage: config.storageProvider === "local" && env.isStrictProduction
-      ? "fail"
-      : "ok",
-    payment: config.paymentProvider === "mock" && env.isStrictProduction
-      ? "fail"
-      : "ok",
-    notifications:
-      (config.notificationEmailProvider === "mock" ||
-        config.notificationLineProvider === "mock") &&
-      env.isStrictProduction
-        ? "fail"
-        : "ok",
+    // Sprint 26: external/OIDC boundaries exist, but real vendor adapters are
+    // not registered yet — production readiness stays fail-closed.
+    storage: env.isStrictProduction ? "fail" : "ok",
+    payment: env.isStrictProduction ? "fail" : "ok",
+    notifications: env.isStrictProduction ? "fail" : "ok",
+    adminAuth: env.isStrictProduction ? "fail" : "ok",
     rateLimit:
       config.rateLimitStore === "memory" && env.isStrictProduction
         ? "fail"
@@ -69,11 +63,17 @@ export async function GET(request: Request) {
       configuration: checks.configuration,
       database: checks.database,
       prisma: checks.prisma,
+      storage: checks.storage,
+      payment: checks.payment,
+      notifications: checks.notifications,
+      adminAuth: checks.adminAuth,
       storageProvider: config.storageProvider,
       paymentProvider: config.paymentProvider,
       notificationEmailProvider: config.notificationEmailProvider,
       notificationLineProvider: config.notificationLineProvider,
+      adminAuthProvider: config.adminAuthProvider,
       rateLimitStore: config.rateLimitStore,
+      rateLimit: checks.rateLimit,
       dataSource: config.dataSource,
     },
     errors: config.errors,

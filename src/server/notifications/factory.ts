@@ -1,9 +1,11 @@
 import type { NotificationProvider } from "@/src/server/notifications/interfaces";
+import { ExternalEmailProvider } from "@/src/server/notifications/providers/external-email.provider";
+import { ExternalLineProvider } from "@/src/server/notifications/providers/external-line.provider";
 import { MockEmailProvider } from "@/src/server/notifications/providers/mock-email.provider";
 import { MockLineProvider } from "@/src/server/notifications/providers/mock-line.provider";
 import type { NotificationChannel } from "@/src/server/notifications/types";
 
-export type NotificationProviderKind = "mock";
+export type NotificationProviderKind = "mock" | "external";
 
 export type NotificationProviderOptions = {
   emailProvider?: NotificationProviderKind;
@@ -21,18 +23,24 @@ export function createNotificationProvider(
 
   if (channel === "EMAIL") {
     const kind = options.emailProvider ?? "mock";
+    if (kind === "external") {
+      return new ExternalEmailProvider();
+    }
     if (kind !== "mock") {
       throw new Error(
-        `Unsupported NOTIFICATION_EMAIL_PROVIDER="${kind}". Only "mock" is supported in this sprint.`,
+        `Unsupported NOTIFICATION_EMAIL_PROVIDER="${String(kind)}".`,
       );
     }
     return new MockEmailProvider({ forceFailure, failureRetryable });
   }
 
   const kind = options.lineProvider ?? "mock";
+  if (kind === "external") {
+    return new ExternalLineProvider();
+  }
   if (kind !== "mock") {
     throw new Error(
-      `Unsupported NOTIFICATION_LINE_PROVIDER="${kind}". Only "mock" is supported in this sprint.`,
+      `Unsupported NOTIFICATION_LINE_PROVIDER="${String(kind)}".`,
     );
   }
   return new MockLineProvider({ forceFailure, failureRetryable });

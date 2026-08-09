@@ -19,12 +19,14 @@ import {
   MockNotificationSettingRepository,
 } from "@/src/server/repositories/mock/notification.repository";
 import { PrismaBoutiqueRepository } from "@/src/server/repositories/prisma/boutique.repository";
+import { PrismaCartRepository } from "@/src/server/repositories/prisma/cart.repository";
 import { PrismaCategoryRepository } from "@/src/server/repositories/prisma/category.repository";
 import { PrismaHomepageBannerRepository } from "@/src/server/repositories/prisma/homepage-banner.repository";
 import { PrismaHomepageContentRepository } from "@/src/server/repositories/prisma/homepage-content.repository";
 import { PrismaHomepageSectionRepository } from "@/src/server/repositories/prisma/homepage-section.repository";
 import { PrismaMediaRepository } from "@/src/server/repositories/prisma/media.repository";
 import { PrismaOrderRepository } from "@/src/server/repositories/prisma/order.repository";
+import { PrismaPaymentRepository } from "@/src/server/repositories/prisma/payment.repository";
 import { PrismaPickupRepository } from "@/src/server/repositories/prisma/pickup.repository";
 import { PrismaPickupVerificationRepository } from "@/src/server/repositories/prisma/pickup-verification.repository";
 import { PrismaProductRepository } from "@/src/server/repositories/prisma/product.repository";
@@ -70,11 +72,9 @@ function createPrismaRepositories(): RepositoryBundle {
     pickupVerifications: new PrismaPickupVerificationRepository(),
     notificationQueue: new PrismaNotificationQueueRepository(),
     notificationSettings: new PrismaNotificationSettingRepository(),
-    // Intentionally in-memory until dedicated Prisma models exist:
-    // - Cart has no Prisma model yet (Production Blocker)
-    // - Gateway PaymentRepository is separate from checkout PaymentRecord (Production Blocker)
-    carts: new MockCartRepository(),
-    payments: new MockPaymentRepository(),
+    // Sprint 26: durable cart + gateway payments under prisma.
+    carts: new PrismaCartRepository(),
+    payments: new PrismaPaymentRepository(),
     webhookEvents: new PrismaWebhookEventRepository(),
   };
 }

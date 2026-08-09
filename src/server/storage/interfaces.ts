@@ -1,4 +1,5 @@
-export type StorageProviderName = "local";
+/** local = filesystem (dev/staging); external = cloud adapter boundary. */
+export type StorageProviderName = "local" | "external";
 
 export type UploadObjectInput = {
   /** Relative storage key (no leading slash), e.g. "folder/uuid.webp". */
