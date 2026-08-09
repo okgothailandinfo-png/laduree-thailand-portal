@@ -15,6 +15,7 @@ import type {
 } from "@/src/server/repositories/interfaces";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
+import { parseProductModifierGroups } from "@/src/server/repositories/prisma/product-modifiers";
 import {
   optionalString,
   requireBoolean,
@@ -123,8 +124,11 @@ function toDetail(
   return {
     ...toListItem(product, categoryName),
     description: [...product.description],
+    allergenLabel: product.allergenLabel,
+    allergenText: product.allergenText,
     storageLabel: product.storageLabel,
     storageText: product.storageText,
+    modifierGroups: product.modifierGroups.map((group) => ({ ...group })),
     images: product.images.map((image) => ({ ...image })),
   };
 }
@@ -159,7 +163,7 @@ export class AdminProductService {
 
   parseCreateBody(raw: unknown): AdminCreateProductInput {
     const body = requireObject(raw, "body");
-    return {
+    const input: AdminCreateProductInput = {
       name: requireString(body.name, "name"),
       slug: requireString(body.slug, "slug"),
       sku: requireString(body.sku, "sku"),
@@ -174,6 +178,23 @@ export class AdminProductService {
       storageText: optionalString(body.storageText, "storageText"),
       images: parseImages(body.images),
     };
+    if (body.allergenLabel !== undefined) {
+      input.allergenLabel = optionalString(body.allergenLabel, "allergenLabel");
+    }
+    if (body.allergenText !== undefined) {
+      input.allergenText = optionalString(body.allergenText, "allergenText");
+    }
+    if (body.modifierGroups !== undefined) {
+      if (!Array.isArray(body.modifierGroups)) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "modifierGroups must be an array.",
+          { details: { field: "modifierGroups" } },
+        );
+      }
+      input.modifierGroups = parseProductModifierGroups(body.modifierGroups);
+    }
+    return input;
   }
 
   parseUpdateBody(raw: unknown): AdminUpdateProductInput {
@@ -208,6 +229,22 @@ export class AdminProductService {
     }
     if (body.storageText !== undefined) {
       input.storageText = optionalString(body.storageText, "storageText");
+    }
+    if (body.allergenLabel !== undefined) {
+      input.allergenLabel = optionalString(body.allergenLabel, "allergenLabel");
+    }
+    if (body.allergenText !== undefined) {
+      input.allergenText = optionalString(body.allergenText, "allergenText");
+    }
+    if (body.modifierGroups !== undefined) {
+      if (!Array.isArray(body.modifierGroups)) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "modifierGroups must be an array.",
+          { details: { field: "modifierGroups" } },
+        );
+      }
+      input.modifierGroups = parseProductModifierGroups(body.modifierGroups);
     }
     if (body.images !== undefined) input.images = parseImages(body.images);
     return input;

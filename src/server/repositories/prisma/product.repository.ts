@@ -9,6 +9,7 @@ import type {
   ProductRepository,
 } from "@/src/server/repositories/interfaces";
 import { toDomainProduct } from "@/src/server/repositories/prisma/mappers";
+import { toModifierGroupsJson } from "@/src/server/repositories/prisma/product-modifiers";
 import { prisma } from "@/src/server/database/prisma";
 import { AppError } from "@/src/server/utils/errors";
 import { thbMajorToMinor } from "@/src/server/utils/money";
@@ -160,6 +161,8 @@ export class PrismaProductRepository implements ProductRepository {
           sku: input.sku,
           title: input.name,
           description: input.description,
+          allergenLabel: input.allergenLabel ?? null,
+          allergenText: input.allergenText ?? null,
           storageLabel: input.storageLabel ?? null,
           storageText: input.storageText ?? null,
           priceMinor,
@@ -167,6 +170,7 @@ export class PrismaProductRepository implements ProductRepository {
           isActive: input.isActive,
           available: input.available,
           sortOrder: input.sortOrder,
+          modifierGroupsJson: toModifierGroupsJson(input.modifierGroups ?? []),
           images: {
             create: images.map((image) => ({
               mediaId: image.mediaId,
@@ -199,6 +203,15 @@ export class PrismaProductRepository implements ProductRepository {
     }
     if (input.storageText !== undefined) {
       data.storageText = input.storageText ?? null;
+    }
+    if (input.allergenLabel !== undefined) {
+      data.allergenLabel = input.allergenLabel ?? null;
+    }
+    if (input.allergenText !== undefined) {
+      data.allergenText = input.allergenText ?? null;
+    }
+    if (input.modifierGroups !== undefined) {
+      data.modifierGroupsJson = toModifierGroupsJson(input.modifierGroups);
     }
     if (input.priceThb !== undefined) {
       data.priceMinor = thbMajorToMinor(input.priceThb);

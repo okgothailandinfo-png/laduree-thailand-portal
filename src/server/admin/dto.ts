@@ -1,3 +1,5 @@
+import type { ProductModifierGroup } from "@/src/server/models/product";
+
 /** Admin catalog DTOs — separate from storefront contracts. */
 
 export type AdminMediaDto = {
@@ -97,8 +99,11 @@ export type AdminProductListItemDto = {
 
 export type AdminProductDetailDto = AdminProductListItemDto & {
   description: string[];
+  allergenLabel: string;
+  allergenText: string;
   storageLabel: string;
   storageText: string;
+  modifierGroups: ProductModifierGroup[];
   images: AdminProductImageDto[];
 };
 
@@ -130,8 +135,12 @@ export type AdminCreateProductInput = {
   isActive: boolean;
   available: boolean;
   sortOrder: number;
+  allergenLabel?: string;
+  allergenText?: string;
   storageLabel?: string;
   storageText?: string;
+  /** Must mirror mock/SG modifier structures — never invent labels or prices. */
+  modifierGroups?: ProductModifierGroup[];
   images: AdminProductImageInput[];
 };
 

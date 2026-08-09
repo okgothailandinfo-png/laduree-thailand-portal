@@ -7,8 +7,12 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { MOCK_PRODUCTS } from "../src/server/repositories/mock/data";
 
 const prisma = new PrismaClient();
+
+/** Modifier/allergen structure from mock catalog — do not invent Thailand copy. */
+const MOCK_MACARON_REFERENCE = MOCK_PRODUCTS[0]!;
 
 /** Stable UUIDs so seed upserts remain idempotent. */
 const IDS = {
@@ -191,6 +195,18 @@ async function seedProducts(categoryIds: Map<string, string>) {
       throw new Error(`Missing seeded category: ${product.categorySlug}`);
     }
 
+    const isMacaronPlaceholder =
+      product.id === IDS.products.placeholderMacaron;
+    const allergenLabel = isMacaronPlaceholder
+      ? MOCK_MACARON_REFERENCE.allergenLabel
+      : null;
+    const allergenText = isMacaronPlaceholder
+      ? MOCK_MACARON_REFERENCE.allergenText
+      : null;
+    const modifierGroupsJson = isMacaronPlaceholder
+      ? MOCK_MACARON_REFERENCE.modifierGroups
+      : [];
+
     const row = await prisma.product.upsert({
       where: { slug: product.slug },
       create: {
@@ -200,6 +216,8 @@ async function seedProducts(categoryIds: Map<string, string>) {
         sku: product.sku,
         title: product.title,
         description: [...product.description],
+        allergenLabel,
+        allergenText,
         storageLabel: product.storageLabel,
         storageText: product.storageText,
         priceMinor: product.priceMinor,
@@ -207,12 +225,15 @@ async function seedProducts(categoryIds: Map<string, string>) {
         isActive: true,
         available: true,
         sortOrder: product.sortOrder,
+        modifierGroupsJson,
       },
       update: {
         categoryId,
         sku: product.sku,
         title: product.title,
         description: [...product.description],
+        allergenLabel,
+        allergenText,
         storageLabel: product.storageLabel,
         storageText: product.storageText,
         priceMinor: product.priceMinor,
@@ -220,6 +241,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
         isActive: true,
         available: true,
         sortOrder: product.sortOrder,
+        modifierGroupsJson,
       },
     });
 
