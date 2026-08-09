@@ -1,6 +1,7 @@
 import { readCartIdFromCookie } from "@/src/server/api/cart-session";
 import { handleApi } from "@/src/server/api/handle";
 import { created, ok } from "@/src/server/api/responses";
+import { assertCsrfOrigin } from "@/src/server/http/csrf";
 import {
   getIdempotentResponse,
   readIdempotencyKey,
@@ -15,6 +16,8 @@ import { AppError } from "@/src/server/utils/errors";
 
 export async function POST(request: Request) {
   return handleApi(async () => {
+    assertCsrfOrigin(request);
+
     await assertRateLimit({
       bucket: "checkout",
       subject: clientSubjectFromRequest(request),

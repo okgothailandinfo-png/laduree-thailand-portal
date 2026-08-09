@@ -11,7 +11,7 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "OKGO Pickup",
+  title: "Ladurée Thailand",
   description: "Order in advance and collect at your preferred boutique.",
 };
 

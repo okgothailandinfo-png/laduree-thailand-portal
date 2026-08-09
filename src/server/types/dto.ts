@@ -237,6 +237,10 @@ export type CheckoutCustomerRequestDto = {
   lastName: string;
   email: string;
   phone: string;
+  /** Optional pickup recipient override (not the paying customer). */
+  recipientName?: string;
+  /** Optional pickup special request note. */
+  specialRequest?: string;
 };
 
 export type CheckoutPickupRequestDto = {

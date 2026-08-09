@@ -8,10 +8,11 @@ import {
   toDomainPickupSlot,
 } from "@/src/server/repositories/prisma/mappers";
 import { prisma } from "@/src/server/database/prisma";
+import { AppError } from "@/src/server/utils/errors";
 
 /**
  * Available slots: capacity is null (unlimited) or capacity > 0.
- * Reservation counts are not decremented in this sprint.
+ * Finite capacity is decremented via reserveSlotCapacity on checkout.
  */
 function isSlotAvailable(capacity: number | null): boolean {
   return capacity === null || capacity > 0;
@@ -76,5 +77,35 @@ export class PrismaPickupRepository implements PickupRepository {
       start: row.startTime,
       end: row.endTime,
     };
+  }
+
+  async reserveSlotCapacity(slotId: string): Promise<void> {
+    const row = await prisma.pickupSlot.findUnique({ where: { id: slotId } });
+    if (!row) {
+      throw new AppError("NOT_FOUND", `Pickup slot not found: ${slotId}`);
+    }
+    if (row.capacity === null) {
+      return;
+    }
+    const updated = await prisma.pickupSlot.updateMany({
+      where: { id: slotId, capacity: { gt: 0 } },
+      data: { capacity: { decrement: 1 } },
+    });
+    if (updated.count === 0) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "pickup.pickupSlotId is not available for the selected boutique/date.",
+        { details: { field: "pickup.pickupSlotId", code: "CAPACITY_EXHAUSTED" } },
+      );
+    }
+  }
+
+  async releaseSlotCapacity(slotId: string): Promise<void> {
+    const row = await prisma.pickupSlot.findUnique({ where: { id: slotId } });
+    if (!row || row.capacity === null) return;
+    await prisma.pickupSlot.update({
+      where: { id: slotId },
+      data: { capacity: { increment: 1 } },
+    });
   }
 }

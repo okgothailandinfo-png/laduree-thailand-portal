@@ -128,6 +128,16 @@ function parseCustomer(body: Record<string, unknown>) {
     lastName: requireString(customerRaw.lastName, "customer.lastName"),
     email,
     phone,
+    recipientName: optionalTrimmedString(
+      customerRaw,
+      "recipientName",
+      "customer",
+    ),
+    specialRequest: optionalTrimmedString(
+      customerRaw,
+      "specialRequest",
+      "customer",
+    ),
   };
 }
 
@@ -383,6 +393,8 @@ export class DefaultCheckoutService {
       );
     }
 
+    await this.pickup.reserveSlotCapacity(slot.id);
+
     const { items, itemsMinor, itemCount } = await this.buildCartItems(cartId);
     const customerName =
       `${input.customer.firstName} ${input.customer.lastName}`.trim();
@@ -402,6 +414,8 @@ export class DefaultCheckoutService {
         customerName,
         mobileNumber: input.customer.phone,
         email: input.customer.email,
+        recipientName: input.customer.recipientName,
+        specialRequest: input.customer.specialRequest,
       },
       pickup: {
         boutiqueId: boutique.id,
@@ -413,7 +427,13 @@ export class DefaultCheckoutService {
       },
     };
 
-    const saved = await this.orders.create(order);
+    let saved: Order;
+    try {
+      saved = await this.orders.create(order);
+    } catch (error) {
+      await this.pickup.releaseSlotCapacity(slot.id);
+      throw error;
+    }
     logger.info("Draft checkout created", {
       orderId: saved.id,
       orderNumber: saved.orderNumber,

@@ -1,7 +1,10 @@
 import type { GatewayPaymentStatus, Prisma } from "@prisma/client";
 import type { Payment } from "@/src/server/models/payment";
 import type { PaymentStatus } from "@/src/server/payment/dto";
-import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
+import type {
+  PaymentRepository,
+  SavePendingExclusiveResult,
+} from "@/src/server/repositories/payment.repository";
 import { prisma } from "@/src/server/database/prisma";
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
 
@@ -46,8 +49,18 @@ export class PrismaPaymentRepository implements PaymentRepository {
   }
 
   async findByOrderId(orderId: string): Promise<Payment | null> {
+    const pending = await this.findPendingByOrderId(orderId);
+    if (pending) return pending;
     const row = await prisma.gatewayPayment.findFirst({
       where: { orderId },
+      orderBy: { createdAt: "desc" },
+    });
+    return row ? toDomain(row) : null;
+  }
+
+  async findPendingByOrderId(orderId: string): Promise<Payment | null> {
+    const row = await prisma.gatewayPayment.findFirst({
+      where: { orderId, status: "PENDING" },
       orderBy: { createdAt: "desc" },
     });
     return row ? toDomain(row) : null;
@@ -77,5 +90,38 @@ export class PrismaPaymentRepository implements PaymentRepository {
       },
     });
     return toDomain(row);
+  }
+
+  async savePendingExclusive(
+    payment: Payment,
+  ): Promise<SavePendingExclusiveResult> {
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.gatewayPayment.findFirst({
+        where: { orderId: payment.orderId, status: "PENDING" },
+        orderBy: { createdAt: "desc" },
+      });
+      if (existing) {
+        if (existing.method === payment.method) {
+          return { payment: toDomain(existing), reused: true };
+        }
+        await tx.gatewayPayment.update({
+          where: { paymentId: existing.paymentId },
+          data: { status: "CANCELLED" },
+        });
+      }
+
+      const data: Prisma.GatewayPaymentUncheckedCreateInput = {
+        paymentId: payment.paymentId,
+        orderId: payment.orderId,
+        status: "PENDING",
+        paymentUrl: payment.paymentUrl,
+        method: payment.method,
+        methodLabel: payment.methodLabel,
+        safeDisplay: payment.safeDisplay,
+        provider: "mock",
+      };
+      const row = await tx.gatewayPayment.create({ data });
+      return { payment: toDomain(row), reused: false };
+    });
   }
 }

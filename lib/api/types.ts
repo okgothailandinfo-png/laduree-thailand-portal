@@ -172,6 +172,10 @@ export type CheckoutRequest = {
     lastName: string;
     email: string;
     phone: string;
+    /** Optional pickup recipient override. */
+    recipientName?: string;
+    /** Optional pickup special request note. */
+    specialRequest?: string;
   };
   /** Defaults to PICKUP when omitted. */
   serviceType?: "PICKUP" | "DELIVERY";

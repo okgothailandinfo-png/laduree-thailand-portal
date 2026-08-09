@@ -4,6 +4,7 @@ import {
 } from "@/src/server/api/cart-session";
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
+import { assertCsrfOrigin } from "@/src/server/http/csrf";
 import { cartService } from "@/src/server/services/container";
 
 export async function GET(request: Request) {
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   return handleApi(async () => {
+    assertCsrfOrigin(request);
     const cartId = await readCartIdFromCookie();
     const data = await cartService.clearCart(cartId);
     await writeCartIdCookie(data.id);

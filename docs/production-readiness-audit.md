@@ -1,17 +1,32 @@
-# Production Readiness Audit — Sprint 20.8
+# Production Readiness Audit
 
 **Project:** Ladurée Thailand Pickup Platform  
-**Branch:** `cursor/sprint-20-8-production-readiness-audit`  
-**Date:** 2026-07-19  
-**Verdict:** **Not production-ready.** Estimated readiness: **62%** (verified evidence below).
+**Last updated:** Sprint 30 (2026-08-09)  
+**Verdict:** **Not production-ready.** Mock pickup staging path is strong; go-live remains **externally gated**.
 
 ---
 
-## Executive summary
+## Sprint 30 addendum (code-only)
+
+Closed in code (no external vendors):
+
+| Former ID | Topic | Status |
+|-----------|-------|--------|
+| PR-021 | Pickup recipient / special request not sent | **CLOSED** (checkout parse + client payload) |
+| PR-023 | SEO title `OKGO Pickup` | **CLOSED** → `Ladurée Thailand` |
+| PR-024 | Public cart/checkout CSRF | **CLOSED** (`assertCsrfOrigin`) |
+| PR-034 | Slot capacity not decremented | **CLOSED** (reserve/release on create) |
+| Dual-PENDING race | Concurrent payment creates | **HARDENED** (`savePendingExclusive`) |
+
+Still EXTERNAL / owner-gated: real PSP, OIDC, Postgres provision, Redis host, Thailand content freeze beyond confirmed docs, hosting, backups. Delivery remains deferred for MVP. See `docs/sprint-30-production-readiness.md`.
+
+---
+
+## Historical — Sprint 20.8 executive summary
 
 The SG-parity ordering path (catalog → exact macaron selection → cart → pickup → checkout → mock payment → confirmation / QR / pickup code) is functionally strong on the **mock catalog** path. Sprint 20.8 fixed safe Critical/High defects that could corrupt pickup dates, allow unpriced purchases into the cart, skip stale-slot gating on the cart CTA, create duplicate draft orders, ignore terms acceptance server-side, and hide trusted totals on payment review.
 
-The platform remains blocked for production by missing real integrations, Prisma modifier persistence, persistent cart, customer order access control, approved Thailand content, and boutique/ops data. Do not soft-launch.
+Later sprints closed Prisma modifiers / cart / IDOR / payment recovery. The platform remains blocked for production by missing real integrations, approved Thailand content, and boutique/ops data. Do not soft-launch.
 
 ---
 

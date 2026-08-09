@@ -4,6 +4,7 @@ import {
 } from "@/src/server/api/cart-session";
 import { handleApi } from "@/src/server/api/handle";
 import { ok } from "@/src/server/api/responses";
+import { assertCsrfOrigin } from "@/src/server/http/csrf";
 import { cartService } from "@/src/server/services/container";
 import { AppError } from "@/src/server/utils/errors";
 
@@ -13,6 +14,7 @@ type RouteContext = {
 
 export async function PATCH(request: Request, context: RouteContext) {
   return handleApi(async () => {
+    assertCsrfOrigin(request);
     const { id } = await context.params;
     let raw: unknown;
     try {
@@ -31,6 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(request: Request, context: RouteContext) {
   return handleApi(async () => {
+    assertCsrfOrigin(request);
     const { id } = await context.params;
     const cartId = await readCartIdFromCookie();
     const data = await cartService.removeItem(cartId, id);

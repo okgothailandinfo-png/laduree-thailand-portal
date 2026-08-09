@@ -231,7 +231,10 @@ export class PaymentService {
       });
     }
 
-    const existing = await this.payments.findByOrderId(id);
+    // Prefer explicit PENDING lookup (survives concurrent creates / mapping races).
+    const existing =
+      (await this.payments.findPendingByOrderId(id)) ??
+      (await this.payments.findByOrderId(id));
     if (existing && existing.status === "PENDING") {
       if (existing.method === method) {
         await this.orders.attachPayment(id, {
@@ -259,21 +262,40 @@ export class PaymentService {
       safeDisplay: input.safeDisplay ?? null,
     });
 
-    await this.orders.attachPayment(id, {
+    // Re-read after exclusive create — concurrent callers may have reused one PENDING.
+    const canonical =
+      (await this.payments.findPendingByOrderId(id)) ??
+      (await this.payments.findById(created.paymentId));
+    const active = canonical ?? {
+      paymentId: created.paymentId,
+      orderId: id,
+      status: "PENDING" as const,
+      paymentUrl: created.paymentUrl,
       method: created.method,
       methodLabel: created.methodLabel,
-      status: "pending",
       safeDisplay: input.safeDisplay ?? null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.orders.attachPayment(id, {
+      method: active.method,
+      methodLabel: active.methodLabel,
+      status: "pending",
+      safeDisplay: active.safeDisplay,
     });
 
     logger.info("Payment created", {
-      paymentId: created.paymentId,
+      paymentId: active.paymentId,
       orderId: id,
-      method: created.method,
+      method: active.method,
     });
     return {
-      ...created,
-      paymentUrl: appendAccessTokenToUrl(created.paymentUrl, accessToken),
+      paymentId: active.paymentId,
+      paymentUrl: appendAccessTokenToUrl(active.paymentUrl, accessToken),
+      status: "PENDING",
+      method: active.method,
+      methodLabel: active.methodLabel,
       accessToken,
       orderNumber: order.orderNumber,
     };
