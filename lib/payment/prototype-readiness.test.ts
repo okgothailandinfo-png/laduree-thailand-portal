@@ -235,6 +235,39 @@ describe("Sprint 27 — prototype/staging readiness", () => {
     assert.match(after.orderNumber, /^LD-TH-[0-9A-Z]{8}$/);
   });
 
+  it("clears source cart after durable payment SUCCESS (idempotent)", async () => {
+    const orders = new MockOrderRepository();
+    const payments = new MockPaymentRepository();
+    const cleared: string[] = [];
+    const service = new PaymentService(
+      orders,
+      payments,
+      createWebhookRepo(),
+      "test-secret",
+      300,
+      undefined,
+      undefined,
+      undefined,
+      async (cartId) => {
+        cleared.push(cartId);
+      },
+    );
+    const order = draftOrder({ sourceCartId: "cart-source-1" });
+    await orders.create(order);
+    const token = issueOrderAccessToken(order.id);
+    const created = await service.createPayment({
+      orderId: order.id,
+      method: "promptpay-qr",
+      accessToken: token,
+    });
+    await service.confirmPayment(created.paymentId, "SUCCESS", token);
+    assert.deepEqual(cleared, ["cart-source-1"]);
+
+    // Idempotent SUCCESS confirm returns durable state without re-running sync.
+    await service.confirmPayment(created.paymentId, "SUCCESS", token);
+    assert.deepEqual(cleared, ["cart-source-1"]);
+  });
+
   it("marks mock UI surfaces and recovery links for prototype mode", () => {
     const mockPage = readFileSync(
       path.join(process.cwd(), "app/payment/mock/MockPaymentPageClient.tsx"),

@@ -78,6 +78,11 @@ export type Order = {
    */
   totalMinor: number;
   termsAccepted: boolean;
+  /**
+   * Cart that produced this draft — cleared server-side after payment SUCCESS.
+   * Optional; absent on older orders / prisma rows without the column.
+   */
+  sourceCartId?: string;
 };
 
 export type OrderHistoryEntry = {

@@ -7,12 +7,6 @@ import { fetchOrderHistory } from "@/lib/api/orders";
 import type { OrderHistoryItem } from "@/lib/api/types";
 import { listRememberedOrders } from "@/lib/customer-orders";
 import {
-  formatMockOrderStatus,
-  formatMockServiceType,
-  listMockMemberOrders,
-} from "@/lib/customer/mock-order-history";
-import type { MockOrderHistoryEntry } from "@/lib/customer/types";
-import {
   buildOrderCompletedPath,
   buildOrderConfirmationPath,
 } from "@/lib/orders/post-payment-session";
@@ -24,6 +18,10 @@ import {
   formatStatusLabel,
 } from "../order-completed/format";
 import "../order-completed/order-completed.css";
+import {
+  buildPaymentRecoveryPath,
+  historyItemNeedsPaymentRecovery,
+} from "../payment/payment-recovery";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
 
 type HistoryFilter = "all" | "completed" | "cancelled" | "active";
@@ -35,30 +33,17 @@ function matchesFilter(item: OrderHistoryItem, filter: HistoryFilter): boolean {
   return item.status !== "completed" && item.status !== "cancelled";
 }
 
-function matchesMockFilter(
-  item: MockOrderHistoryEntry,
-  filter: HistoryFilter,
-): boolean {
-  if (filter === "all") return true;
-  if (filter === "completed") return item.status === "completed";
-  if (filter === "cancelled") return item.status === "cancelled";
-  return item.status !== "completed" && item.status !== "cancelled";
-}
-
-function formatMockDate(dateKey: string): string {
-  // DD/MM/YYYY (Thailand locale default)
-  const [year, month, day] = dateKey.split("-");
-  if (!year || !month || !day) return dateKey;
-  return `${day}/${month}/${year}`;
-}
-
+/**
+ * Sprint 28 — Order History uses tokenized remembered orders for both guest
+ * and member sessions. Fabricated mock member rows are not shown in UAT.
+ */
 export default function OrderHistoryClient() {
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const { isAuthenticated, email, ready } = useCustomerSession();
+  const { ready } = useCustomerSession();
 
   const rememberedOrders = ready ? listRememberedOrders() : [];
 
-  const guestQuery = useAsyncResource(
+  const historyQuery = useAsyncResource(
     (signal) =>
       fetchOrderHistory(
         rememberedOrders.map((entry) => ({
@@ -69,23 +54,14 @@ export default function OrderHistoryClient() {
       ),
     {
       isEmpty: (data) => data.length === 0,
-      deps: [ready, isAuthenticated, rememberedOrders.length],
+      deps: [ready, rememberedOrders.length],
     },
   );
 
-  const mockOrders = useMemo(() => {
-    if (!isAuthenticated) return [];
-    return listMockMemberOrders(email);
-  }, [isAuthenticated, email]);
-
-  const filteredGuest = useMemo(() => {
-    if (!guestQuery.data) return [];
-    return guestQuery.data.filter((item) => matchesFilter(item, filter));
-  }, [guestQuery.data, filter]);
-
-  const filteredMock = useMemo(() => {
-    return mockOrders.filter((item) => matchesMockFilter(item, filter));
-  }, [mockOrders, filter]);
+  const filtered = useMemo(() => {
+    if (!historyQuery.data) return [];
+    return historyQuery.data.filter((item) => matchesFilter(item, filter));
+  }, [historyQuery.data, filter]);
 
   if (!ready) {
     return (
@@ -97,92 +73,8 @@ export default function OrderHistoryClient() {
     );
   }
 
-  if (isAuthenticated) {
-    return (
-      <main className="order-history-page">
-        <div className="order-history-page__inner">
-          <div className="order-completed-page__top">
-            <Link href="/" className="order-completed-page__back">
-              ← Back
-            </Link>
-          </div>
-
-          <h1 className="order-completed-page__title">Order History</h1>
-
-          <div
-            className="order-history-filters"
-            role="tablist"
-            aria-label="Filter"
-          >
-            {(
-              [
-                ["all", "All"],
-                ["completed", "Completed"],
-                ["cancelled", "Cancelled"],
-                ["active", "Active"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={filter === value}
-                className={`order-history-filter${
-                  filter === value ? " order-history-filter--active" : ""
-                }`}
-                onClick={() => setFilter(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {filteredMock.length === 0 ? (
-            <div className="order-history-empty" role="status">
-              No orders match this filter.
-            </div>
-          ) : (
-            <ul className="order-history-list">
-              {filteredMock.map((item) => (
-                <li key={item.orderId} className="order-history-item">
-                  <div className="order-history-item__header">
-                    <p className="order-history-item__number">
-                      {item.orderNumber}
-                    </p>
-                    <p className="order-history-item__status">
-                      {formatMockOrderStatus(item.status)}
-                    </p>
-                  </div>
-                  <p className="order-history-item__meta">
-                    Date: {formatMockDate(item.date)}
-                    <br />
-                    {formatMockServiceType(item.serviceType)}
-                    <br />
-                    Payment Method: {item.paymentMethodLabel}
-                    <br />
-                    Payment Status: {item.paymentStatus}
-                    <br />
-                    Fulfilment Status: {item.fulfilmentStatus}
-                    <br />
-                    Total: {formatPriceThb(item.totalThb)}
-                  </p>
-                  <Link
-                    href={item.detailPath}
-                    className="order-history-item__link"
-                  >
-                    View Details
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </main>
-    );
-  }
-
   const showLoadState =
-    guestQuery.status === "loading" || guestQuery.status === "error";
+    historyQuery.status === "loading" || historyQuery.status === "error";
 
   return (
     <main className="order-history-page">
@@ -221,26 +113,28 @@ export default function OrderHistoryClient() {
 
         {showLoadState ? (
           <CatalogStatus
-            status={guestQuery.status === "loading" ? "loading" : "error"}
-            errorMessage={guestQuery.errorMessage}
-            onRetry={guestQuery.status === "error" ? guestQuery.reload : undefined}
+            status={historyQuery.status === "loading" ? "loading" : "error"}
+            errorMessage={historyQuery.errorMessage}
+            onRetry={
+              historyQuery.status === "error" ? historyQuery.reload : undefined
+            }
           />
         ) : null}
 
-        {guestQuery.status === "empty" ? (
+        {historyQuery.status === "empty" ? (
           <div className="order-history-empty" role="status">
             No orders yet. Place an order to see it here.
           </div>
         ) : null}
 
-        {guestQuery.status === "success" ? (
-          filteredGuest.length === 0 ? (
+        {historyQuery.status === "success" ? (
+          filtered.length === 0 ? (
             <div className="order-history-empty" role="status">
               No orders match this filter.
             </div>
           ) : (
             <ul className="order-history-list">
-              {filteredGuest.map((item) => (
+              {filtered.map((item) => (
                 <li key={item.orderId} className="order-history-item">
                   <div className="order-history-item__header">
                     <p className="order-history-item__number">
@@ -286,19 +180,23 @@ export default function OrderHistoryClient() {
                       (entry) => entry.orderId === item.orderId,
                     )?.accessToken;
                     if (!token) return null;
+                    const href = historyItemNeedsPaymentRecovery(item)
+                      ? buildPaymentRecoveryPath({
+                          orderId: item.orderId,
+                          accessToken: token,
+                        })
+                      : item.status === "completed"
+                        ? buildOrderCompletedPath({
+                            orderId: item.orderId,
+                            accessToken: token,
+                          })
+                        : buildOrderConfirmationPath({
+                            orderId: item.orderId,
+                            accessToken: token,
+                          });
                     return (
                       <Link
-                        href={
-                          item.status === "completed"
-                            ? buildOrderCompletedPath({
-                                orderId: item.orderId,
-                                accessToken: token,
-                              })
-                            : buildOrderConfirmationPath({
-                                orderId: item.orderId,
-                                accessToken: token,
-                              })
-                        }
+                        href={href}
                         className="order-history-item__link"
                       >
                         View Order Details

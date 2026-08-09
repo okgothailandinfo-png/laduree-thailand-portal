@@ -398,5 +398,30 @@ describe("Sprint 24 payment experience", () => {
     assert.match(confirmation, /Payment successful!/);
     assert.match(confirmation, /Your order is good to go!/);
     assert.match(confirmation, /View Payment Receipt/);
+    // Sprint 28 — legacy no-orderId confirmation path is gated.
+    assert.match(
+      confirmation,
+      /confirmation requires a tokenized server order/i,
+    );
+  });
+
+  it("Sprint 28 payment page recovers from server order without live cart", () => {
+    const paymentPage = readFileSync(
+      path.join(process.cwd(), "app/payment/PaymentPageClient.tsx"),
+      "utf8",
+    );
+    assert.match(paymentPage, /isRecoverableUnpaidOrder/);
+    assert.match(paymentPage, /buildOrderReviewFromOrderDetail/);
+    assert.match(paymentPage, /canContinuePayment/);
+    assert.match(paymentPage, /customerSafePaymentError/);
+    assert.match(paymentPage, /Order already paid/);
+
+    const history = readFileSync(
+      path.join(process.cwd(), "app/order-history/OrderHistoryClient.tsx"),
+      "utf8",
+    );
+    assert.match(history, /listRememberedOrders/);
+    assert.match(history, /historyItemNeedsPaymentRecovery/);
+    assert.doesNotMatch(history, /listMockMemberOrders/);
   });
 });
