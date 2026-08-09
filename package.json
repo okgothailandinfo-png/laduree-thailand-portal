@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts lib/product/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts lib/orders/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/delivery/*.test.ts src/server/orders/*.test.ts src/server/admin/oidc/*.test.ts src/server/http/*.test.ts",
+    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts app/payment/*.test.ts lib/product/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts lib/orders/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/delivery/*.test.ts src/server/orders/*.test.ts src/server/admin/oidc/*.test.ts src/server/http/*.test.ts",
     "prisma:format": "prisma format",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",
@@ -19,7 +19,8 @@
     "smoke:api": "tsx src/server/repositories/smoke/run-api-smoke.ts",
     "smoke:admin": "tsx src/server/admin/smoke/run-admin-smoke.ts",
     "smoke:notifications": "tsx src/server/notifications/smoke/run-notification-smoke.ts",
-    "smoke:security": "tsx src/server/hardening/smoke/run-security-smoke.ts"
+    "smoke:security": "tsx src/server/hardening/smoke/run-security-smoke.ts",
+    "smoke:webhook": "tsx src/server/payment/webhook/run-webhook-smoke.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

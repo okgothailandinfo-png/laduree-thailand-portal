@@ -93,6 +93,9 @@ export const paymentService = new PaymentService(
   createPaymentProvider(repositories.payments, env.paymentProvider),
   pickupVerificationService,
   notificationOrchestrator,
+  async (cartId) => {
+    await cartService.clearCart(cartId);
+  },
 );
 export const adminProductService = new AdminProductService(
   repositories.products,

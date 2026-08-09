@@ -397,6 +397,7 @@ export class DefaultCheckoutService {
       items,
       totalMinor: itemsMinor,
       termsAccepted: input.termsAccepted,
+      sourceCartId: cartId,
       customer: {
         customerName,
         mobileNumber: input.customer.phone,
@@ -555,6 +556,7 @@ export class DefaultCheckoutService {
       items,
       totalMinor,
       termsAccepted: input.termsAccepted,
+      sourceCartId: cartId,
       customer: {
         customerName,
         mobileNumber: input.customer.phone,

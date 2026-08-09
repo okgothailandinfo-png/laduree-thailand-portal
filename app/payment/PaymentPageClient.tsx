@@ -46,6 +46,16 @@ import { useOrderFlow } from "../order/OrderFlowContext";
 import { usePickup } from "../pickup/PickupContext";
 import { isDeliveryQuoteValidForCheckout } from "../pickup/delivery-quote";
 import { formatPickupDateKeyLong } from "../pickup/pickup-dates";
+import {
+  buildOrderConfirmationPath,
+} from "@/lib/orders/post-payment-session";
+import {
+  buildOrderReviewFromOrderDetail,
+  canContinuePayment,
+  customerSafePaymentError,
+  isOrderAlreadyPaid,
+  isRecoverableUnpaidOrder,
+} from "./payment-recovery";
 import "./payment.css";
 
 type PaymentErrors = CardFieldErrors &
@@ -57,12 +67,6 @@ const emptyCard: CardDraft = {
   expiry: "",
   cvv: "",
 };
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiClientError) return error.message;
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
 
 function deliveryModeLabel(
   mode: "EARLIEST_AVAILABLE" | "PREORDER",
@@ -122,23 +126,34 @@ export default function PaymentPageClient({
 
   const isEmpty = items.length === 0;
   const termsAccepted = checkout?.termsAccepted === true;
-  const canPay =
+  const order = orderId ? orderQuery.data : null;
+  const recoverableOrder = isRecoverableUnpaidOrder(order);
+  const sessionReady =
     !isEmpty &&
     isPickupComplete &&
     isCheckoutInfoComplete &&
     termsAccepted &&
     !!checkout &&
     !!orderId;
+  const canPay = canContinuePayment({
+    orderId,
+    accessToken: resolvedAccessToken,
+    order,
+    sessionReady,
+  });
 
-  const order = orderId ? orderQuery.data : null;
-  const isDelivery = pickup?.serviceType === "DELIVERY";
+  const isDelivery =
+    recoverableOrder && order
+      ? order.serviceType === "DELIVERY"
+      : pickup?.serviceType === "DELIVERY";
   const deliveryFeeThb =
-    isDelivery &&
-    pickup &&
-    isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
-    typeof pickup.deliveryQuote.deliveryFee === "number"
-      ? pickup.deliveryQuote.deliveryFee
-      : order?.delivery?.feeThb ?? null;
+    recoverableOrder && order
+      ? (order.delivery?.feeThb ?? null)
+      : pickup?.serviceType === "DELIVERY" &&
+          isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+          typeof pickup.deliveryQuote.deliveryFee === "number"
+        ? pickup.deliveryQuote.deliveryFee
+        : order?.delivery?.feeThb ?? null;
 
   const orderTotals = buildOrderReviewTotals({
     serviceType: isDelivery ? "DELIVERY" : "PICKUP",
@@ -154,6 +169,10 @@ export default function PaymentPageClient({
   });
 
   const reviewModel: OrderReviewModel | null = useMemo(() => {
+    // Prefer durable server order snapshot when available (UAT recovery path).
+    if (order && isRecoverableUnpaidOrder(order)) {
+      return buildOrderReviewFromOrderDetail(order);
+    }
     if (!pickup || !checkout) return null;
     const customerName =
       `${checkout.firstName} ${checkout.lastName}`.trim() ||
@@ -163,23 +182,36 @@ export default function PaymentPageClient({
       checkout.specialRequest.trim() ||
       null;
 
+    // When a draft order exists, still prefer its line items over a mutated cart.
+    const reviewItems =
+      order && order.items.length > 0
+        ? order.items.map((item, index) => ({
+            id: `${item.productId}-${index}`,
+            name: item.name,
+            quantity: item.quantity,
+            modifiersLabel: formatModifiersLabel(item.modifiers),
+          }))
+        : items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            modifiersLabel: formatModifiersLabel(item.modifiers),
+          }));
+
+    const sessionIsDelivery = pickup.serviceType === "DELIVERY";
+
     return {
-      serviceType: isDelivery ? "DELIVERY" : "PICKUP",
+      serviceType: sessionIsDelivery ? "DELIVERY" : "PICKUP",
       customer: {
         customerName,
         email: checkout.email,
         mobileNumber: checkout.mobileNumber,
       },
-      items: items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        modifiersLabel: formatModifiersLabel(item.modifiers),
-      })),
+      items: reviewItems,
       totals: orderTotals,
       taxLabel: TRUSTED_TAX_PLACEHOLDER,
       pickup:
-        !isDelivery && pickup.serviceType === "PICKUP"
+        pickup.serviceType === "PICKUP"
           ? {
               boutiqueName: pickup.boutique.name,
               boutiqueAddress: pickup.boutique.address,
@@ -187,43 +219,43 @@ export default function PaymentPageClient({
               timeLabel: `${pickup.timeSlot.start} To ${pickup.timeSlot.end}`,
             }
           : null,
-      delivery: isDelivery
-        ? {
-            fullAddress: formatFullDeliveryAddressInline(
-              checkout.deliveryAddress.address.trim()
-                ? checkout.deliveryAddress
-                : pickup.deliveryAddress,
-            ),
-            modeLabel: deliveryModeLabel(pickup.deliveryMode),
-            dateLabel:
-              isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
-              pickup.deliveryQuote.deliveryDate
-                ? formatPickupDateKeyLong(pickup.deliveryQuote.deliveryDate)
-                : null,
-            windowLabel:
-              isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
-              pickup.deliveryQuote.deliveryWindow
-                ? `${pickup.deliveryQuote.deliveryWindow.start} To ${pickup.deliveryQuote.deliveryWindow.end}`
-                : null,
-            notes: deliveryNotes,
-            deliveryFeeThb,
-          }
-        : null,
+      delivery:
+        pickup.serviceType === "DELIVERY"
+          ? {
+              fullAddress: formatFullDeliveryAddressInline(
+                checkout.deliveryAddress.address.trim()
+                  ? checkout.deliveryAddress
+                  : pickup.deliveryAddress,
+              ),
+              modeLabel: deliveryModeLabel(pickup.deliveryMode),
+              dateLabel:
+                isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+                pickup.deliveryQuote.deliveryDate
+                  ? formatPickupDateKeyLong(pickup.deliveryQuote.deliveryDate)
+                  : null,
+              windowLabel:
+                isDeliveryQuoteValidForCheckout(pickup.deliveryQuote) &&
+                pickup.deliveryQuote.deliveryWindow
+                  ? `${pickup.deliveryQuote.deliveryWindow.start} To ${pickup.deliveryQuote.deliveryWindow.end}`
+                  : null,
+              notes: deliveryNotes,
+              deliveryFeeThb,
+            }
+          : null,
     };
-  }, [
-    pickup,
-    checkout,
-    isDelivery,
-    items,
-    orderTotals,
-    deliveryFeeThb,
-  ]);
+  }, [pickup, checkout, items, order, orderTotals, deliveryFeeThb]);
+
+  const reviewItemCount =
+    reviewModel?.items.reduce((sum, item) => sum + item.quantity, 0) ??
+    itemCount;
 
   const placeOrderEnabled =
     canPay &&
     method !== null &&
     !preventsDuplicateSubmission(uiState) &&
-    uiState !== "SUCCEEDED";
+    uiState !== "SUCCEEDED" &&
+    orderQuery.status !== "loading" &&
+    orderQuery.status !== "error";
 
   function setCardField<K extends keyof CardDraft>(key: K, value: string) {
     let nextValue = value;
@@ -329,18 +361,13 @@ export default function PaymentPageClient({
       router.push(result.paymentUrl);
     } catch (error: unknown) {
       setUiState("FAILED");
-      const message = errorMessage(
-        error,
-        "Unable to start payment. Please try again.",
+      setSubmitError(
+        customerSafePaymentError(
+          error instanceof ApiClientError || error instanceof Error
+            ? error
+            : new Error("Unable to start payment. Please try again."),
+        ),
       );
-      if (
-        error instanceof ApiClientError &&
-        /already paid/i.test(error.message)
-      ) {
-        setSubmitError("Order already paid.");
-      } else {
-        setSubmitError(message);
-      }
     }
   }
 
@@ -370,14 +397,80 @@ export default function PaymentPageClient({
 
         <h1 className="payment-page__title">Payment</h1>
 
-        {isEmpty ? (
+        {orderId &&
+        (orderQuery.status === "loading" || orderQuery.status === "error") ? (
+          <div className="payment-gate" role="status">
+            <CatalogStatus
+              status={orderQuery.status === "loading" ? "loading" : "error"}
+              errorMessage={
+                orderQuery.errorMessage
+                  ? customerSafePaymentError(
+                      new Error(orderQuery.errorMessage),
+                      "Unable to load order. Please try again.",
+                    )
+                  : "Unable to load order. Please try again."
+              }
+              onRetry={
+                orderQuery.status === "error" ? orderQuery.reload : undefined
+              }
+            />
+          </div>
+        ) : null}
+
+        {!orderId ? (
+          <div className="payment-gate" role="alert">
+            Complete checkout information before payment.{" "}
+            <Link href="/checkout">Checkout</Link>
+          </div>
+        ) : null}
+
+        {orderId &&
+        orderQuery.status === "success" &&
+        order &&
+        isOrderAlreadyPaid(order) ? (
+          <div className="payment-gate" role="status">
+            Order already paid.{" "}
+            {resolvedAccessToken ? (
+              <Link
+                href={buildOrderConfirmationPath({
+                  orderId: order.id,
+                  accessToken: resolvedAccessToken,
+                })}
+              >
+                Order Confirmation
+              </Link>
+            ) : (
+              <Link href="/order-history">Order History</Link>
+            )}
+          </div>
+        ) : null}
+
+        {orderId &&
+        orderQuery.status === "success" &&
+        order &&
+        order.status === "cancelled" ? (
+          <div className="payment-gate" role="alert">
+            Cancelled.{" "}
+            <Link href="/order-history">Order History</Link>
+          </div>
+        ) : null}
+
+        {orderId &&
+        !recoverableOrder &&
+        !isOrderAlreadyPaid(order) &&
+        order?.status !== "cancelled" &&
+        orderQuery.status === "success" &&
+        isEmpty ? (
           <div className="payment-gate" role="alert">
             {CHECKOUT_BLOCKING_MESSAGES.emptyCart}{" "}
             <Link href="/">Home</Link>
           </div>
         ) : null}
 
-        {!isEmpty && !isPickupComplete ? (
+        {orderId &&
+        !recoverableOrder &&
+        !isEmpty &&
+        !isPickupComplete ? (
           <div className="payment-gate" role="alert">
             Select service, date and time before payment.{" "}
             <button
@@ -389,24 +482,18 @@ export default function PaymentPageClient({
           </div>
         ) : null}
 
-        {!isEmpty && isPickupComplete && !isCheckoutInfoComplete ? (
-          <div className="payment-gate" role="alert">
-            Complete checkout information before payment.{" "}
-            <Link href="/checkout">Checkout</Link>
-          </div>
-        ) : null}
-
-        {!isEmpty &&
+        {orderId &&
+        !recoverableOrder &&
+        !isEmpty &&
         isPickupComplete &&
-        isCheckoutInfoComplete &&
-        !orderId ? (
+        !isCheckoutInfoComplete ? (
           <div className="payment-gate" role="alert">
             Complete checkout information before payment.{" "}
             <Link href="/checkout">Checkout</Link>
           </div>
         ) : null}
 
-        {canPay && pickup && checkout && reviewModel ? (
+        {canPay && reviewModel ? (
           <>
             <section className="payment-card" aria-labelledby="payment-review">
               <OrderReview
@@ -414,28 +501,8 @@ export default function PaymentPageClient({
                 testId="payment-order-review"
                 className="payment-order-review"
               />
-              {orderId &&
-              (orderQuery.status === "loading" ||
-                orderQuery.status === "error") ? (
-                <div className="payment-order-status">
-                  <CatalogStatus
-                    status={
-                      orderQuery.status === "loading" ? "loading" : "error"
-                    }
-                    errorMessage={
-                      orderQuery.errorMessage ??
-                      "Unable to load order totals. Please try again."
-                    }
-                    onRetry={
-                      orderQuery.status === "error"
-                        ? orderQuery.reload
-                        : undefined
-                    }
-                  />
-                </div>
-              ) : null}
               <p className="payment-summary-meta" data-testid="payment-item-count">
-                Item(s) Total: {itemCount}
+                Item(s) Total: {reviewItemCount}
               </p>
             </section>
 

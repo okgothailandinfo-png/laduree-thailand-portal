@@ -86,6 +86,8 @@ export class PaymentService {
     provider?: PaymentProvider,
     private readonly pickupVerifications?: PickupVerificationService,
     private readonly notifications?: NotificationOrchestrator,
+    /** Clears the source cart after durable payment SUCCESS (idempotent). */
+    private readonly clearSourceCart?: (cartId: string) => Promise<void>,
   ) {
     this.provider = provider ?? createPaymentProvider(payments, "mock");
   }
@@ -541,6 +543,7 @@ export class PaymentService {
 
     if (paymentStatus === "SUCCESS") {
       working = await this.promoteDraftOrderNumber(working.id);
+      await this.clearCartAfterSuccessfulPayment(working);
     }
 
     if (
@@ -567,6 +570,31 @@ export class PaymentService {
     }
 
     return toApiOrderStatus(working.status);
+  }
+
+  /**
+   * Clear the checkout source cart only after durable SUCCESS.
+   * Best-effort — must not undo payment/order confirmation.
+   */
+  private async clearCartAfterSuccessfulPayment(order: {
+    id: string;
+    sourceCartId?: string;
+  }): Promise<void> {
+    const cartId = order.sourceCartId?.trim();
+    if (!cartId || !this.clearSourceCart) return;
+    try {
+      await this.clearSourceCart(cartId);
+      logger.info("Source cart cleared after payment SUCCESS", {
+        orderId: order.id,
+        // Never log full cart payloads — id only.
+        cartId,
+      });
+    } catch (error) {
+      logger.error("Failed to clear source cart after payment SUCCESS", {
+        orderId: order.id,
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
   }
 
   /**
