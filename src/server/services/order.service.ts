@@ -300,6 +300,8 @@ export class DefaultOrderService implements OrderService {
       });
     }
 
+    await this.pickup.reserveSlotCapacity(slot.id);
+
     const order: Order = {
       id: randomUUID(),
       orderNumber: createOrderNumber(),
@@ -341,7 +343,13 @@ export class DefaultOrderService implements OrderService {
       },
     };
 
-    const saved = await this.orders.create(order);
+    let saved: Order;
+    try {
+      saved = await this.orders.create(order);
+    } catch (error) {
+      await this.pickup.releaseSlotCapacity(slot.id);
+      throw error;
+    }
     logger.info("Order placed", {
       orderId: saved.id,
       orderNumber: saved.orderNumber,

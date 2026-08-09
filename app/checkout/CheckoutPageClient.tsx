@@ -295,6 +295,12 @@ export default function CheckoutPageClient() {
                 lastName,
                 email: info.email.trim(),
                 phone: info.mobileNumber.trim(),
+                ...(info.recipientName.trim()
+                  ? { recipientName: info.recipientName.trim() }
+                  : {}),
+                ...(info.specialRequest.trim()
+                  ? { specialRequest: info.specialRequest.trim() }
+                  : {}),
               },
               serviceType: "PICKUP" as const,
               pickup: {

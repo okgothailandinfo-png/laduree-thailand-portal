@@ -64,13 +64,14 @@ export class MockPaymentProvider implements PaymentProvider {
       createdAt: now,
       updatedAt: now,
     };
-    await this.payments.save(record);
+    // Exclusive PENDING create — concurrent same-order creates reuse one row.
+    const { payment } = await this.payments.savePendingExclusive(record);
     return {
-      paymentId: record.paymentId,
-      paymentUrl: record.paymentUrl,
+      paymentId: payment.paymentId,
+      paymentUrl: payment.paymentUrl,
       status: "PENDING",
-      method: record.method,
-      methodLabel: record.methodLabel,
+      method: payment.method,
+      methodLabel: payment.methodLabel,
     };
   }
 

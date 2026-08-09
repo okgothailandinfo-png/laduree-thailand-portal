@@ -110,6 +110,8 @@ const EARLIEST_RULE = {
 function createService(options?: {
   slotDateKey?: string;
   availableDateKey?: string;
+  /** null = unlimited (default); finite values exercise capacity decrement. */
+  slotCapacity?: number | null;
   zones?: DeliveryZone[];
   availabilityRules?: Parameters<
     typeof createDeliveryAvailabilityEngine
@@ -118,6 +120,8 @@ function createService(options?: {
 }) {
   const slotDateKey = options?.slotDateKey ?? "";
   const availableDateKey = options?.availableDateKey ?? "2026-07-21";
+  let slotCapacity: number | null =
+    options?.slotCapacity === undefined ? null : options.slotCapacity;
   const carts = new Map<string, Cart>();
   const cart: Cart = {
     id: "cart-1",
@@ -213,6 +217,9 @@ function createService(options?: {
       if (dateKey !== availableDateKey) {
         return { boutiqueId, dateKey, timezone: "Asia/Bangkok", slots: [] };
       }
+      if (slotCapacity !== null && slotCapacity <= 0) {
+        return { boutiqueId, dateKey, timezone: "Asia/Bangkok", slots: [] };
+      }
       return {
         boutiqueId,
         dateKey,
@@ -232,6 +239,7 @@ function createService(options?: {
     },
     async findSlotById(id) {
       if (id !== "1030-1100") return null;
+      if (slotCapacity !== null && slotCapacity <= 0) return null;
       return {
         id: "1030-1100",
         boutiqueId: "boutique-1",
@@ -240,6 +248,29 @@ function createService(options?: {
         start: "10:30",
         end: "11:00",
       };
+    },
+    async reserveSlotCapacity(id) {
+      if (id !== "1030-1100") {
+        throw new AppError("NOT_FOUND", `Pickup slot not found: ${id}`);
+      }
+      if (slotCapacity === null) return;
+      if (slotCapacity <= 0) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "pickup.pickupSlotId is not available for the selected boutique/date.",
+          {
+            details: {
+              field: "pickup.pickupSlotId",
+              code: "CAPACITY_EXHAUSTED",
+            },
+          },
+        );
+      }
+      slotCapacity -= 1;
+    },
+    async releaseSlotCapacity(id) {
+      if (id !== "1030-1100" || slotCapacity === null) return;
+      slotCapacity += 1;
     },
   };
 
@@ -291,6 +322,7 @@ function createService(options?: {
     ),
     orders,
     getPickupCalls: () => pickupCalls,
+    getSlotCapacity: () => slotCapacity,
   };
 }
 
@@ -389,6 +421,74 @@ describe("DefaultCheckoutService production readiness", () => {
         error instanceof AppError &&
         error.code === "VALIDATION_ERROR" &&
         error.message.includes("Terms"),
+    );
+  });
+
+  it("Sprint 30 — persists pickup recipientName and specialRequest", async () => {
+    const { service, orders } = createService();
+    const parsed = service.parseCheckoutBody({
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+        recipientName: "  Charles Babbage  ",
+        specialRequest: "  Please use paper bag  ",
+      },
+      pickup: {
+        boutiqueId: "boutique-1",
+        dateKey: "2026-07-21",
+        pickupSlotId: "1030-1100",
+      },
+      termsAccepted: true,
+    });
+    assert.equal(parsed.customer.recipientName, "Charles Babbage");
+    assert.equal(parsed.customer.specialRequest, "Please use paper bag");
+
+    const result = await service.createDraftCheckout("cart-1", parsed);
+    const order = orders.get(result.orderId);
+    assert.ok(order);
+    assert.equal(order.customer.recipientName, "Charles Babbage");
+    assert.equal(order.customer.specialRequest, "Please use paper bag");
+  });
+
+  it("Sprint 30 — decrements finite pickup slot capacity on draft create", async () => {
+    const { service, getSlotCapacity } = createService({ slotCapacity: 1 });
+    await service.createDraftCheckout("cart-1", {
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      pickup: {
+        boutiqueId: "boutique-1",
+        dateKey: "2026-07-21",
+        pickupSlotId: "1030-1100",
+      },
+      termsAccepted: true,
+    });
+    assert.equal(getSlotCapacity(), 0);
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          pickup: {
+            boutiqueId: "boutique-1",
+            dateKey: "2026-07-21",
+            pickupSlotId: "1030-1100",
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        // Exhausted capacity is rejected at findSlotById (NOT_FOUND) or reserve.
+        error instanceof AppError &&
+        (error.code === "NOT_FOUND" || error.code === "VALIDATION_ERROR"),
     );
   });
 

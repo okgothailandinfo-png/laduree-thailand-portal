@@ -215,6 +215,15 @@ export interface PickupRepository {
   }): Promise<PickupAvailability | null>;
   listSlots(): Promise<PickupAvailability["slots"]>;
   findSlotById(id: string): Promise<PickupSlotRecord | null>;
+  /**
+   * Atomically reserve one unit of finite slot capacity.
+   * Null/unlimited capacity is a no-op success. Capacity 0 / missing slot fails.
+   */
+  reserveSlotCapacity(slotId: string): Promise<void>;
+  /**
+   * Release one previously reserved unit (best-effort; unlimited/null is no-op).
+   */
+  releaseSlotCapacity(slotId: string): Promise<void>;
 }
 
 export interface OrderRepository {
