@@ -50,6 +50,11 @@ export type CreatePaymentRequestDto = {
   orderId: string;
   method: CreateOrderPaymentDto["method"];
   safeDisplay?: string | null;
+  /**
+   * Capability token issued at checkout. Required to create/reopen payment
+   * (prevents IDOR minting via orderId alone).
+   */
+  accessToken: string;
 };
 
 export type ConfirmPaymentRequestDto = {

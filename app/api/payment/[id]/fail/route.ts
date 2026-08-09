@@ -21,7 +21,8 @@ export async function POST(request: Request, context: RouteContext) {
       windowMs: 60_000,
     });
     const { id } = await context.params;
-    const data = await paymentService.confirmPayment(id, "FAILED");
+    const accessToken = paymentService.resolveAccessToken(request);
+    const data = await paymentService.confirmPayment(id, "FAILED", accessToken);
     return ok(data);
   }, request);
 }

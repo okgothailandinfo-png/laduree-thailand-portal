@@ -21,7 +21,8 @@ export async function POST(request: Request, context: RouteContext) {
       windowMs: 60_000,
     });
     const { id } = await context.params;
-    const data = await paymentService.cancelPayment(id);
+    const accessToken = paymentService.resolveAccessToken(request);
+    const data = await paymentService.cancelPayment(id, accessToken);
     return ok(data);
   }, request);
 }

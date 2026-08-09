@@ -390,6 +390,8 @@ export type CreatePaymentRequest = {
   method: "credit-card" | "promptpay-qr";
   /** Safe display only (e.g. Card ending in 4242). Never send PAN/CVV. */
   safeDisplay?: string | null;
+  /** Capability token from checkout — required for payment create. */
+  accessToken: string;
 };
 
 export type CreatePaymentResponse = {

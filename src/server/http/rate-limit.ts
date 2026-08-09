@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { env } from "@/src/server/config/env";
+import { RedisRateLimitStore } from "@/src/server/http/redis-rate-limit-store";
 import { AppError } from "@/src/server/utils/errors";
 
 export type RateLimitOptions = {
@@ -63,39 +64,6 @@ class MemoryRateLimitStore implements RateLimitStore {
       remaining: maxAttempts - existing.count,
       retryAfterMs: 0,
     };
-  }
-}
-
-/**
- * Redis/Upstash-compatible store placeholder.
- * Production requires REDIS_URL; this sprint does not integrate a paid SaaS SDK.
- * When configured, fails closed until a real Redis client is wired.
- */
-class RedisRateLimitStore implements RateLimitStore {
-  readonly name = "redis" as const;
-
-  constructor(private readonly redisUrl: string) {
-    if (!redisUrl) {
-      throw new AppError(
-        "CONFIG_ERROR",
-        "REDIS_URL is required for redis rate limiting.",
-      );
-    }
-  }
-
-  async check(
-    key: string,
-    windowMs: number,
-    maxAttempts: number,
-  ): Promise<RateLimitResult> {
-    void key;
-    void windowMs;
-    void maxAttempts;
-    // Production Blocker: wire ioredis/upstash client here.
-    throw new AppError(
-      "PROVIDER_UNAVAILABLE",
-      "Redis rate-limit store is configured but not implemented. This is a Production Blocker.",
-    );
   }
 }
 

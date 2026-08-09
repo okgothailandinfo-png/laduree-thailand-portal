@@ -74,6 +74,11 @@ function AdminLoginForm() {
               disabled={busy}
             />
           </div>
+          <p style={{ margin: "0.75rem 0 0", fontSize: "0.85rem" }}>
+            <a href="/api/admin/auth/oidc/start">Continue with OIDC</a>
+            {" — "}
+            production admin auth (requires ADMIN_AUTH_PROVIDER=oidc)
+          </p>
           {error ? (
             <p style={{ margin: 0, color: "#a94442", fontSize: "0.9rem" }}>
               {error}

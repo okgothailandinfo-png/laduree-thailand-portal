@@ -12,6 +12,7 @@ import { NotificationOrchestrator } from "@/src/server/notifications/orchestrato
 import { NotificationQueueService } from "@/src/server/notifications/queue.service";
 import { NotificationSettingsService } from "@/src/server/notifications/settings.service";
 import { DefaultNotificationTemplateService } from "@/src/server/notifications/template.service";
+import { createPaymentProvider } from "@/src/server/payment/factory";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { PickupVerificationService } from "@/src/server/pickup/pickup-verification.service";
 import { DefaultBoutiqueService } from "@/src/server/services/boutique.service";
@@ -89,7 +90,7 @@ export const paymentService = new PaymentService(
   repositories.webhookEvents,
   env.mockPaymentWebhookSecret,
   env.mockPaymentWebhookToleranceSeconds,
-  undefined,
+  createPaymentProvider(repositories.payments, env.paymentProvider),
   pickupVerificationService,
   notificationOrchestrator,
 );

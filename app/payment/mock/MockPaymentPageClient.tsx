@@ -53,8 +53,10 @@ function resolveUiState(
 
 export default function MockPaymentPageClient({
   paymentId,
+  accessToken: accessTokenProp,
 }: {
   paymentId: string | null;
+  accessToken: string | null;
 }) {
   const router = useRouter();
   const { placeMockOrder } = useOrderFlow();
@@ -74,10 +76,29 @@ export default function MockPaymentPageClient({
   const redirected = useRef(false);
   const sessionCleared = useRef(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [resolvedToken, setResolvedToken] = useState<string | null>(
+    () => accessTokenProp?.trim() || null,
+  );
+
+  function resolveToken(orderId?: string | null): string | null {
+    const fromProp = accessTokenProp?.trim() || resolvedToken?.trim() || null;
+    if (fromProp) return fromProp;
+    if (orderId) return getRememberedOrderAccessToken(orderId);
+    return null;
+  }
+
+  const loadToken =
+    accessTokenProp?.trim() ||
+    resolvedToken?.trim() ||
+    (payment?.orderId
+      ? getRememberedOrderAccessToken(payment.orderId)
+      : null);
+  const missingAccessToken = Boolean(paymentId) && !loadToken;
 
   useEffect(() => {
-    if (!paymentId) return;
+    if (!paymentId || !loadToken) return;
     const id = paymentId;
+    const token = loadToken;
 
     let cancelled = false;
     const controller = new AbortController();
@@ -86,9 +107,18 @@ export default function MockPaymentPageClient({
       try {
         const data = await fetchPayment(id, {
           signal: controller.signal,
+          accessToken: token,
         });
         if (cancelled) return;
         setPayment(data);
+        if (data.accessToken) {
+          setResolvedToken(data.accessToken);
+          rememberCustomerOrder({
+            orderId: data.orderId,
+            accessToken: data.accessToken,
+            orderNumber: data.orderNumber,
+          });
+        }
         const remaining = mockPaymentRemainingMs(data.createdAt);
         setRemainingMs(remaining);
         setUiState(resolveUiState(data, remaining));
@@ -106,10 +136,13 @@ export default function MockPaymentPageClient({
 
     const interval = window.setInterval(() => {
       if (cancelled) return;
-      void fetchPayment(id, { signal: controller.signal })
+      void fetchPayment(id, { signal: controller.signal, accessToken: token })
         .then((data) => {
           if (cancelled) return;
           setPayment(data);
+          if (data.accessToken) {
+            setResolvedToken(data.accessToken);
+          }
           const remaining = mockPaymentRemainingMs(data.createdAt);
           setRemainingMs(remaining);
           setUiState(resolveUiState(data, remaining));
@@ -144,7 +177,7 @@ export default function MockPaymentPageClient({
       window.clearInterval(interval);
       window.clearInterval(tick);
     };
-  }, [paymentId, reloadKey]);
+  }, [paymentId, reloadKey, loadToken]);
 
   useEffect(() => {
     if (!payment || payment.status !== "SUCCESS" || redirected.current) return;
@@ -195,11 +228,21 @@ export default function MockPaymentPageClient({
     if (!paymentId || actionBusy) return;
     if (payment && payment.status !== "PENDING") return;
     if (uiState === "EXPIRED") return;
+    const token = resolveToken(payment?.orderId);
+    if (!token) {
+      setError(
+        "Order access token is required. Return to checkout to continue payment.",
+      );
+      return;
+    }
     setActionBusy(true);
     setError(null);
     setUiState("PROCESSING");
     try {
-      const confirmed = await confirmPayment({ paymentId, result });
+      const confirmed = await confirmPayment(
+        { paymentId, result },
+        { accessToken: token },
+      );
       setPayment((current) =>
         current
           ? {
@@ -229,10 +272,19 @@ export default function MockPaymentPageClient({
   async function runCancel(): Promise<void> {
     if (!paymentId || actionBusy) return;
     if (payment && payment.status !== "PENDING") return;
+    const tokenForCancel = resolveToken(payment?.orderId);
+    if (!tokenForCancel) {
+      setError(
+        "Order access token is required. Return to checkout to continue payment.",
+      );
+      return;
+    }
     setActionBusy(true);
     setError(null);
     try {
-      const cancelled = await cancelPayment(paymentId);
+      const cancelled = await cancelPayment(paymentId, {
+        accessToken: tokenForCancel,
+      });
       setPayment((current) =>
         current
           ? {
@@ -304,19 +356,23 @@ export default function MockPaymentPageClient({
           </div>
         ) : null}
 
-        {paymentId && phase === "loading" ? (
+        {paymentId && !missingAccessToken && phase === "loading" ? (
           <CatalogStatus status="loading" />
         ) : null}
 
-        {paymentId && phase === "error" ? (
+        {paymentId && (missingAccessToken || phase === "error") ? (
           <CatalogStatus
             status="error"
-            errorMessage={error ?? "Unable to load payment."}
-            onRetry={retry}
+            errorMessage={
+              missingAccessToken
+                ? "Order access token is required. Return to checkout to continue payment."
+                : (error ?? "Unable to load payment.")
+            }
+            onRetry={missingAccessToken ? undefined : retry}
           />
         ) : null}
 
-        {paymentId && payment && phase === "ready" ? (
+        {paymentId && payment && phase === "ready" && !missingAccessToken ? (
           <section
             className="payment-card"
             aria-labelledby="mock-payment-title"

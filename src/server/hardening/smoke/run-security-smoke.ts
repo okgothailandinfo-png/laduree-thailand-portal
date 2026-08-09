@@ -131,8 +131,15 @@ async function run(): Promise<void> {
       assert.ok(PRODUCTION_BLOCKERS.length >= 5);
       assert.ok(
         PRODUCTION_BLOCKERS.some((item) =>
-          item.toLowerCase().includes("admin authentication"),
+          item.toLowerCase().includes("oidc"),
         ),
+        "expected OIDC admin auth blocker to remain listed",
+      );
+      assert.ok(
+        PRODUCTION_BLOCKERS.some((item) =>
+          item.toLowerCase().includes("psp"),
+        ),
+        "expected PSP adapter blocker to remain listed",
       );
     }),
   );

@@ -5,6 +5,7 @@
 
 import { randomUUID } from "crypto";
 import { env } from "@/src/server/config/env";
+import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { signMockWebhookPayload } from "@/src/server/payment/webhook/verify";
 import { createRepositories } from "@/src/server/repositories/create-repositories";
@@ -52,7 +53,7 @@ async function main() {
     },
   });
 
-  const created = await paymentService.createPayment({ orderId, method: "credit-card" });
+  const created = await paymentService.createPayment({ orderId, method: "credit-card", accessToken: issueOrderAccessToken(orderId) });
   const checks: Check[] = [];
 
   async function send(
@@ -126,7 +127,7 @@ async function main() {
       timeSlotLabel: "10:00–10:30",
     },
   });
-  const pay2 = await paymentService.createPayment({ orderId: order2, method: "credit-card" });
+  const pay2 = await paymentService.createPayment({ orderId: order2, method: "credit-card", accessToken: issueOrderAccessToken(order2) });
 
   async function sendFor(
     paymentId: string,
@@ -187,7 +188,7 @@ async function main() {
       timeSlotLabel: "10:00–10:30",
     },
   });
-  const pay3 = await paymentService.createPayment({ orderId: order3, method: "credit-card" });
+  const pay3 = await paymentService.createPayment({ orderId: order3, method: "credit-card", accessToken: issueOrderAccessToken(order3) });
   const cancelled = await sendFor(pay3.paymentId, "payment.cancelled");
   const orderAfterCancel = await repos.orders.findById(order3);
   checks.push({
@@ -222,7 +223,7 @@ async function main() {
       timeSlotLabel: "10:00–10:30",
     },
   });
-  const pay4 = await paymentService.createPayment({ orderId: order4, method: "credit-card" });
+  const pay4 = await paymentService.createPayment({ orderId: order4, method: "credit-card", accessToken: issueOrderAccessToken(order4) });
   await sendFor(pay4.paymentId, "payment.succeeded");
   const refunded = await sendFor(pay4.paymentId, "payment.refunded");
   const orderAfterRefund = await repos.orders.findById(order4);

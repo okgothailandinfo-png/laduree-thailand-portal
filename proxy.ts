@@ -4,13 +4,13 @@ import {
   ADMIN_SESSION_COOKIE,
   isMockAdminSession,
 } from "@/lib/admin/session";
+import { isAdminOidcSessionCookie } from "@/src/server/admin/oidc/session";
 import { createRequestId, REQUEST_ID_HEADER } from "@/src/server/http/request-context";
 
 /**
  * Next.js 16 proxy (replaces deprecated middleware).
- * Protects Admin CMS routes with a mock session cookie only.
- *
- * Production Blocker: mock admin authentication must be replaced before go-live.
+ * Protects Admin CMS routes. Accepts mock session (non-prod) or OIDC session cookie.
+ * Customer auth is separate and not handled here.
  * API routes under /api/admin are guarded in handlers (session + CSRF), not here.
  */
 export function proxy(request: NextRequest) {
@@ -28,7 +28,8 @@ export function proxy(request: NextRequest) {
 
   const isLogin = pathname === "/admin/login";
   const session = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  const authenticated = isMockAdminSession(session);
+  const authenticated =
+    isMockAdminSession(session) || isAdminOidcSessionCookie(session);
 
   if (!authenticated && !isLogin) {
     const loginUrl = new URL("/admin/login", request.url);

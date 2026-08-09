@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts lib/product/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts lib/orders/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/delivery/*.test.ts src/server/orders/*.test.ts",
+    "test:pickup": "tsx --test app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts lib/product/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts lib/orders/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/delivery/*.test.ts src/server/orders/*.test.ts src/server/admin/oidc/*.test.ts src/server/http/*.test.ts",
     "prisma:format": "prisma format",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",
@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "ioredis": "^6.0.0",
     "next": "16.2.10",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/ioredis": "^4.28.10",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",

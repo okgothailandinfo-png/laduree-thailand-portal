@@ -16,19 +16,26 @@ Mock providers are allowed only in `development`, `test`, and explicitly configu
 
 There is **no** production bypass flag such as `ALLOW_MOCK_PAYMENT_IN_PRODUCTION`.
 
-## Production Blockers (remaining)
+## Production Blockers (remaining after Sprint 26)
 
-Real providers / auth are **not** implemented in this sprint. Production runtime will refuse to start until they exist and are configured:
+Sprint 26 delivered persistence (cart + gateway payments), Redis rate-limit client,
+provider abstractions (`mock|external`), admin OIDC boundary, and payment IDOR hardening
+(capability token required on payment create/get/mutate).
 
-1. Real admin authentication provider (replace mock session cookie)
-2. Real payment provider (Omise/Stripe/etc.)
-3. Cloud storage provider (S3/GCS/etc.)
-4. Real notification email provider (SendGrid/SES/SMTP)
-5. Real LINE Messaging API provider
-6. Persistent cart store under `DATA_SOURCE=prisma`
-7. Persistent gateway payment records under `DATA_SOURCE=prisma`
-8. Redis/Upstash rate-limit client wiring (interface + fail-closed config exist)
-9. Customer order access control (capability token / signed link) for IDOR hardening
+Still required before Go-Live (external accounts + adapter registration):
+
+1. Register real Thailand PSP adapter behind `PAYMENT_PROVIDER=external`
+2. Register real email adapter behind `NOTIFICATION_EMAIL_PROVIDER=external`
+3. Register cloud storage adapter behind `STORAGE_PROVIDER=external` (CMS uploads)
+4. Configure production OIDC IdP (`ADMIN_AUTH_PROVIDER=oidc` + `OIDC_*`)
+5. Provision managed PostgreSQL + `db:deploy` (incl. cart/gateway payment migration)
+6. Provision Redis + `REDIS_URL`
+7. Owner-approved notification templates and Thailand catalog/pricing content
+8. LINE Login / LINE Messaging — deferred from pickup MVP (architecture preserved)
+9. Real courier dispatch — deferred (delivery code preserved; not a Go-Live blocker)
+
+Customer order capability tokens (Sprint 25) remain required; payment endpoints no longer
+mint tokens without a prior checkout token.
 
 ## Pending Infrastructure (does not block mock feature work)
 

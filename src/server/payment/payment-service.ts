@@ -22,7 +22,11 @@ import {
 } from "@/src/server/payment/webhook/types";
 import { verifyWebhookSignature } from "@/src/server/payment/webhook/verify";
 import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
-import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
+import { appendAccessTokenToUrl } from "@/src/server/orders/append-access-token";
+import {
+  extractOrderAccessToken,
+  verifyOrderAccessToken,
+} from "@/src/server/orders/order-access-token";
 import {
   createFinalOrderNumber,
   isDraftOrderNumber,
@@ -107,11 +111,45 @@ export class PaymentService {
       }
       safeDisplay = trimmed || null;
     }
+    const accessToken =
+      typeof body.accessToken === "string" ? body.accessToken.trim() : "";
+    if (!accessToken) {
+      throw new AppError(
+        "UNAUTHORIZED",
+        "Order access token is required to create a payment.",
+        { status: 401, details: { field: "accessToken" } },
+      );
+    }
     return {
       orderId: requireString(body.orderId, "orderId"),
       method: methodRaw,
       safeDisplay,
+      accessToken,
     };
+  }
+
+  /**
+   * Resolve capability token from parsed body and/or request headers/query.
+   * Body wins when present (create payload); otherwise header/query.
+   */
+  resolveAccessToken(
+    request: Request,
+    bodyToken?: string | null,
+  ): string {
+    const fromBody = bodyToken?.trim() ?? "";
+    if (fromBody) return fromBody;
+    const fromRequest = extractOrderAccessToken(request);
+    if (fromRequest) return fromRequest;
+    throw new AppError(
+      "UNAUTHORIZED",
+      "Order access token is required.",
+      { status: 401 },
+    );
+  }
+
+  assertOrderAccessToken(orderId: string, accessToken: string): string {
+    verifyOrderAccessToken(accessToken, orderId, "order");
+    return accessToken.trim();
   }
 
   parseConfirmPaymentBody(raw: unknown): ConfirmPaymentRequestDto {
@@ -169,6 +207,7 @@ export class PaymentService {
     input: CreatePaymentRequestDto,
   ): Promise<CreatePaymentResult> {
     const id = requireString(input.orderId, "orderId");
+    const accessToken = this.assertOrderAccessToken(id, input.accessToken);
     const method: PaymentMethodId = input.method;
     const order = await this.orders.findById(id);
     if (!order) {
@@ -194,11 +233,11 @@ export class PaymentService {
         });
         return {
           paymentId: existing.paymentId,
-          paymentUrl: existing.paymentUrl,
+          paymentUrl: appendAccessTokenToUrl(existing.paymentUrl, accessToken),
           status: "PENDING",
           method: existing.method,
           methodLabel: existing.methodLabel,
-          accessToken: issueOrderAccessToken(id),
+          accessToken,
           orderNumber: order.orderNumber,
         };
       }
@@ -225,23 +264,34 @@ export class PaymentService {
     });
     return {
       ...created,
-      accessToken: issueOrderAccessToken(id),
+      paymentUrl: appendAccessTokenToUrl(created.paymentUrl, accessToken),
+      accessToken,
       orderNumber: order.orderNumber,
     };
   }
 
-  async getPayment(paymentId: string): Promise<PaymentRecordDto> {
+  async getPayment(
+    paymentId: string,
+    accessToken: string,
+  ): Promise<PaymentRecordDto> {
     const payment = await this.provider.getPayment(
       requireString(paymentId, "paymentId"),
     );
-    return this.enrichPaymentForCustomer(payment);
+    const token = this.assertOrderAccessToken(payment.orderId, accessToken);
+    return this.enrichPaymentForCustomer(payment, token);
   }
 
   async confirmPayment(
     paymentId: string,
     result: ConfirmPaymentRequestDto["result"],
+    accessToken?: string | null,
   ): Promise<ConfirmPaymentResponseDto> {
     const id = requireString(paymentId, "paymentId");
+    const existing = await this.provider.getPayment(id);
+    const token = this.assertOrderAccessToken(
+      existing.orderId,
+      accessToken ?? "",
+    );
     const payment = await this.provider.confirmPayment(id, result);
     await this.syncOrderPaymentSnapshot(payment);
     const orderStatus = await this.syncOrderFromPayment(
@@ -256,7 +306,7 @@ export class PaymentService {
       }
     }
 
-    const enriched = await this.enrichPaymentForCustomer(payment);
+    const enriched = await this.enrichPaymentForCustomer(payment, token);
     return {
       paymentId: payment.paymentId,
       orderId: payment.orderId,
@@ -267,17 +317,38 @@ export class PaymentService {
     };
   }
 
-  async cancelPayment(paymentId: string): Promise<PaymentRecordDto> {
-    const payment = await this.provider.cancelPayment(
+  async cancelPayment(
+    paymentId: string,
+    accessToken?: string | null,
+  ): Promise<PaymentRecordDto> {
+    const current = await this.provider.getPayment(
       requireString(paymentId, "paymentId"),
     );
+    const token = this.assertOrderAccessToken(
+      current.orderId,
+      accessToken ?? "",
+    );
+    const payment = await this.provider.cancelPayment(current.paymentId);
     await this.syncOrderPaymentSnapshot(payment);
     await this.syncOrderFromPayment(payment.orderId, payment.status);
-    return this.enrichPaymentForCustomer(payment);
+    return this.enrichPaymentForCustomer(payment, token);
   }
 
-  async refundPayment(paymentId: string): Promise<PaymentRecordDto> {
-    return this.provider.refundPayment(requireString(paymentId, "paymentId"));
+  async refundPayment(
+    paymentId: string,
+    accessToken?: string | null,
+  ): Promise<PaymentRecordDto> {
+    const current = await this.provider.getPayment(
+      requireString(paymentId, "paymentId"),
+    );
+    const token = this.assertOrderAccessToken(
+      current.orderId,
+      accessToken ?? "",
+    );
+    const payment = await this.provider.refundPayment(current.paymentId);
+    await this.syncOrderPaymentSnapshot(payment);
+    await this.syncOrderFromPayment(payment.orderId, payment.status);
+    return this.enrichPaymentForCustomer(payment, token);
   }
 
   /**
@@ -461,12 +532,13 @@ export class PaymentService {
 
   private async enrichPaymentForCustomer(
     payment: PaymentRecordDto,
+    verifiedAccessToken: string,
   ): Promise<PaymentRecordDto> {
     const order = await this.orders.findById(payment.orderId);
     return {
       ...payment,
-      // Issued from checkout draft onward; re-issued here for payment reopen.
-      accessToken: issueOrderAccessToken(payment.orderId),
+      // Echo verified capability token only — never mint without prior proof.
+      accessToken: verifiedAccessToken,
       orderNumber: order?.orderNumber ?? null,
       totalThb: order ? minorToMajor(order.totalMinor) : null,
     };
