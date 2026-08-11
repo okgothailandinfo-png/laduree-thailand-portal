@@ -78,10 +78,10 @@ npm run smoke:notifications
 | Prisma modifiers / `sourceCartId` | Addressed in Sprint 29 (`docs/sprint-29-prisma-parity.md`) — schema + mapper + seed; prisma UAT still needs approved Postgres |
 | Real Thailand PSP / OIDC / Redis / cloud storage | External production blockers (see `docs/production-hardening.md`) |
 | Orphan draft orders on repeated checkout | Accepted residual for RC1; reopen uses latest tokenized draft |
-| Concurrent dual PENDING payments | Hardened in Sprint 30 via `savePendingExclusive` (in-process lock + prisma transaction); multi-instance uniqueness still needs infra review |
+| Concurrent dual PENDING payments | Hardened in Sprint 30 via `savePendingExclusive`; Sprint 32 adds partial unique PENDING index + P2002 recovery (apply migration when Postgres approved) |
 | `smoke:repos` / `smoke:api` order-create checks | Sprint 29 builds valid exact-selection + acknowledgement modifiers from product config |
 | Public cart/checkout CSRF / capacity / SEO title | Closed in Sprint 30 (`docs/sprint-30-production-readiness.md`) |
-
+| Webhook claim-before-process poison-pill | Closed in Sprint 32 (`docs/sprint-32-payment-hardening.md`) |
 ## RC1 decision
 
 Staging UAT RC1 is ready when:

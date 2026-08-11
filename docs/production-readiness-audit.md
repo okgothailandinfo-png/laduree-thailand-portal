@@ -1,8 +1,23 @@
 # Production Readiness Audit
 
 **Project:** Ladurée Thailand Pickup Platform  
-**Last updated:** Sprint 31 (2026-08-11)  
+**Last updated:** Sprint 32 (2026-08-11)  
 **Verdict:** **Not production-ready.** Mock pickup staging path is strong; go-live remains **externally gated**.
+
+---
+
+## Sprint 32 addendum (code-only payment durability)
+
+Closed in code (no external vendors; migration file in-repo only):
+
+| Topic | Status |
+|-------|--------|
+| Multi-instance dual-PENDING | **HARDENED** (partial unique index SQL + `savePendingExclusive` P2002 recovery) |
+| Webhook claim-before-process poison-pill | **CLOSED** (two-phase `PROCESSING` → `PROCESSED` + `releaseClaim`) |
+| Mock/Prisma webhook claim parity | **ALIGNED** |
+| Live `db:deploy` of Sprint 32 migration | **EXTERNAL** — requires owner-approved `DATABASE_URL` |
+
+Still EXTERNAL / owner-gated: real PSP, OIDC, Postgres provision, Redis host, Thailand content freeze beyond confirmed docs, hosting, backups. Delivery remains deferred for MVP. See `docs/sprint-32-payment-hardening.md`.
 
 ---
 
@@ -78,26 +93,26 @@ Later sprints closed Prisma modifiers / cart / IDOR / payment recovery. The plat
 
 ---
 
-## P0 issues (open — production blockers)
-
-| ID | Sev | Area | Description | User impact | Root cause | Recommended fix | Status | Validation |
-|----|-----|------|-------------|-------------|------------|-----------------|--------|------------|
-| PR-010 | P0 | Data/CMS | Prisma `modifierGroups: []` | Exact selection / acks vanish on prisma path | No modifier persistence | Schema/JSON + mapper + Admin CRUD (later CMS sprint) | **Open** | `mappers.ts`, `docs/admin-modifier-gaps.md` |
-| PR-011 | P0 | Infra | Cart still in-memory under prisma | Cart lost on restart/scale | `MockCartRepository` always | Persist Cart model | **Open** | `create-repositories.ts`, `PRODUCTION_BLOCKERS` |
-| PR-012 | P0 | Security | Customer order/pickup IDOR | Anyone with UUID can fetch order/credentials | Unauthenticated public GETs | Capability token / signed link | **Open** | `app/api/orders/[id]/*` |
-| PR-013 | P0 | Infra | Real admin auth, payment, storage, email, LINE, Redis client | Production fail-closed cannot start | Providers unimplemented | Wire real providers | **Open** | `env.ts`, `docs/production-hardening.md` |
-
----
-
-## P1 issues (open — deferred)
+## P0 issues (historical — closed in later sprints)
 
 | ID | Sev | Area | Description | Status |
 |----|-----|------|-------------|--------|
-| PR-020 | P1 | Orders | Confirmed orders keep `DRAFT-…` numbers | Deferred |
-| PR-021 | P1 | Checkout | Recipient / special request collected but not sent | Deferred |
-| PR-022 | P1 | Cart | Cart not cleared after successful payment | Deferred |
-| PR-023 | P1 | SEO | Root metadata still `OKGO Pickup`; weak OG/canonical | Deferred |
-| PR-024 | P1 | Security | Public cart/checkout mutations lack CSRF origin check | Deferred (admin writes already protected) |
+| PR-010 | P0 | Data/CMS | Prisma `modifierGroups: []` | **CLOSED** (Sprint 29 — `modifierGroupsJson` + allergens; Admin UI still deferred) |
+| PR-011 | P0 | Infra | Cart still in-memory under prisma | **CLOSED** (Sprint 26 — `PrismaCartRepository`) |
+| PR-012 | P0 | Security | Customer order/pickup IDOR | **CLOSED** (Sprint 25 — capability tokens) |
+| PR-013 | P0 | Infra | Real admin auth, payment, storage, email, LINE, Redis client | **OPEN** — external providers / credentials (see `PRODUCTION_BLOCKERS`) |
+
+---
+
+## P1 issues (historical — closed unless noted)
+
+| ID | Sev | Area | Description | Status |
+|----|-----|------|-------------|--------|
+| PR-020 | P1 | Orders | Confirmed orders keep `DRAFT-…` numbers | **CLOSED** (promote to `LD-TH-XXXXXXXX` after SUCCESS) |
+| PR-021 | P1 | Checkout | Recipient / special request collected but not sent | **CLOSED** (Sprint 30) |
+| PR-022 | P1 | Cart | Cart not cleared after successful payment | **CLOSED** (`sourceCartId` + clear after SUCCESS) |
+| PR-023 | P1 | SEO | Root metadata still `OKGO Pickup` | **CLOSED** (title `Ladurée Thailand`; OG/canonical still weak) |
+| PR-024 | P1 | Security | Public cart/checkout mutations lack CSRF | **CLOSED** (Sprint 30) |
 
 ---
 
@@ -109,7 +124,7 @@ Later sprints closed Prisma modifiers / cart / IDOR / payment recovery. The plat
 | PR-031 | P2 | Storefront | PDP carousel ignores `product.images` (placeholder ×4) |
 | PR-032 | P2 | Storefront | Direct slug can load inactive/unavailable products |
 | PR-033 | P2 | Cart API | Quantity has no server upper bound (client clamps 999) |
-| PR-034 | P2 | Pickup | Slot capacity not decremented (overbooking risk) |
+| PR-034 | P2 | Pickup | Slot capacity not decremented | **CLOSED** (Sprint 30) |
 | PR-035 | P2 | Pickup | `parseDateKey` weak calendar validity |
 | PR-036 | P2 | Security | CSP still allows `'unsafe-inline'` |
 | PR-037 | P2 | Admin | Media delete can orphan files |
