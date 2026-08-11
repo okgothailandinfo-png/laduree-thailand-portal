@@ -10,6 +10,10 @@ import {
   PRODUCTION_BLOCKERS,
   resolveDataSource,
 } from "@/src/server/config/env";
+import {
+  assertDatabaseSeedAllowed,
+  evaluateRateLimitReadiness,
+} from "@/src/server/hardening/deploy-readiness";
 import { buildContentSecurityPolicy } from "@/src/server/http/security-headers";
 import { hashRateLimitSubject } from "@/src/server/http/rate-limit";
 import { AppError } from "@/src/server/utils/errors";
@@ -151,6 +155,44 @@ async function run(): Promise<void> {
       });
       assert.equal(error.status, 429);
       assert.equal(error.retryAfterSeconds, 12);
+    }),
+  );
+
+  results.push(
+    check("Sprint 31 — db:seed refused in production", () => {
+      assert.throws(
+        () => assertDatabaseSeedAllowed({ APP_ENV: "production" }),
+        EnvValidationError,
+      );
+      assert.throws(
+        () => assertDatabaseSeedAllowed({ APP_ENV: "prod" }),
+        EnvValidationError,
+      );
+      assert.doesNotThrow(() =>
+        assertDatabaseSeedAllowed({ APP_ENV: "development" }),
+      );
+    }),
+  );
+
+  results.push(
+    check("Sprint 31 — redis rate-limit failure stays fail-closed", () => {
+      assert.equal(
+        evaluateRateLimitReadiness({
+          rateLimitStore: "redis",
+          redisUrl: "redis://127.0.0.1:6379",
+          isStrictProduction: true,
+          redisProbe: "fail",
+        }),
+        "fail",
+      );
+      assert.equal(
+        evaluateRateLimitReadiness({
+          rateLimitStore: "memory",
+          redisUrl: null,
+          isStrictProduction: true,
+        }),
+        "fail",
+      );
     }),
   );
 

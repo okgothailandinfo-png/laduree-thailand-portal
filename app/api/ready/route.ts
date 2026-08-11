@@ -6,17 +6,36 @@ import {
   PRODUCTION_BLOCKERS,
 } from "@/src/server/config/env";
 import { prisma } from "@/src/server/database/prisma";
+import {
+  evaluateRateLimitReadiness,
+  isReadyFromChecks,
+  type DeployCheckStatus,
+} from "@/src/server/hardening/deploy-readiness";
 import { createRequestId, REQUEST_ID_HEADER } from "@/src/server/http/request-context";
+import { probeRedisConnectivity } from "@/src/server/http/redis-rate-limit-store";
 import { logEvent } from "@/src/server/utils/logger";
 
 /**
  * GET /api/ready — readiness. Returns 200 only when dependencies are ready.
  * Never exposes secrets or raw database URLs.
+ *
+ * Liveness remains GET /api/health (no dependency checks).
  */
 export async function GET(request: Request) {
   const requestId = createRequestId(request.headers.get(REQUEST_ID_HEADER));
   const config = getEnvReadiness();
-  const checks: Record<string, "ok" | "fail" | "skip"> = {
+
+  let redisProbe: DeployCheckStatus | undefined;
+  if (config.rateLimitStore === "redis") {
+    if (!env.redisUrl?.trim()) {
+      redisProbe = "fail";
+    } else {
+      const ok = await probeRedisConnectivity(env.redisUrl);
+      redisProbe = ok ? "ok" : "fail";
+    }
+  }
+
+  const checks: Record<string, DeployCheckStatus> = {
     configuration: config.ok ? "ok" : "fail",
     database: "skip",
     prisma: "skip",
@@ -26,10 +45,12 @@ export async function GET(request: Request) {
     payment: env.isStrictProduction ? "fail" : "ok",
     notifications: env.isStrictProduction ? "fail" : "ok",
     adminAuth: env.isStrictProduction ? "fail" : "ok",
-    rateLimit:
-      config.rateLimitStore === "memory" && env.isStrictProduction
-        ? "fail"
-        : "ok",
+    rateLimit: evaluateRateLimitReadiness({
+      rateLimitStore: config.rateLimitStore,
+      redisUrl: env.redisUrl,
+      isStrictProduction: env.isStrictProduction,
+      redisProbe,
+    }),
   };
 
   if (config.dataSource === "prisma" && config.databaseConfigured) {
@@ -49,11 +70,11 @@ export async function GET(request: Request) {
     checks.prisma = "fail";
   }
 
-  const ready =
-    config.ok &&
-    Object.values(checks).every((value) => value === "ok" || value === "skip") &&
-    (!env.isStrictProduction ||
-      (checks.database === "ok" && checks.prisma === "ok"));
+  const ready = isReadyFromChecks(
+    config.ok,
+    checks,
+    env.isStrictProduction,
+  );
 
   const body = {
     status: ready ? "ready" : "not_ready",

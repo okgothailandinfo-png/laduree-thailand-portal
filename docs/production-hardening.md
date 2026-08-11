@@ -52,7 +52,9 @@ and mock-mode notices on post-payment UI.
 Sprint 28–29 delivered payment recovery RC1 hardening and Prisma pickup parity
 (`sourceCartId`, modifier/allergen JSON). Sprint 30 closed safe code-only gaps
 (CSRF on cart/checkout, pickup special-request persistence, capacity reserve,
-dual-PENDING payment hardening, SEO title). Delivery remains deferred for MVP.
+dual-PENDING payment hardening, SEO title). Sprint 31 closed deploy/migration
+safety gaps (seed refuse in production, preflight/deploy smoke, Redis readiness
+probe, cutover/rollback docs). Delivery remains deferred for MVP.
 
 Still required before Go-Live (external accounts + adapter registration):
 
@@ -109,18 +111,23 @@ HSTS is enabled only when `APP_ENV=production`.
 2. Set `APP_ENV=production`, `DATA_SOURCE=prisma`, real provider values
 3. `npm ci`
 4. `npm run prisma:generate`
-5. `npm run db:deploy`
-6. Do **not** run `db:seed` against production
-7. `npm run build`
-8. `npm run start`
-9. Probe `GET /api/health` (liveness) and `GET /api/ready` (readiness — expect 503 until real providers exist)
+5. `npm run db:status` (inspect pending migrations — requires approved `DATABASE_URL`)
+6. `npm run db:deploy`
+7. Do **not** run `db:seed` against production (Sprint 31: seed is code-refused when `APP_ENV=production`)
+8. `npm run build`
+9. `npm run start`
+10. Probe `GET /api/health` (liveness — expect 200) and `GET /api/ready` (readiness — expect 503 until real providers exist)
+11. `npm run smoke:deploy` (optional `DEPLOY_SMOKE_BASE_URL` for live HTTP probes)
+
+See also: `docs/sprint-31-deployment-readiness.md` (cutover checklist, migration recovery, rollback tree).
+`npm run preflight:deploy` prints the same checklist from code.
 
 ## Health endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/health` | Process up; version; environment; timestamp |
-| `GET /api/ready` | Config + DB/Prisma + provider readiness (no secrets) |
+| `GET /api/health` | Process up; version; environment; timestamp — **no dependency checks** |
+| `GET /api/ready` | Config + DB/Prisma + provider readiness + Redis probe when configured (no secrets) |
 
 ## Rate limiting
 
@@ -128,6 +135,8 @@ Provider-neutral abstraction in `src/server/http/rate-limit.ts`.
 
 - Development/staging: in-memory store
 - Production: requires redis store configuration; does not silently fall back to memory
+- Redis check/ping failures return `PROVIDER_UNAVAILABLE` (503) — fail-closed
+- `/api/ready` probes Redis connectivity when `RATE_LIMIT_STORE=redis`
 - Sensitive key material is hashed before use
 - HTTP 429 includes `Retry-After`
 

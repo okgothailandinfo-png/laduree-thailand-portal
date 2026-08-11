@@ -1,8 +1,25 @@
 # Production Readiness Audit
 
 **Project:** Ladurée Thailand Pickup Platform  
-**Last updated:** Sprint 30 (2026-08-09)  
+**Last updated:** Sprint 31 (2026-08-11)  
 **Verdict:** **Not production-ready.** Mock pickup staging path is strong; go-live remains **externally gated**.
+
+---
+
+## Sprint 31 addendum (code-only deploy safety)
+
+Closed in code (no external vendors):
+
+| Topic | Status |
+|-------|--------|
+| Production `db:seed` refuse | **CLOSED** (`assertDatabaseSeedAllowed`) |
+| Deploy preflight checklist | **CLOSED** (`npm run preflight:deploy`) |
+| Deploy/readiness smoke packaging | **CLOSED** (`npm run smoke:deploy`) |
+| Redis probe on `/api/ready` | **CLOSED** (fail-closed; no memory fallback) |
+| Migration recovery / rollback docs | **CLOSED** (`docs/sprint-31-deployment-readiness.md`) |
+| Liveness vs readiness separation | **PRESERVED** (`/api/health` vs `/api/ready`) |
+
+Still EXTERNAL / owner-gated: real PSP, OIDC, Postgres provision, Redis host, Thailand content freeze beyond confirmed docs, hosting, backups. Delivery remains deferred for MVP. See `docs/sprint-31-deployment-readiness.md`.
 
 ---
 
