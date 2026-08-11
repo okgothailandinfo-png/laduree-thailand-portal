@@ -4,10 +4,14 @@
  * Rerunnable via upsert on unique keys.
  *
  * Run: npm run db:seed
+ * Refused when APP_ENV=production (Sprint 31 fail-closed).
  */
 
 import { PrismaClient } from "@prisma/client";
+import { assertDatabaseSeedAllowed } from "../src/server/hardening/deploy-readiness";
 import { MOCK_PRODUCTS } from "../src/server/repositories/mock/data";
+
+assertDatabaseSeedAllowed();
 
 const prisma = new PrismaClient();
 

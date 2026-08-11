@@ -26,6 +26,7 @@ export class RedisRateLimitStore implements RateLimitStore {
       maxRetriesPerRequest: 2,
       enableReadyCheck: true,
       lazyConnect: true,
+      connectTimeout: 2000,
     });
     this.client.on("error", (error) => {
       logger.error("Redis rate-limit client error", {
@@ -77,6 +78,61 @@ export class RedisRateLimitStore implements RateLimitStore {
         "Redis rate-limit store is unavailable.",
         { status: 503 },
       );
+    }
+  }
+
+  /** Sprint 31 — readiness probe. Does not fall back to memory on failure. */
+  async ping(): Promise<void> {
+    try {
+      if (this.client.status === "wait") {
+        await this.client.connect();
+      }
+      const result = await this.client.ping();
+      if (result !== "PONG") {
+        throw new Error(`Unexpected Redis PING response: ${String(result)}`);
+      }
+    } catch (error) {
+      logger.error("Redis rate-limit ping failed", {
+        message: error instanceof Error ? error.message : "unknown",
+      });
+      throw new AppError(
+        "PROVIDER_UNAVAILABLE",
+        "Redis rate-limit store is unavailable.",
+        { status: 503 },
+      );
+    }
+  }
+}
+
+/**
+ * One-shot Redis connectivity probe for readiness diagnostics.
+ * Uses a short-lived client and always disconnects.
+ * Never falls back to memory — caller must fail closed on false.
+ */
+export async function probeRedisConnectivity(
+  redisUrl: string,
+): Promise<boolean> {
+  if (!redisUrl?.trim()) return false;
+  const client = new Redis(redisUrl, {
+    maxRetriesPerRequest: 1,
+    enableReadyCheck: true,
+    lazyConnect: true,
+    connectTimeout: 2000,
+  });
+  try {
+    await client.connect();
+    const result = await client.ping();
+    return result === "PONG";
+  } catch (error) {
+    logger.error("Redis connectivity probe failed", {
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    return false;
+  } finally {
+    try {
+      client.disconnect();
+    } catch {
+      // ignore disconnect errors
     }
   }
 }
