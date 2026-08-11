@@ -445,39 +445,46 @@ export class PaymentService {
       };
     }
 
-    const nextStatus = paymentStatusFromWebhookEvent(event.type);
-    const payment = await this.provider.applyStatus(
-      event.paymentId,
-      nextStatus,
-    );
-    await this.syncOrderPaymentSnapshot(payment);
-    const orderStatus = await this.syncOrderFromPayment(
-      payment.orderId,
-      payment.status,
-    );
+    try {
+      const nextStatus = paymentStatusFromWebhookEvent(event.type);
+      const payment = await this.provider.applyStatus(
+        event.paymentId,
+        nextStatus,
+      );
+      await this.syncOrderPaymentSnapshot(payment);
+      const orderStatus = await this.syncOrderFromPayment(
+        payment.orderId,
+        payment.status,
+      );
 
-    if (payment.status === "FAILED" && this.notifications) {
-      const order = await this.orders.findById(payment.orderId);
-      if (order) {
-        await this.notifications.onPaymentFailed(order);
+      if (payment.status === "FAILED" && this.notifications) {
+        const order = await this.orders.findById(payment.orderId);
+        if (order) {
+          await this.notifications.onPaymentFailed(order);
+        }
       }
+
+      await this.webhookEvents.markProcessed(event.eventId);
+
+      logger.info("Webhook event applied", {
+        eventId: event.eventId,
+        type: event.type,
+        paymentId: payment.paymentId,
+        paymentStatus: payment.status,
+      });
+
+      return {
+        eventId: event.eventId,
+        duplicate: false,
+        paymentId: payment.paymentId,
+        orderId: payment.orderId,
+        paymentStatus: payment.status,
+        orderStatus,
+      };
+    } catch (error) {
+      await this.webhookEvents.releaseClaim(event.eventId);
+      throw error;
     }
-
-    logger.info("Webhook event applied", {
-      eventId: event.eventId,
-      type: event.type,
-      paymentId: payment.paymentId,
-      paymentStatus: payment.status,
-    });
-
-    return {
-      eventId: event.eventId,
-      duplicate: false,
-      paymentId: payment.paymentId,
-      orderId: payment.orderId,
-      paymentStatus: payment.status,
-      orderStatus,
-    };
   }
 
   /**

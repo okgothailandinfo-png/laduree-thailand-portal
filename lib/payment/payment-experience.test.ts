@@ -4,27 +4,14 @@ import { describe, it } from "node:test";
 import path from "node:path";
 import { MockOrderRepository } from "@/src/server/repositories/mock/order.repository";
 import { MockPaymentRepository } from "@/src/server/repositories/mock/payment.repository";
-import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
+import { MockWebhookEventRepository } from "@/src/server/repositories/mock/webhook-event.repository";
 import { PaymentService } from "@/src/server/payment/payment-service";
 import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
 import type { Order } from "@/src/server/models/order";
 import { randomUUID } from "crypto";
 
-function createWebhookRepo(): WebhookEventRepository {
-  const claimed = new Set<string>();
-  return {
-    async hasProcessed(eventId: string) {
-      return claimed.has(eventId);
-    },
-    async claimEvent(eventId: string) {
-      if (claimed.has(eventId)) return false;
-      claimed.add(eventId);
-      return true;
-    },
-    async markProcessed(eventId: string) {
-      claimed.add(eventId);
-    },
-  };
+function createWebhookRepo(): MockWebhookEventRepository {
+  return new MockWebhookEventRepository();
 }
 
 function draftOrder(overrides?: Partial<Order>): Order {

@@ -64,30 +64,30 @@ model Category {
 }
 
 model Product {
-  id           String   @id @default(uuid()) @db.Uuid
-  categoryId   String   @db.Uuid
-  slug         String   @unique
-  sku          String   @unique
-  title        String
-  description  String[] @default([])
+  id                 String   @id @default(uuid()) @db.Uuid
+  categoryId         String   @db.Uuid
+  slug               String   @unique
+  sku                String   @unique
+  title              String
+  description        String[] @default([])
   /// Storefront allergen heading — Singapore/mock wording until Thailand approval.
-  allergenLabel String?
+  allergenLabel      String?
   /// Storefront allergen body — Singapore/mock wording until Thailand approval.
-  allergenText  String?
-  storageLabel String?
-  storageText  String?
+  allergenText       String?
+  storageLabel       String?
+  storageText        String?
   /// Thailand retail price in satang (minor units). Null until owner-approved.
-  priceMinor   Int?
-  currency     String   @default("THB") @db.Char(3)
+  priceMinor         Int?
+  currency           String   @default("THB") @db.Char(3)
   /// Catalog visibility (soft-deactivate without removing order history).
-  isActive     Boolean  @default(true)
+  isActive           Boolean  @default(true)
   /// Pickup availability for the storefront catalog.
-  available    Boolean  @default(true)
-  sortOrder    Int      @default(0)
+  available          Boolean  @default(true)
+  sortOrder          Int      @default(0)
   /// ProductModifierGroup[] JSON — structure mirrors mock/SG catalog; never invent copy.
-  modifierGroupsJson Json @default("[]")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  modifierGroupsJson Json     @default("[]")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   category   Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   images     ProductImage[]
@@ -268,21 +268,21 @@ model Customer {
 }
 
 model Order {
-  id             String      @id @default(uuid()) @db.Uuid
-  orderNumber    String      @unique
-  status         OrderStatus @default(PENDING)
+  id                  String               @id @default(uuid()) @db.Uuid
+  orderNumber         String               @unique
+  status              OrderStatus          @default(PENDING)
   /// PICKUP (default) or DELIVERY — Pickup behaviour unchanged when PICKUP.
-  serviceType    ServiceType @default(PICKUP)
-  customerId     String      @db.Uuid
-  boutiqueId     String      @db.Uuid
-  pickupSlotId   String      @db.Uuid
+  serviceType         ServiceType          @default(PICKUP)
+  customerId          String               @db.Uuid
+  boutiqueId          String               @db.Uuid
+  pickupSlotId        String               @db.Uuid
   /// Cart that produced this draft — cleared after payment SUCCESS (no FK; cart may be deleted).
-  sourceCartId   String?     @db.Uuid
-  currency       String      @default("THB") @db.Char(3)
+  sourceCartId        String?              @db.Uuid
+  currency            String               @default("THB") @db.Char(3)
   /// Order total in satang (minor units), including delivery fee when quoted.
-  totalMinor     Int         @default(0)
-  specialRequest String?
-  termsAccepted  Boolean     @default(false)
+  totalMinor          Int                  @default(0)
+  specialRequest      String?
+  termsAccepted       Boolean              @default(false)
   /// Delivery address — null for PICKUP orders.
   deliveryRecipient   String?
   deliveryPhone       String?
@@ -295,8 +295,8 @@ model Order {
   deliveryFeeMinor    Int?
   deliveryZoneId      String?
   deliveryFeeStrategy DeliveryFeeStrategy?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
   customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
   boutique           Boutique            @relation(fields: [boutiqueId], references: [id], onDelete: Restrict)
@@ -433,6 +433,9 @@ model GatewayPayment {
   providerRef String?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
+  /// Sprint 32: partial unique index `GatewayPayment_orderId_pending_key` on
+  /// (orderId) WHERE status = PENDING is defined in SQL migration (Prisma DSL
+  /// cannot express partial unique indexes).
 
   @@index([orderId])
   @@index([status])
@@ -527,16 +530,28 @@ model NotificationSetting {
   @@index([isEnabled])
 }
 
+/// Two-phase webhook claim lifecycle (Sprint 32).
+/// PROCESSING = claimed, apply in flight; PROCESSED = durable success.
+enum WebhookEventStatus {
+  PROCESSING
+  PROCESSED
+}
+
 /// Durable payment webhook idempotency (provider event ids).
 model WebhookEvent {
-  id          String   @id @default(uuid()) @db.Uuid
-  eventId     String   @unique
-  provider    String   @default("mock")
-  processedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id          String             @id @default(uuid()) @db.Uuid
+  eventId     String             @unique
+  provider    String             @default("mock")
+  status      WebhookEventStatus @default(PROCESSING)
+  /// Set when status becomes PROCESSED. Null while PROCESSING.
+  processedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([processedAt])
   @@index([provider])
+  @@index([status])
+  @@index([status, updatedAt])
 }
 
 /// Admin / system audit trail. Safe metadata only — no secrets or PII payloads.

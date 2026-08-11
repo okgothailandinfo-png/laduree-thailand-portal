@@ -16,7 +16,7 @@ export interface PaymentRepository {
    * Atomically create a PENDING payment or reuse an existing PENDING for the
    * same order + method. Cancels a different-method PENDING before creating.
    * Prevents concurrent dual-PENDING rows for one order in-process (mock) and
-   * via transactional check (prisma).
+   * via transactional check + partial unique index (prisma, Sprint 32).
    */
   savePendingExclusive(payment: Payment): Promise<SavePendingExclusiveResult>;
 }

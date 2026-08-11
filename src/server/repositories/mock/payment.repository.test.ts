@@ -71,4 +71,33 @@ describe("Sprint 30 — MockPaymentRepository exclusive PENDING", () => {
     const pending = await repo.findPendingByOrderId(orderId);
     assert.equal(pending?.paymentId, "pay-b");
   });
+
+  it("Sprint 32 — keeps a single PENDING after interleaved method switches", async () => {
+    resetMockPayments();
+    const repo = new MockPaymentRepository();
+    const orderId = "order-interleaved";
+
+    await Promise.all([
+      repo.savePendingExclusive(pendingPayment(orderId, "pay-cc-1", "credit-card")),
+      repo.savePendingExclusive(
+        pendingPayment(orderId, "pay-qr-1", "promptpay-qr"),
+      ),
+      repo.savePendingExclusive(pendingPayment(orderId, "pay-cc-2", "credit-card")),
+      repo.savePendingExclusive(
+        pendingPayment(orderId, "pay-qr-2", "promptpay-qr"),
+      ),
+    ]);
+
+    const pending = await repo.findPendingByOrderId(orderId);
+    assert.ok(pending);
+    assert.equal(pending.status, "PENDING");
+
+    const allStatuses = await Promise.all(
+      ["pay-cc-1", "pay-qr-1", "pay-cc-2", "pay-qr-2"].map((id) =>
+        repo.findById(id),
+      ),
+    );
+    const pendingRows = allStatuses.filter((row) => row?.status === "PENDING");
+    assert.equal(pendingRows.length, 1);
+  });
 });

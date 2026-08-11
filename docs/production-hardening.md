@@ -54,7 +54,10 @@ Sprint 28–29 delivered payment recovery RC1 hardening and Prisma pickup parity
 (CSRF on cart/checkout, pickup special-request persistence, capacity reserve,
 dual-PENDING payment hardening, SEO title). Sprint 31 closed deploy/migration
 safety gaps (seed refuse in production, preflight/deploy smoke, Redis readiness
-probe, cutover/rollback docs). Delivery remains deferred for MVP.
+probe, cutover/rollback docs). Sprint 32 closed multi-instance dual-PENDING
+(partial unique index + P2002 recovery) and webhook claim durability
+(two-phase PROCESSING → PROCESSED + release on failure). Delivery remains
+deferred for MVP.
 
 Still required before Go-Live (external accounts + adapter registration):
 

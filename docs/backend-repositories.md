@@ -214,12 +214,13 @@ Do **not** run `npm run db:migrate` / `db:deploy` for Delivery Foundation work u
 See also [production-hardening.md](./production-hardening.md) for fail-closed rules and Production Blockers.
 
 - Replace development seed with owner-approved Thailand catalog, prices, boutique ops, and hours
-- Product modifier groups not persisted in Prisma yet
-- Real admin authentication provider not implemented (mock session only — refused in production)
-- Cart (`Cart`), gateway payment (`GatewayPayment`), and webhook event (`WebhookEvent`) persistence are Prisma-backed under `DATA_SOURCE=prisma` (Sprint 26)
+- Admin modifier **UI** still pending (API/JSON persistence done in Sprint 29 — see `docs/admin-modifier-gaps.md`)
+- Real admin authentication provider not implemented (mock session only — refused in production; OIDC path exists)
+- Cart (`Cart`), gateway payment (`GatewayPayment`), and webhook event (`WebhookEvent`) persistence are Prisma-backed under `DATA_SOURCE=prisma` (Sprint 26+)
 - `DATA_SOURCE=mock` keeps in-memory repositories for local prototype runs without PostgreSQL
-- Pickup reservation counts not decremented on order create
+- Pickup slot capacity reserve/release on order create (Sprint 30)
 - Payment gateway not implemented (mock payment refused in production)
 - Production must set `DATA_SOURCE=prisma` (mock refused)
-- Cloud storage / real notification providers / Redis rate-limit client still required before go-live
+- Cloud storage / real notification providers still required before go-live; Redis rate-limit client exists (needs provisioned `REDIS_URL`)
+- Sprint 32 migration (pending unique + webhook two-phase status) ships in-repo; apply via `db:deploy` only with approved Postgres
 - **Pending Infrastructure:** apply delivery foundation Prisma migration after local Postgres is available
