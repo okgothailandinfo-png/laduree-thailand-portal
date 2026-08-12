@@ -1,3 +1,5 @@
+import type { ProductBehavior } from "@/lib/product/product-behavior";
+
 export type ProductImage = {
   id: string;
   mediaId: string;
@@ -60,6 +62,15 @@ export type Product = {
   isActive: boolean;
   /** Pickup availability. */
   available: boolean;
+  /** Sprint 33B — delivery eligibility capability (Thailand values in 33C). */
+  deliveryEligible: boolean;
+  /** Sprint 33B — explicit ordering behavior (never category-name inferred). */
+  productBehavior: ProductBehavior;
+  /**
+   * Pack / box size metadata (pieces or units). Informational for FIXED_PACK;
+   * does not force internal customer selection.
+   */
+  packSize: number | null;
   sortOrder: number;
   modifierGroups: ProductModifierGroup[];
 };

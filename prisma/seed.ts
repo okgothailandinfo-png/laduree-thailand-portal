@@ -201,6 +201,7 @@ async function seedProducts(categoryIds: Map<string, string>) {
 
     const isMacaronPlaceholder =
       product.id === IDS.products.placeholderMacaron;
+    const isTeaPlaceholder = product.id === IDS.products.placeholderTea;
     const allergenLabel = isMacaronPlaceholder
       ? MOCK_MACARON_REFERENCE.allergenLabel
       : null;
@@ -210,6 +211,12 @@ async function seedProducts(categoryIds: Map<string, string>) {
     const modifierGroupsJson = isMacaronPlaceholder
       ? MOCK_MACARON_REFERENCE.modifierGroups
       : [];
+    const productBehavior = isMacaronPlaceholder
+      ? ("CONFIGURABLE_BOX" as const)
+      : isTeaPlaceholder
+        ? ("FIXED_PACK" as const)
+        : ("SIMPLE_PRODUCT" as const);
+    const packSize = isMacaronPlaceholder ? 8 : isTeaPlaceholder ? 12 : null;
 
     const row = await prisma.product.upsert({
       where: { slug: product.slug },
@@ -228,6 +235,9 @@ async function seedProducts(categoryIds: Map<string, string>) {
         currency: "THB",
         isActive: true,
         available: true,
+        deliveryEligible: true,
+        productBehavior,
+        packSize,
         sortOrder: product.sortOrder,
         modifierGroupsJson,
       },
@@ -244,6 +254,9 @@ async function seedProducts(categoryIds: Map<string, string>) {
         currency: "THB",
         isActive: true,
         available: true,
+        deliveryEligible: true,
+        productBehavior,
+        packSize,
         sortOrder: product.sortOrder,
         modifierGroupsJson,
       },

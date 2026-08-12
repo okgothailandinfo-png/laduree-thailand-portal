@@ -47,6 +47,15 @@ enum PaymentStatus {
   FAILED
 }
 
+/// Sprint 33B — product ordering behavior (data-driven; never category-name logic).
+enum ProductBehavior {
+  CONFIGURABLE_BOX
+  FIXED_PACK
+  SIMPLE_PRODUCT
+  /// Architecture-ready only — optional modifier groups; no speculative storefront flow.
+  OPTIONAL_CONFIGURABLE
+}
+
 model Category {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
@@ -83,6 +92,12 @@ model Product {
   isActive           Boolean  @default(true)
   /// Pickup availability for the storefront catalog.
   available          Boolean  @default(true)
+  /// Sprint 33B — delivery eligibility capability (Thailand values filled in 33C).
+  deliveryEligible   Boolean  @default(true)
+  /// Sprint 33B — ordering behavior. Default SIMPLE_PRODUCT for new rows.
+  productBehavior    ProductBehavior @default(SIMPLE_PRODUCT)
+  /// Pack / box size metadata (pieces, units). Not a customer selection force for FIXED_PACK.
+  packSize           Int?
   sortOrder          Int      @default(0)
   /// ProductModifierGroup[] JSON — structure mirrors mock/SG catalog; never invent copy.
   modifierGroupsJson Json     @default("[]")
@@ -97,6 +112,8 @@ model Product {
   @@index([available])
   @@index([isActive])
   @@index([sortOrder])
+  @@index([productBehavior])
+  @@index([deliveryEligible])
 }
 
 /// Media library asset (URL-based and/or binary upload).
@@ -369,6 +386,14 @@ model OrderItem {
   currency       String   @default("THB") @db.Char(3)
   modifiers      Json?
   note           String?
+  /// Sprint 33B — historical product behavior snapshot (null = pre-33B legacy row).
+  productBehavior ProductBehavior?
+  /// Sprint 33B — pack/box size snapshot at order time.
+  packSize       Int?
+  /// Sprint 33B — exact-selection size snapshot for CONFIGURABLE_BOX lines.
+  exactSelectionQuantity Int?
+  /// Sprint 33B — delivery eligibility snapshot at order time.
+  deliveryEligible Boolean?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -377,6 +402,7 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+  @@index([productBehavior])
 }
 
 model PaymentRecord {

@@ -2,6 +2,11 @@ import { randomUUID } from "crypto";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
+import {
+  isDeliveryEligibleProduct,
+  snapshotProductBehavior,
+  usesExactSelection,
+} from "@/lib/product/product-behavior";
 import type { Order } from "@/src/server/models/order";
 import {
   createFinalOrderNumber,
@@ -239,20 +244,41 @@ export class DefaultOrderService implements OrderService {
         );
       }
 
-      const modifiers = line.modifiers ?? [];
-      const exactSelection = validateExactSelectionModifiers(
-        product.modifierGroups,
-        modifiers,
-        line.quantity,
-      );
-      if (!exactSelection.ok) {
-        throw new AppError("VALIDATION_ERROR", exactSelection.message, {
-          details: {
-            field: "items.modifiers",
-            code: exactSelection.code,
-            productId: product.id,
+      const serviceType = input.serviceType ?? "PICKUP";
+      if (
+        serviceType === "DELIVERY" &&
+        !isDeliveryEligibleProduct(product)
+      ) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "One or more products are not available for delivery.",
+          {
+            details: {
+              field: "items",
+              code: "DELIVERY_INELIGIBLE",
+              productId: product.id,
+            },
           },
-        });
+        );
+      }
+
+      const modifiers = line.modifiers ?? [];
+      if (usesExactSelection(product.productBehavior)) {
+        const exactSelection = validateExactSelectionModifiers(
+          product.modifierGroups,
+          modifiers,
+          line.quantity,
+        );
+        if (!exactSelection.ok) {
+          throw new AppError("VALIDATION_ERROR", exactSelection.message, {
+            details: {
+              field: "items.modifiers",
+              code: exactSelection.code,
+              productId: product.id,
+              productBehavior: product.productBehavior,
+            },
+          });
+        }
       }
 
       const requiredModifiers = validateRequiredModifierGroups(
@@ -290,6 +316,7 @@ export class DefaultOrderService implements OrderService {
       }
       totalMinor += unitPriceMinor * line.quantity;
 
+      const snapshot = snapshotProductBehavior(product);
       items.push({
         productId: product.id,
         name: product.title,
@@ -297,6 +324,10 @@ export class DefaultOrderService implements OrderService {
         modifiers: line.modifiers ?? [],
         note: line.note,
         unitPriceMinor,
+        productBehavior: snapshot.productBehavior,
+        packSize: snapshot.packSize,
+        exactSelectionQuantity: snapshot.exactSelectionQuantity,
+        deliveryEligible: snapshot.deliveryEligible,
       });
     }
 
@@ -509,6 +540,10 @@ function toCompletionDto(
       quantity: item.quantity,
       modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
       note: item.note,
+      productBehavior: item.productBehavior ?? null,
+      packSize: item.packSize ?? null,
+      exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+      deliveryEligible: item.deliveryEligible ?? null,
     })),
     totalThb: minorToThb(order.totalMinor),
     currency: "THB",

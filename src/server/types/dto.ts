@@ -1,5 +1,7 @@
 /** Request / response DTOs for placeholder APIs. */
 
+import type { ProductBehavior } from "@/lib/product/product-behavior";
+
 export type ProductSummaryDto = {
   id: string;
   slug: string;
@@ -10,6 +12,12 @@ export type ProductSummaryDto = {
   priceThb: number | null;
   imagePlaceholder: string;
   available: boolean;
+  /** Sprint 33B — delivery eligibility capability. */
+  deliveryEligible: boolean;
+  /** Sprint 33B — explicit ordering behavior. */
+  productBehavior: ProductBehavior;
+  /** Pack/box size metadata; null when not applicable. */
+  packSize: number | null;
 };
 
 export type ProductDetailDto = ProductSummaryDto & {
@@ -89,6 +97,9 @@ export type CartItemDto = {
   modifiers: CartModifierDto[];
   note?: string;
   exactSelectionQuantity?: number | null;
+  productBehavior?: ProductBehavior | null;
+  packSize?: number | null;
+  deliveryEligible?: boolean;
   /** Trusted catalog unit price in THB major units. Null until approved. */
   unitPriceThb: number | null;
   unitPriceMinor: number | null;
@@ -211,6 +222,10 @@ export type OrderDto = {
     quantity: number;
     modifiers: Array<{ label: string; quantity?: number }>;
     note?: string;
+    productBehavior?: ProductBehavior | null;
+    packSize?: number | null;
+    exactSelectionQuantity?: number | null;
+    deliveryEligible?: boolean | null;
   }>;
   customer: CreateOrderCustomerDto;
   /** Present for PICKUP orders. */
@@ -345,6 +360,10 @@ export type OrderCompletionDto = {
     quantity: number;
     modifiers: Array<{ label: string; quantity?: number }>;
     note?: string;
+    productBehavior?: ProductBehavior | null;
+    packSize?: number | null;
+    exactSelectionQuantity?: number | null;
+    deliveryEligible?: boolean | null;
   }>;
   totalThb: number;
   currency: "THB";

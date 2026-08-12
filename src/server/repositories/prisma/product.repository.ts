@@ -169,6 +169,9 @@ export class PrismaProductRepository implements ProductRepository {
           currency: input.currency,
           isActive: input.isActive,
           available: input.available,
+          deliveryEligible: input.deliveryEligible ?? true,
+          productBehavior: input.productBehavior ?? "SIMPLE_PRODUCT",
+          packSize: input.packSize ?? null,
           sortOrder: input.sortOrder,
           modifierGroupsJson: toModifierGroupsJson(input.modifierGroups ?? []),
           images: {
@@ -219,6 +222,13 @@ export class PrismaProductRepository implements ProductRepository {
     if (input.currency !== undefined) data.currency = input.currency;
     if (input.isActive !== undefined) data.isActive = input.isActive;
     if (input.available !== undefined) data.available = input.available;
+    if (input.deliveryEligible !== undefined) {
+      data.deliveryEligible = input.deliveryEligible;
+    }
+    if (input.productBehavior !== undefined) {
+      data.productBehavior = input.productBehavior;
+    }
+    if (input.packSize !== undefined) data.packSize = input.packSize;
     if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
     if (input.categoryId !== undefined) {
       data.category = { connect: { id: input.categoryId } };

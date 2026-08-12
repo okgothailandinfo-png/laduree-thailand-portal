@@ -12,7 +12,8 @@ export const CHECKOUT_BLOCKING_MESSAGES = {
   emptyCart: "Your cart is empty.Add at least 1 item to checkout!",
   missingBoutique: "Please select a pickup boutique.",
   missingPickupDateTime: "Please select a pickup date and time.",
-  incompleteSelection: "Complete your macaron selection.",
+  /** Generic incomplete exact-selection gate. [OWNER APPROVAL] Confirm vs Singapore portal. */
+  incompleteSelection: "Complete your selection.",
   unavailableProducts: "One or more products are unavailable.",
   priceUnavailable: "Price unavailable for one or more products.",
   stalePickupSlot: "The selected pickup time is no longer available.",

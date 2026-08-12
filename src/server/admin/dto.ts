@@ -1,3 +1,4 @@
+import type { ProductBehavior } from "@/lib/product/product-behavior";
 import type { ProductModifierGroup } from "@/src/server/models/product";
 
 /** Admin catalog DTOs — separate from storefront contracts. */
@@ -93,6 +94,9 @@ export type AdminProductListItemDto = {
   priceMinor: number | null;
   isActive: boolean;
   available: boolean;
+  deliveryEligible: boolean;
+  productBehavior: ProductBehavior;
+  packSize: number | null;
   sortOrder: number;
   primaryImageUrl: string | null;
 };
@@ -134,6 +138,9 @@ export type AdminCreateProductInput = {
   categoryId: string;
   isActive: boolean;
   available: boolean;
+  deliveryEligible?: boolean;
+  productBehavior?: ProductBehavior;
+  packSize?: number | null;
   sortOrder: number;
   allergenLabel?: string;
   allergenText?: string;
@@ -352,6 +359,10 @@ export type AdminOrderItemDto = {
   currency: "THB";
   modifiers: Array<{ label: string; quantity?: number }>;
   note: string | null;
+  productBehavior?: ProductBehavior | null;
+  packSize?: number | null;
+  exactSelectionQuantity?: number | null;
+  deliveryEligible?: boolean | null;
 };
 
 export type AdminOrderHistoryDto = {

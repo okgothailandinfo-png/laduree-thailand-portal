@@ -1,5 +1,11 @@
 /** Client-side API types mirroring backend DTOs (no server imports). */
 
+export type ProductBehavior =
+  | "CONFIGURABLE_BOX"
+  | "FIXED_PACK"
+  | "SIMPLE_PRODUCT"
+  | "OPTIONAL_CONFIGURABLE";
+
 export type ApiErrorBody = {
   code: string;
   message: string;
@@ -34,6 +40,9 @@ export type ProductSummary = {
   priceThb: number | null;
   imagePlaceholder: string;
   available: boolean;
+  deliveryEligible: boolean;
+  productBehavior: ProductBehavior;
+  packSize: number | null;
 };
 
 export type ProductModifierOptionDetail = {
@@ -139,6 +148,9 @@ export type CartItem = {
   modifiers: CartModifier[];
   note?: string;
   exactSelectionQuantity?: number | null;
+  productBehavior?: ProductBehavior | null;
+  packSize?: number | null;
+  deliveryEligible?: boolean;
   unitPriceThb: number | null;
   unitPriceMinor: number | null;
   lineTotalThb: number | null;
@@ -243,6 +255,10 @@ export type OrderDetail = {
     quantity: number;
     modifiers: Array<{ label: string; quantity?: number }>;
     note?: string;
+    productBehavior?: ProductBehavior | null;
+    packSize?: number | null;
+    exactSelectionQuantity?: number | null;
+    deliveryEligible?: boolean | null;
   }>;
   customer: {
     customerName: string;

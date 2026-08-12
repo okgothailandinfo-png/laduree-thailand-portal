@@ -24,6 +24,9 @@ describe("Sprint 29 — Prisma domain mapping parity", () => {
       currency: "THB",
       isActive: true,
       available: true,
+      deliveryEligible: true,
+      productBehavior: "CONFIGURABLE_BOX",
+      packSize: 8,
       sortOrder: 1,
       modifierGroupsJson: mock.modifierGroups,
       createdAt: new Date("2026-08-09T00:00:00.000Z"),
@@ -33,6 +36,9 @@ describe("Sprint 29 — Prisma domain mapping parity", () => {
 
     assert.equal(product.allergenLabel, mock.allergenLabel);
     assert.equal(product.allergenText, mock.allergenText);
+    assert.equal(product.productBehavior, "CONFIGURABLE_BOX");
+    assert.equal(product.packSize, 8);
+    assert.equal(product.deliveryEligible, true);
     assert.equal(product.modifierGroups.length, mock.modifierGroups.length);
     assert.equal(product.modifierGroups[0]?.exactSelectionQuantity, 8);
   });

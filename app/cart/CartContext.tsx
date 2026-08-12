@@ -17,7 +17,7 @@ import {
   updateCartItem,
 } from "@/lib/api/cart";
 import { ApiClientError } from "@/lib/api/client";
-import type { CartItem as ApiCartItem } from "@/lib/api/types";
+import type { CartItem as ApiCartItem, ProductBehavior } from "@/lib/api/types";
 
 export type CartModifier = {
   label: string;
@@ -33,6 +33,9 @@ export type CartItem = {
   modifiers: CartModifier[];
   note?: string;
   exactSelectionQuantity?: number | null;
+  productBehavior?: ProductBehavior | null;
+  packSize?: number | null;
+  deliveryEligible?: boolean;
   unitPriceThb: number | null;
   unitPriceMinor: number | null;
   lineTotalThb: number | null;
@@ -87,6 +90,9 @@ function toCartItems(items: ApiCartItem[]): CartItem[] {
     modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
     note: item.note,
     exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+    productBehavior: item.productBehavior ?? null,
+    packSize: item.packSize ?? null,
+    deliveryEligible: item.deliveryEligible !== false,
     unitPriceThb: item.unitPriceThb ?? null,
     unitPriceMinor: item.unitPriceMinor ?? null,
     lineTotalThb: item.lineTotalThb ?? null,

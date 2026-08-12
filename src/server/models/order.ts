@@ -1,3 +1,4 @@
+import type { ProductBehavior } from "@/lib/product/product-behavior";
 import type { OrderDelivery } from "@/src/server/models/delivery";
 import type { ServiceType } from "@/src/server/models/service-type";
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
@@ -25,6 +26,14 @@ export type OrderItem = {
   note?: string;
   /** Snapshot unit price in satang; used for persistence, omitted from API DTO. */
   unitPriceMinor: number;
+  /** Sprint 33B — historical behavior snapshot (null/omit on pre-33B legacy). */
+  productBehavior?: ProductBehavior | null;
+  /** Sprint 33B — pack/box size snapshot at order time. */
+  packSize?: number | null;
+  /** Sprint 33B — exact-selection size snapshot for CONFIGURABLE_BOX. */
+  exactSelectionQuantity?: number | null;
+  /** Sprint 33B — delivery eligibility snapshot at order time. */
+  deliveryEligible?: boolean | null;
 };
 
 export type OrderCustomer = {

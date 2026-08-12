@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   EXACT_SELECTION_MESSAGE_KEYS,
+  formatExactSelectionIncompleteMessage,
+  formatExactSelectionMaximumMessage,
   formatExactSelectionProgress,
   sumExactSelectionFromQtyMap,
   sumExactSelectionQuantity,
@@ -75,6 +77,17 @@ describe("exact-selection", () => {
     assert.equal(
       EXACT_SELECTION_MESSAGE_KEYS.pleaseSelectNMore,
       "product.exactSelection.pleaseSelectNMore",
+    );
+  });
+
+  it("Sprint 33B — maximum/incomplete messages are product-agnostic", () => {
+    assert.equal(
+      formatExactSelectionMaximumMessage(8),
+      "You have selected the maximum of 8.",
+    );
+    assert.equal(
+      formatExactSelectionIncompleteMessage(8),
+      "Please select all 8 before adding this box to your cart.",
     );
   });
 });
