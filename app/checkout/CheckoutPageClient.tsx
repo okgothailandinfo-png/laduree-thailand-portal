@@ -430,7 +430,7 @@ export default function CheckoutPageClient() {
   ]);
 
   return (
-    <main className="checkout-page">
+    <main className="checkout-page" id="main-content" tabIndex={-1}>
       <div className="checkout-page__inner">
         <div className="checkout-page__top">
           <Link href="/" className="checkout-page__back">

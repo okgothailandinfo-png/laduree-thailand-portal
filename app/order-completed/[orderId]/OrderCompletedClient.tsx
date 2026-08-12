@@ -68,7 +68,7 @@ export default function OrderCompletedClient({
       query.status === "empty");
 
   return (
-    <main className="order-completed-page">
+    <main className="order-completed-page" id="main-content" tabIndex={-1}>
       <div className="order-completed-page__inner">
         <div className="order-completed-page__top">
           <Link href="/" className="order-completed-page__back">

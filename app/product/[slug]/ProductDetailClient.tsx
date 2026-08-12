@@ -242,7 +242,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     !product
   ) {
     return (
-      <div className="product-detail-page modal-product-detail">
+      <main
+        id="main-content"
+        className="product-detail-page modal-product-detail"
+        tabIndex={-1}
+      >
         <div className="modal-header header-title">
           <div className="header-title__product-contaner">
             <Link
@@ -276,7 +280,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
             onRetry={productQuery.reload}
           />
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -289,7 +293,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     !allExactSelectionsComplete || !requiredComplete || !priceAvailable;
 
   return (
-    <div className="product-detail-page modal-product-detail">
+    <main
+      id="main-content"
+      className="product-detail-page modal-product-detail"
+      tabIndex={-1}
+    >
       <div className="modal-header header-title">
         <div className="header-title__product-contaner">
           <Link
@@ -343,7 +351,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                             <img
                               className="img-product-detail img-responsive"
                               src={product.imagePlaceholder}
-                              alt=""
+                              alt={
+                                imageCount > 1
+                                  ? `${product.title} — image ${index + 1}`
+                                  : product.title
+                              }
                             />
                           </button>
                         </div>
@@ -711,6 +723,6 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

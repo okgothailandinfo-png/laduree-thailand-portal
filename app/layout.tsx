@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
+import SkipToContent from "./a11y/SkipToContent";
 import CartProviderShell from "./cart/CartProviderShell";
 import "./globals.css";
 
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full antialiased ${lora.variable}`}>
       <body className="min-h-full flex flex-col font-sans">
+        <SkipToContent />
         <CartProviderShell>{children}</CartProviderShell>
       </body>
     </html>

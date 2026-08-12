@@ -350,7 +350,7 @@ export default function MockPaymentPageClient({
     payment?.status === "PENDING" && uiState !== "EXPIRED" && !actionBusy;
 
   return (
-    <main className="payment-page">
+    <main className="payment-page" id="main-content" tabIndex={-1}>
       <div className="payment-page__inner">
         <div className="payment-page__top">
           <Link

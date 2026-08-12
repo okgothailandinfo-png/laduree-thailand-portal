@@ -387,7 +387,7 @@ export default function PaymentPageClient({
   const isSubmitting = uiState === "PROCESSING";
 
   return (
-    <main className="payment-page">
+    <main className="payment-page" id="main-content" tabIndex={-1}>
       <div className="payment-page__inner">
         <div className="payment-page__top">
           <Link href="/checkout" className="payment-page__back">
