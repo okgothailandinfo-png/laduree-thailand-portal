@@ -6,6 +6,11 @@ import {
 } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
+import {
+  resolveExactSelectionQuantityForBehavior,
+  snapshotProductBehavior,
+  usesExactSelection,
+} from "@/lib/product/product-behavior";
 import type { Cart, CartItem } from "@/src/server/models/cart";
 import type { Product } from "@/src/server/models/product";
 import type {
@@ -88,24 +93,61 @@ function catalogPriceFields(
   };
 }
 
+function catalogBehaviorFields(product: Product): {
+  productBehavior: CartItem["productBehavior"];
+  packSize: number | null;
+  deliveryEligible: boolean;
+  exactSelectionQuantity: number | null;
+} {
+  const snapshot = snapshotProductBehavior(product);
+  return {
+    productBehavior: snapshot.productBehavior,
+    packSize: snapshot.packSize,
+    deliveryEligible: snapshot.deliveryEligible,
+    exactSelectionQuantity: usesExactSelection(product.productBehavior)
+      ? (resolveExactSelectionQuantityForBehavior(product) ??
+        getExactSelectionGroups(product.modifierGroups)[0]
+          ?.exactSelectionQuantity ??
+        null)
+      : null,
+  };
+}
+
+/**
+ * Behavior-aware configuration validation.
+ * Exact-selection runs only for CONFIGURABLE_BOX; required modifier groups always apply.
+ */
 function assertProductConfiguration(
   product: Product,
   modifiers: CartItem["modifiers"],
   quantity: number,
 ) {
-  const exactSelection = validateExactSelectionModifiers(
-    product.modifierGroups,
-    modifiers,
-    quantity,
-  );
-  if (!exactSelection.ok) {
-    throw new AppError("VALIDATION_ERROR", exactSelection.message, {
-      details: {
-        field: "modifiers",
-        code: exactSelection.code,
-        productId: product.id,
-      },
-    });
+  if (usesExactSelection(product.productBehavior)) {
+    const exactSelection = validateExactSelectionModifiers(
+      product.modifierGroups,
+      modifiers,
+      quantity,
+    );
+    if (!exactSelection.ok) {
+      throw new AppError("VALIDATION_ERROR", exactSelection.message, {
+        details: {
+          field: "modifiers",
+          code: exactSelection.code,
+          productId: product.id,
+          productBehavior: product.productBehavior,
+        },
+      });
+    }
+  } else if (
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > 999
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Product quantity must be between 1 and 999.",
+      { details: { field: "quantity", productId: product.id } },
+    );
   }
 
   const required = validateRequiredModifierGroups(
@@ -189,8 +231,11 @@ export class DefaultCartService implements CartService {
     }
 
     const exactGroups = getExactSelectionGroups(product.modifierGroups);
-    const exactSelectionQuantity =
-      exactGroups[0]?.exactSelectionQuantity ?? null;
+    const behaviorFields = catalogBehaviorFields(product);
+    const exactSelectionQuantity = usesExactSelection(product.productBehavior)
+      ? (exactGroups[0]?.exactSelectionQuantity ??
+        behaviorFields.exactSelectionQuantity)
+      : null;
     const incomingKey = cartLineConfigKey({
       productId: product.id,
       modifiers,
@@ -214,6 +259,7 @@ export class DefaultCartService implements CartService {
         ...existing,
         quantity: existing.quantity + input.quantity,
         ...catalog,
+        ...behaviorFields,
         exactSelectionQuantity,
       };
     } else {
@@ -225,8 +271,9 @@ export class DefaultCartService implements CartService {
         quantity: input.quantity,
         modifiers,
         note: input.note,
-        exactSelectionQuantity,
+        ...behaviorFields,
         ...catalog,
+        exactSelectionQuantity,
       };
       cart.items.push(item);
     }
@@ -294,7 +341,7 @@ export class DefaultCartService implements CartService {
     return toCartDto(saved);
   }
 
-  /** Refresh trusted catalog price/availability onto cart lines. */
+  /** Refresh trusted catalog price/availability/behavior onto cart lines. */
   private async refreshCatalogFields(
     cart: Cart,
   ): Promise<{ cart: Cart; changed: boolean }> {
@@ -304,12 +351,14 @@ export class DefaultCartService implements CartService {
     for (const item of cart.items) {
       const product = await this.products.findById(item.productId);
       const catalog = catalogPriceFields(product, item.modifiers);
-      const exactSelectionQuantity = product
-        ? (getExactSelectionGroups(product.modifierGroups)[0]
-            ?.exactSelectionQuantity ??
-          item.exactSelectionQuantity ??
-          null)
-        : (item.exactSelectionQuantity ?? null);
+      const behaviorFields = product
+        ? catalogBehaviorFields(product)
+        : {
+            productBehavior: item.productBehavior,
+            packSize: item.packSize ?? null,
+            deliveryEligible: item.deliveryEligible !== false,
+            exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+          };
 
       const next: CartItem = {
         ...item,
@@ -320,13 +369,19 @@ export class DefaultCartService implements CartService {
           "/product-placeholder.svg",
         unitPriceMinor: catalog.unitPriceMinor,
         productAvailable: catalog.productAvailable,
-        exactSelectionQuantity,
+        productBehavior: behaviorFields.productBehavior,
+        packSize: behaviorFields.packSize,
+        deliveryEligible: behaviorFields.deliveryEligible,
+        exactSelectionQuantity: behaviorFields.exactSelectionQuantity,
       };
 
       if (
         next.unitPriceMinor !== item.unitPriceMinor ||
         next.productAvailable !== item.productAvailable ||
         next.exactSelectionQuantity !== item.exactSelectionQuantity ||
+        next.productBehavior !== item.productBehavior ||
+        next.packSize !== item.packSize ||
+        next.deliveryEligible !== item.deliveryEligible ||
         next.name !== item.name
       ) {
         changed = true;

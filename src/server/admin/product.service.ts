@@ -9,6 +9,10 @@ import type {
 import { MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { requirePrismaDataSource } from "@/src/server/admin/auth";
 import { writeAuditLog } from "@/src/server/audit/audit.service";
+import {
+  isProductBehavior,
+  type ProductBehavior,
+} from "@/lib/product/product-behavior";
 import type {
   CategoryRepository,
   ProductRepository,
@@ -51,6 +55,30 @@ function requireCurrency(value: unknown): "THB" {
     });
   }
   return "THB";
+}
+
+function requireProductBehavior(value: unknown, field: string): ProductBehavior {
+  if (!isProductBehavior(value)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `${field} must be a valid productBehavior.`,
+      { details: { field } },
+    );
+  }
+  return value;
+}
+
+function optionalPackSize(value: unknown, field: string): number | null {
+  if (value === null || value === undefined) return null;
+  const packSize = requireInt(value, field);
+  if (packSize <= 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `${field} must be a positive integer when set.`,
+      { details: { field } },
+    );
+  }
+  return packSize;
 }
 
 function parseImages(raw: unknown): AdminCreateProductInput["images"] {
@@ -112,6 +140,9 @@ function toListItem(
     priceMinor: product.priceMinor,
     isActive: product.isActive,
     available: product.available,
+    deliveryEligible: product.deliveryEligible,
+    productBehavior: product.productBehavior,
+    packSize: product.packSize,
     sortOrder: product.sortOrder,
     primaryImageUrl: primary?.url ?? null,
   };
@@ -173,6 +204,15 @@ export class AdminProductService {
       categoryId: requireString(body.categoryId, "categoryId"),
       isActive: requireBoolean(body.isActive ?? true, "isActive"),
       available: requireBoolean(body.available ?? true, "available"),
+      deliveryEligible: requireBoolean(
+        body.deliveryEligible ?? true,
+        "deliveryEligible",
+      ),
+      productBehavior: requireProductBehavior(
+        body.productBehavior ?? "SIMPLE_PRODUCT",
+        "productBehavior",
+      ),
+      packSize: optionalPackSize(body.packSize, "packSize"),
       sortOrder: requireInt(body.sortOrder ?? 0, "sortOrder"),
       storageLabel: optionalString(body.storageLabel, "storageLabel"),
       storageText: optionalString(body.storageText, "storageText"),
@@ -220,6 +260,21 @@ export class AdminProductService {
     }
     if (body.available !== undefined) {
       input.available = requireBoolean(body.available, "available");
+    }
+    if (body.deliveryEligible !== undefined) {
+      input.deliveryEligible = requireBoolean(
+        body.deliveryEligible,
+        "deliveryEligible",
+      );
+    }
+    if (body.productBehavior !== undefined) {
+      input.productBehavior = requireProductBehavior(
+        body.productBehavior,
+        "productBehavior",
+      );
+    }
+    if (body.packSize !== undefined) {
+      input.packSize = optionalPackSize(body.packSize, "packSize");
     }
     if (body.sortOrder !== undefined) {
       input.sortOrder = requireInt(body.sortOrder, "sortOrder");

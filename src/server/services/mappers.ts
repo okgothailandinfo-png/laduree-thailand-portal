@@ -24,6 +24,9 @@ export function toProductSummaryDto(product: Product): ProductSummaryDto {
     priceThb: product.priceThb,
     imagePlaceholder: product.imagePlaceholder,
     available: product.available,
+    deliveryEligible: product.deliveryEligible,
+    productBehavior: product.productBehavior,
+    packSize: product.packSize,
   };
 }
 
@@ -92,6 +95,10 @@ export function toOrderDto(order: Order): OrderDto {
       quantity: item.quantity,
       modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
       note: item.note,
+      productBehavior: item.productBehavior ?? null,
+      packSize: item.packSize ?? null,
+      exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+      deliveryEligible: item.deliveryEligible ?? null,
     })),
     customer: { ...order.customer },
     ...(order.pickup ? { pickup: { ...order.pickup } } : {}),
@@ -139,6 +146,9 @@ export function toCartDto(cart: Cart): CartDto {
       modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
       note: item.note,
       exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+      productBehavior: item.productBehavior ?? null,
+      packSize: item.packSize ?? null,
+      deliveryEligible: item.deliveryEligible !== false,
       unitPriceThb,
       unitPriceMinor,
       lineTotalThb,

@@ -25,6 +25,17 @@ function parseItems(raw: unknown): CartItem[] {
       typeof row.exactSelectionQuantity === "number"
         ? { exactSelectionQuantity: row.exactSelectionQuantity as number | null }
         : {}),
+      ...(typeof row.productBehavior === "string"
+        ? {
+            productBehavior: row.productBehavior as CartItem["productBehavior"],
+          }
+        : {}),
+      ...(row.packSize === null || typeof row.packSize === "number"
+        ? { packSize: row.packSize as number | null }
+        : {}),
+      ...(typeof row.deliveryEligible === "boolean"
+        ? { deliveryEligible: row.deliveryEligible }
+        : {}),
       ...(row.unitPriceMinor === null || typeof row.unitPriceMinor === "number"
         ? { unitPriceMinor: row.unitPriceMinor as number | null }
         : {}),

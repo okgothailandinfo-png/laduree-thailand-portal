@@ -39,6 +39,9 @@ const product: Product = {
   images: [],
   isActive: true,
   available: true,
+  deliveryEligible: true,
+  productBehavior: "CONFIGURABLE_BOX",
+  packSize: 8,
   sortOrder: 1,
   modifierGroups: [
     {
@@ -117,31 +120,37 @@ function createService(options?: {
     typeof createDeliveryAvailabilityEngine
   >[0];
   preorderConfig?: Parameters<typeof createDeliveryAvailabilityEngine>[1];
+  catalogProduct?: Product;
+  cartItems?: Cart["items"];
 }) {
   const slotDateKey = options?.slotDateKey ?? "";
   const availableDateKey = options?.availableDateKey ?? "2026-07-21";
   let slotCapacity: number | null =
     options?.slotCapacity === undefined ? null : options.slotCapacity;
+  const catalogProduct = options?.catalogProduct ?? product;
   const carts = new Map<string, Cart>();
   const cart: Cart = {
     id: "cart-1",
     currency: "THB",
     updatedAt: new Date().toISOString(),
-    items: [
+    items: options?.cartItems ?? [
       {
         id: "line-1",
-        productId: product.id,
-        name: product.title,
-        imageSrc: product.imagePlaceholder,
+        productId: catalogProduct.id,
+        name: catalogProduct.title,
+        imageSrc: catalogProduct.imagePlaceholder,
         quantity: 1,
         modifiers: [
           { label: "Rose", quantity: 4 },
           { label: "Chocolate", quantity: 4 },
           { label: ACK },
         ],
-        unitPriceMinor: 99000,
+        unitPriceMinor: catalogProduct.priceMinor ?? 99000,
         productAvailable: true,
         exactSelectionQuantity: 8,
+        productBehavior: "CONFIGURABLE_BOX",
+        packSize: 8,
+        deliveryEligible: true,
       },
     ],
   };
@@ -162,16 +171,16 @@ function createService(options?: {
 
   const productRepo: ProductRepository = {
     async list() {
-      return [product];
+      return [catalogProduct];
     },
     async findBySlug() {
-      return product;
+      return catalogProduct;
     },
     async findById() {
-      return product;
+      return catalogProduct;
     },
     async findBySku() {
-      return product;
+      return catalogProduct;
     },
     async adminList() {
       throw new Error("unused");
@@ -822,6 +831,117 @@ describe("Delivery checkout flow (no boutique)", () => {
       (error: unknown) =>
         error instanceof AppError &&
         error.message.includes("not available at this time"),
+    );
+  });
+
+  it("Sprint 33B — snapshots productBehavior/packSize on OrderItem", async () => {
+    const { service, orders } = createService();
+    const draft = await service.createDraftCheckout("cart-1", {
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      pickup: {
+        boutiqueId: "boutique-1",
+        dateKey: "2026-07-21",
+        pickupSlotId: "1030-1100",
+      },
+      termsAccepted: true,
+    });
+    const order = orders.get(draft.orderId);
+    assert.ok(order);
+    assert.equal(order.items[0]?.productBehavior, "CONFIGURABLE_BOX");
+    assert.equal(order.items[0]?.packSize, 8);
+    assert.equal(order.items[0]?.exactSelectionQuantity, 8);
+    assert.equal(order.items[0]?.deliveryEligible, true);
+  });
+
+  it("Sprint 33B — FIXED_PACK checkout does not require exact selection", async () => {
+    const fixed: Product = {
+      ...product,
+      id: "prod-dev-fixed-tea-tin",
+      slug: "dev-fixed-tea-tin",
+      sku: "DEV-FIXED-TEA",
+      title: "[DEV] Fixed Tea Tin",
+      productBehavior: "FIXED_PACK",
+      packSize: 12,
+      priceThb: 890,
+      priceMinor: 89000,
+      modifierGroups: [],
+    };
+    const { service, orders } = createService({
+      catalogProduct: fixed,
+      cartItems: [
+        {
+          id: "line-fixed",
+          productId: fixed.id,
+          name: fixed.title,
+          imageSrc: fixed.imagePlaceholder,
+          quantity: 2,
+          modifiers: [],
+          unitPriceMinor: 89000,
+          productAvailable: true,
+          productBehavior: "FIXED_PACK",
+          packSize: 12,
+          exactSelectionQuantity: null,
+          deliveryEligible: true,
+        },
+      ],
+    });
+    const draft = await service.createDraftCheckout("cart-1", {
+      customer: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "+66812345678",
+      },
+      pickup: {
+        boutiqueId: "boutique-1",
+        dateKey: "2026-07-21",
+        pickupSlotId: "1030-1100",
+      },
+      termsAccepted: true,
+    });
+    const order = orders.get(draft.orderId);
+    assert.ok(order);
+    assert.equal(order.items[0]?.productBehavior, "FIXED_PACK");
+    assert.equal(order.items[0]?.packSize, 12);
+    assert.equal(order.items[0]?.exactSelectionQuantity, null);
+    assert.equal(order.items[0]?.quantity, 2);
+    assert.equal(order.totalMinor, 178000);
+  });
+
+  it("Sprint 33B — delivery rejects deliveryEligible=false products", async () => {
+    const ineligible: Product = {
+      ...product,
+      deliveryEligible: false,
+    };
+    const { service } = createService({
+      catalogProduct: ineligible,
+      zones: [zoneWithFee],
+      availabilityRules: [EARLIEST_RULE],
+    });
+    await assert.rejects(
+      () =>
+        service.createDraftCheckout("cart-1", {
+          serviceType: "DELIVERY",
+          customer: {
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            phone: "+66812345678",
+          },
+          delivery: {
+            mode: "EARLIEST_AVAILABLE",
+            address: deliveryAddress,
+          },
+          termsAccepted: true,
+        }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.message.includes("not available for delivery"),
     );
   });
 });

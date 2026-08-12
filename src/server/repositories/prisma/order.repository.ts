@@ -236,6 +236,10 @@ export class PrismaOrderRepository implements OrderRepository {
                 currency: "THB",
                 modifiers: item.modifiers as Prisma.InputJsonValue,
                 note: item.note,
+                productBehavior: item.productBehavior ?? null,
+                packSize: item.packSize ?? null,
+                exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+                deliveryEligible: item.deliveryEligible ?? null,
               })),
             },
             ...(order.payment

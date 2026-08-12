@@ -46,7 +46,7 @@
 
 ## Deferred
 
-- **33B** Product architecture generalization (CONFIGURABLE_BOX / FIXED_PACK / SIMPLE_PRODUCT)
+- **33B** Product architecture generalization (CONFIGURABLE_BOX / FIXED_PACK / SIMPLE_PRODUCT) — see `docs/sprint-33b-product-architecture.md`
 - **33C** Thailand product & content integration
 - **33D** Storefront finalization (SEO robots/sitemap/OG, consent/privacy pages, full chrome reuse)
 

@@ -212,6 +212,10 @@ function toItemDto(item: Order["items"][number]): AdminOrderItemDto {
     currency: "THB",
     modifiers: item.modifiers,
     note: item.note ?? null,
+    productBehavior: item.productBehavior ?? null,
+    packSize: item.packSize ?? null,
+    exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+    deliveryEligible: item.deliveryEligible ?? null,
   };
 }
 

@@ -73,6 +73,7 @@ Do not invent customer-facing copy. Use TODO for information not yet approved.
   - `product.exactSelection.pleaseSelect` → EN “Please select {n}”
   - `product.exactSelection.pleaseSelectNMore` → EN “Please select {n} more”
   - `product.exactSelection.nOfNSelected` → EN “{n} of {n} selected”
-  - `product.exactSelection.maximumSelected`
-  - `product.exactSelection.incompleteBeforeAdd`
+  - `product.exactSelection.maximumSelected` → EN “You have selected the maximum of {n}.” **[OWNER APPROVAL]** (Sprint 33B neutralized Macaron hard-code)
+  - `product.exactSelection.incompleteBeforeAdd` → EN “Please select all {n} before adding this box to your cart.” **[OWNER APPROVAL]**
+  - Cart gate incomplete selection → EN “Complete your selection.” **[OWNER APPROVAL]**
   - `product.modifier.optional` / `product.modifier.pleaseSelectN` / `product.modifier.acknowledgementRequired`

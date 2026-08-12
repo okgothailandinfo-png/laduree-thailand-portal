@@ -13,6 +13,7 @@ Storefront DTOs and mock catalog now support configuration-driven modifier group
 - Required acknowledgement flag (`isAcknowledgement`)
 - Product-level quantity (outer box qty, independent of flavour total)
 - Availability (`available`, `isActive` on product)
+- Sprint 33B: `productBehavior`, `packSize`, `deliveryEligible` (API + domain; Admin modifier UI still deferred)
 
 ## Persistence status (Sprint 29)
 

@@ -31,6 +31,9 @@ function makeProduct(overrides?: Partial<Product>): Product {
     images: [],
     isActive: true,
     available: true,
+    deliveryEligible: true,
+    productBehavior: "CONFIGURABLE_BOX",
+    packSize: 8,
     sortOrder: 1,
     modifierGroups: [
       {
@@ -283,5 +286,84 @@ describe("DefaultCartService ordering parity", () => {
     });
     assert.equal(cart.subtotalThb, 990);
     assert.equal(cart.items[0]?.unitPriceMinor, 99000);
+  });
+
+  it("Sprint 33B — FIXED_PACK skips exact-selection and preserves packSize", async () => {
+    const service = createService(
+      makeProduct({
+        id: "prod-dev-fixed-tea-tin",
+        slug: "dev-fixed-tea-tin",
+        sku: "DEV-FIXED-TEA",
+        title: "[DEV] Fixed Tea Tin",
+        productBehavior: "FIXED_PACK",
+        packSize: 12,
+        priceThb: 890,
+        priceMinor: 89000,
+        modifierGroups: [],
+      }),
+    );
+    const cart = await service.addItem(undefined, {
+      productId: "prod-dev-fixed-tea-tin",
+      quantity: 2,
+      modifiers: [],
+    });
+    assert.equal(cart.items.length, 1);
+    assert.equal(cart.items[0]?.productBehavior, "FIXED_PACK");
+    assert.equal(cart.items[0]?.packSize, 12);
+    assert.equal(cart.items[0]?.exactSelectionQuantity, null);
+    assert.equal(cart.items[0]?.quantity, 2);
+    assert.equal(cart.subtotalThb, 1780);
+  });
+
+  it("Sprint 33B — SIMPLE_PRODUCT skips exact-selection", async () => {
+    const service = createService(
+      makeProduct({
+        id: "prod-dev-simple-accessory",
+        slug: "dev-simple-accessory",
+        sku: "DEV-SIMPLE-ACC",
+        title: "[DEV] Simple Accessory",
+        productBehavior: "SIMPLE_PRODUCT",
+        packSize: null,
+        priceThb: 490,
+        priceMinor: 49000,
+        modifierGroups: [],
+      }),
+    );
+    const cart = await service.addItem(undefined, {
+      productId: "prod-dev-simple-accessory",
+      quantity: 3,
+      modifiers: [],
+    });
+    assert.equal(cart.items[0]?.productBehavior, "SIMPLE_PRODUCT");
+    assert.equal(cart.items[0]?.exactSelectionQuantity, null);
+    assert.equal(cart.items[0]?.quantity, 3);
+  });
+
+  it("Sprint 33B — FIXED_PACK ignores accidental exactSelectionQuantity groups", async () => {
+    const service = createService(
+      makeProduct({
+        id: "prod-dev-fixed-with-noise",
+        productBehavior: "FIXED_PACK",
+        packSize: 6,
+        modifierGroups: [
+          {
+            id: "should-not-apply",
+            title: "Noise",
+            requiredText: "Please select 8",
+            type: "quantity",
+            exactSelectionQuantity: 8,
+            required: true,
+            options: ["A", "B"],
+          },
+        ],
+      }),
+    );
+    const cart = await service.addItem(undefined, {
+      productId: "prod-dev-fixed-with-noise",
+      quantity: 1,
+      modifiers: [],
+    });
+    assert.equal(cart.items[0]?.exactSelectionQuantity, null);
+    assert.equal(cart.items[0]?.productBehavior, "FIXED_PACK");
   });
 });

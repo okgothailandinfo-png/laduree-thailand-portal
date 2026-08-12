@@ -3,6 +3,11 @@ import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import {
+  isDeliveryEligibleProduct,
+  snapshotProductBehavior,
+  usesExactSelection,
+} from "@/lib/product/product-behavior";
+import {
   createRuntimeDeliveryAvailabilityEngine,
   createRuntimeDeliveryFeeEngine,
   type DeliveryAvailabilityEngine,
@@ -243,7 +248,10 @@ export class DefaultCheckoutService {
     };
   }
 
-  private async buildCartItems(cartId: string): Promise<{
+  private async buildCartItems(
+    cartId: string,
+    serviceType: ServiceType = "PICKUP",
+  ): Promise<{
     items: OrderItem[];
     itemsMinor: number;
     itemCount: number;
@@ -274,19 +282,39 @@ export class DefaultCheckoutService {
         );
       }
 
-      const exactSelection = validateExactSelectionModifiers(
-        product.modifierGroups,
-        line.modifiers,
-        line.quantity,
-      );
-      if (!exactSelection.ok) {
-        throw new AppError("VALIDATION_ERROR", exactSelection.message, {
-          details: {
-            field: "cart.items",
-            code: exactSelection.code,
-            productId: product.id,
+      if (
+        serviceType === "DELIVERY" &&
+        !isDeliveryEligibleProduct(product)
+      ) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "One or more products are not available for delivery.",
+          {
+            details: {
+              field: "cart.items",
+              code: "DELIVERY_INELIGIBLE",
+              productId: product.id,
+            },
           },
-        });
+        );
+      }
+
+      if (usesExactSelection(product.productBehavior)) {
+        const exactSelection = validateExactSelectionModifiers(
+          product.modifierGroups,
+          line.modifiers,
+          line.quantity,
+        );
+        if (!exactSelection.ok) {
+          throw new AppError("VALIDATION_ERROR", exactSelection.message, {
+            details: {
+              field: "cart.items",
+              code: exactSelection.code,
+              productId: product.id,
+              productBehavior: product.productBehavior,
+            },
+          });
+        }
       }
 
       const requiredModifiers = validateRequiredModifierGroups(
@@ -323,6 +351,7 @@ export class DefaultCheckoutService {
         );
       }
 
+      const snapshot = snapshotProductBehavior(product);
       itemsMinor += unitPriceMinor * line.quantity;
       itemCount += line.quantity;
       items.push({
@@ -332,6 +361,10 @@ export class DefaultCheckoutService {
         modifiers: line.modifiers.map((modifier) => ({ ...modifier })),
         note: line.note,
         unitPriceMinor,
+        productBehavior: snapshot.productBehavior,
+        packSize: snapshot.packSize,
+        exactSelectionQuantity: snapshot.exactSelectionQuantity,
+        deliveryEligible: snapshot.deliveryEligible,
       });
     }
 
@@ -395,7 +428,10 @@ export class DefaultCheckoutService {
 
     await this.pickup.reserveSlotCapacity(slot.id);
 
-    const { items, itemsMinor, itemCount } = await this.buildCartItems(cartId);
+    const { items, itemsMinor, itemCount } = await this.buildCartItems(
+      cartId,
+      "PICKUP",
+    );
     const customerName =
       `${input.customer.firstName} ${input.customer.lastName}`.trim();
 
@@ -561,7 +597,10 @@ export class DefaultCheckoutService {
       timeSlotLabel = resolved.timeWindow.label;
     }
 
-    const { items, itemsMinor, itemCount } = await this.buildCartItems(cartId);
+    const { items, itemsMinor, itemCount } = await this.buildCartItems(
+      cartId,
+      "DELIVERY",
+    );
     const totalMinor = itemsMinor + quote.feeMinor;
     const customerName =
       `${input.customer.firstName} ${input.customer.lastName}`.trim();

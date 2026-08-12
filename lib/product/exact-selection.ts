@@ -90,12 +90,21 @@ export function formatSelectedOfRequired(selected: number, required: number): st
   return formatExactSelectionProgress(selected, required);
 }
 
+/**
+ * Generic exact-selection ceiling copy (product-agnostic).
+ * [OWNER APPROVAL] Confirm EN wording vs Singapore portal before Thailand launch.
+ */
 export function formatExactSelectionMaximumMessage(required: number): string {
-  return `You have selected the maximum of ${required} macarons.`;
+  return `You have selected the maximum of ${required}.`;
 }
 
+/**
+ * Generic incomplete exact-selection copy (product-agnostic).
+ * Progress strings (“Please select N”) remain Singapore-aligned.
+ * [OWNER APPROVAL] Confirm EN wording vs Singapore portal before Thailand launch.
+ */
 export function formatExactSelectionIncompleteMessage(required: number): string {
-  return `Please select all ${required} macarons before adding this box to your cart.`;
+  return `Please select all ${required} before adding this box to your cart.`;
 }
 
 export type ExactSelectionValidationResult =

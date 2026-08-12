@@ -15,8 +15,10 @@ import type {
   PaymentStatus as PrismaPaymentStatus,
   PickupSlot as PrismaPickupSlot,
   Product as PrismaProduct,
+  ProductBehavior as PrismaProductBehavior,
   ProductImage as PrismaProductImage,
 } from "@prisma/client";
+import { parseProductBehavior } from "@/lib/product/product-behavior";
 import { env } from "@/src/server/config/env";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Category } from "@/src/server/models/category";
@@ -38,8 +40,21 @@ import type { PickupAvailability, PickupTimeSlot } from "@/src/server/models/pic
 import type { Product } from "@/src/server/models/product";
 import { parseProductModifierGroups } from "@/src/server/repositories/prisma/product-modifiers";
 import type { CreateOrderPaymentDto } from "@/src/server/types/dto";
+import type { ProductBehavior } from "@/lib/product/product-behavior";
 
 const DEFAULT_IMAGE = "/product-placeholder.svg";
+
+export function toPrismaProductBehavior(
+  behavior: ProductBehavior,
+): PrismaProductBehavior {
+  return behavior;
+}
+
+export function toDomainProductBehavior(
+  behavior: PrismaProductBehavior | null | undefined,
+): ProductBehavior {
+  return parseProductBehavior(behavior, "SIMPLE_PRODUCT");
+}
 
 export function toDomainMedia(row: PrismaMedia): Media {
   return {
@@ -179,6 +194,9 @@ export function toDomainProduct(
     images,
     isActive: row.isActive,
     available: row.available,
+    deliveryEligible: row.deliveryEligible,
+    productBehavior: toDomainProductBehavior(row.productBehavior),
+    packSize: row.packSize ?? null,
     sortOrder: row.sortOrder,
     modifierGroups: parseProductModifierGroups(row.modifierGroupsJson),
   };
@@ -422,6 +440,12 @@ export function toDomainOrder(row: PrismaOrderWithRelations): Order {
       modifiers: parseModifiers(item.modifiers),
       note: item.note ?? undefined,
       unitPriceMinor: item.unitPriceMinor,
+      productBehavior: item.productBehavior
+        ? toDomainProductBehavior(item.productBehavior)
+        : null,
+      packSize: item.packSize ?? null,
+      exactSelectionQuantity: item.exactSelectionQuantity ?? null,
+      deliveryEligible: item.deliveryEligible ?? null,
     })),
     customer: {
       customerName: row.customer.customerName,
