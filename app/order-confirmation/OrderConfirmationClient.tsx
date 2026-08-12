@@ -242,7 +242,7 @@ export default function OrderConfirmationClient({
       : DEFAULT_MOCK_DELIVERY_TRACKING_STATUS;
 
     return (
-      <main className="order-confirmation-page">
+      <main className="order-confirmation-page" id="main-content" tabIndex={-1}>
         <div className="order-confirmation-page__inner">
           <div className="order-confirmation-page__top">
             <Link href="/" className="order-confirmation-page__back">
@@ -556,7 +556,7 @@ export default function OrderConfirmationClient({
 
   // Sprint 28 — confirmation requires a tokenized server order.
   return (
-    <main className="order-confirmation-page">
+    <main className="order-confirmation-page" id="main-content" tabIndex={-1}>
       <div className="order-confirmation-page__inner">
         <div className="order-confirmation-page__top">
           <Link href="/" className="order-confirmation-page__back">

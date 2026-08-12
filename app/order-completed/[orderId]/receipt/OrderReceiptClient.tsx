@@ -71,7 +71,7 @@ export default function OrderReceiptClient({
   }
 
   return (
-    <main className="order-receipt-page">
+    <main className="order-receipt-page" id="main-content" tabIndex={-1}>
       <div className="order-receipt-page__inner">
         <div className="order-receipt-toolbar no-print">
           <Link

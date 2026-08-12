@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import {
+  isFocusableElement,
+  trapTabKey,
+} from "@/lib/a11y/dialog-focus";
 import CatalogStatus from "../catalog/CatalogStatus";
 import DeliveryModeSelector from "./DeliveryModeSelector";
 import PickupOutletList from "./PickupOutletList";
@@ -95,6 +99,7 @@ export default function PickupSelectionModal() {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   const isDelivery = draft.serviceType === "DELIVERY";
   const isPreorder = isDelivery && draft.deliveryMode === "PREORDER";
@@ -103,10 +108,18 @@ export default function PickupSelectionModal() {
     if (!isOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    if (isFocusableElement(document.activeElement)) {
+      previouslyFocusedRef.current = document.activeElement;
+    }
     const t = window.setTimeout(() => backRef.current?.focus(), 0);
     return () => {
       document.body.style.overflow = previous;
       window.clearTimeout(t);
+      const restore = previouslyFocusedRef.current;
+      previouslyFocusedRef.current = null;
+      if (restore && document.contains(restore)) {
+        restore.focus();
+      }
     };
   }, [isOpen]);
 
@@ -118,19 +131,8 @@ export default function PickupSelectionModal() {
         closePickupSelection();
         return;
       }
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+      if (panelRef.current) {
+        trapTabKey(event, panelRef.current);
       }
     };
     document.addEventListener("keydown", onKeyDown);

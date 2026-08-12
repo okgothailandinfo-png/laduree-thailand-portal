@@ -7,6 +7,19 @@
 | **Method** | Downloaded homepage HTML; downloaded linked CSS assets with version query strings from HTML `href`s; extracted tokens only from those files and inline `:root` / `@font-face` in the homepage. No invented values. Uncertain items marked **TODO**. |
 | **Asset version query** | `?v=27.20260706-124` (where present on hrefs) |
 
+## Sprint 33A brand canvas tokens (OWNER CONFIRMATION)
+
+Global Website Guidelines call for a **white-background** direction. Singapore portal page canvas is cream `#fdf8ec`. Until the owner confirms which canvas applies to Thailand:
+
+| Token | Current value | Role |
+| --- | --- | --- |
+| `--sg-page-canvas-cream` | `#fdf8ec` | Singapore verified page canvas |
+| `--brand-page-canvas-white` | `#ffffff` | Global white candidate |
+| `--brand-page-canvas` | `var(--sg-page-canvas-cream)` | Active page canvas (flip to white only after owner approval) |
+| `--surface` / `--color-white` | `#ffffff` | Cards, drawers, chrome |
+
+Do not invent additional brand colors or logo assets. Approved logo path remains `/logo.jpg` pending brand confirmation.
+
 ## CSS assets reviewed
 
 | File | Path | Status |

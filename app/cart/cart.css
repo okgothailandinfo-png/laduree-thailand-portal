@@ -394,7 +394,7 @@
   flex: 0 0 auto;
   height: min(92dvh, 100%);
   max-height: 92dvh;
-  background: #fff;
+  background: var(--color-white, #ffffff);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
   overflow: hidden;
@@ -425,8 +425,10 @@
 }
 
 .cart-drawer-sheet .cart-drawer-close {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: var(--touch-target-min, 44px);
+  min-height: var(--touch-target-min, 44px);
   padding: 0;
   color: #333;
   font-size: 24px;
@@ -434,6 +436,11 @@
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+.cart-drawer-sheet .cart-drawer-close:focus-visible {
+  outline: 2px solid var(--main-color, #84754e);
+  outline-offset: 2px;
 }
 
 .cart-drawer-pickup {

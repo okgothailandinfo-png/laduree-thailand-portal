@@ -25,7 +25,7 @@ export default function AccountPageClient() {
 
   if (!ready || !isAuthenticated) {
     return (
-      <main className="account-page">
+      <main className="account-page" id="main-content" tabIndex={-1}>
         <div className="account-page__inner">
           <h1 className="account-page__title">My Account</h1>
         </div>
@@ -34,7 +34,7 @@ export default function AccountPageClient() {
   }
 
   return (
-    <main className="account-page">
+    <main className="account-page" id="main-content" tabIndex={-1}>
       <div className="account-page__inner">
         <Link href="/" className="account-page__back">
           ← Back

@@ -28,7 +28,7 @@ function SignInForm() {
 
   if (isAuthenticated) {
     return (
-      <main className="sign-in-page">
+      <main className="sign-in-page" id="main-content" tabIndex={-1}>
         <div className="sign-in-page__inner">
           <Link href="/" className="sign-in-page__back">
             ← Back
@@ -74,7 +74,7 @@ function SignInForm() {
   }
 
   return (
-    <main className="sign-in-page">
+    <main className="sign-in-page" id="main-content" tabIndex={-1}>
       <div className="sign-in-page__inner">
         <Link href="/" className="sign-in-page__back">
           ← Back
@@ -205,7 +205,7 @@ export default function SignInPageClient() {
   return (
     <Suspense
       fallback={
-        <main className="sign-in-page">
+        <main className="sign-in-page" id="main-content" tabIndex={-1}>
           <div className="sign-in-page__inner">
             <h1 className="sign-in-page__title">Sign In</h1>
           </div>

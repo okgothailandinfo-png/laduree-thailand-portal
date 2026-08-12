@@ -65,7 +65,7 @@ export default function OrderHistoryClient() {
 
   if (!ready) {
     return (
-      <main className="order-history-page">
+      <main className="order-history-page" id="main-content" tabIndex={-1}>
         <div className="order-history-page__inner">
           <h1 className="order-completed-page__title">Order History</h1>
         </div>
@@ -77,7 +77,7 @@ export default function OrderHistoryClient() {
     historyQuery.status === "loading" || historyQuery.status === "error";
 
   return (
-    <main className="order-history-page">
+    <main className="order-history-page" id="main-content" tabIndex={-1}>
       <div className="order-history-page__inner">
         <div className="order-completed-page__top">
           <Link href="/" className="order-completed-page__back">

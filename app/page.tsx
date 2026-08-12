@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import LanguageSwitcher from "./a11y/LanguageSwitcher";
+import PendingNavControl from "./a11y/PendingNavControl";
 import CatalogStatus from "./catalog/CatalogStatus";
 import { useAsyncResource } from "./catalog/useAsyncResource";
 import DesktopCartAside from "./cart/DesktopCartAside";
@@ -303,11 +305,29 @@ export default function Home() {
     };
   }, [mobileMenuOpen]);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileMenuOpen]);
+
   const activeHeroIndex =
     heroSlides.length > 0 ? activeSlide % heroSlides.length : 0;
 
   useEffect(() => {
     if (sliderPaused || heroSlides.length <= 1) return;
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
     const timer = window.setInterval(() => {
       setActiveSlide((current) => (current + 1) % heroSlides.length);
     }, HOME_SLIDER_AUTOPLAY_MS);
@@ -316,6 +336,12 @@ export default function Home() {
 
   useEffect(() => {
     if (FOOTER_SLIDES.length <= 1) return;
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
     const timer = window.setInterval(() => {
       setFooterSlide((current) => (current + 1) % FOOTER_SLIDES.length);
     }, FOOTER_SLIDER_AUTOPLAY_MS);
@@ -356,6 +382,7 @@ export default function Home() {
                       : brandDisplayName}
                   </h1>
                   <div className="header-member">
+                    <LanguageSwitcher className="language-switcher--desktop" />
                     <AccountMenu triggerClassName="btn-login btn-login-desktop" />
                   </div>
                 </div>
@@ -405,20 +432,10 @@ export default function Home() {
                         </div>
                       </li>
                       <li>
-                        <a
-                          href="#recommended"
-                          onClick={(e) => e.preventDefault()}
-                        >
-                          RECOMMENDED
-                        </a>
+                        <PendingNavControl label="RECOMMENDED" />
                       </li>
                       <li>
-                        <a
-                          href="#about-us"
-                          onClick={(e) => e.preventDefault()}
-                        >
-                          About Us
-                        </a>
+                        <PendingNavControl label="About Us" />
                       </li>
                     </ul>
                   </nav>
@@ -463,12 +480,14 @@ export default function Home() {
                   className={`navbar-toggle${mobileMenuOpen ? " is-open" : ""}`}
                   aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
                   aria-expanded={mobileMenuOpen}
+                  aria-controls="menu-mb"
                   onClick={() => setMobileMenuOpen((open) => !open)}
                 >
                   <span className="icon-bar" />
                   <span className="icon-bar" />
                   <span className="icon-bar" />
                 </button>
+                <LanguageSwitcher className="language-switcher--mobile" />
                 <AccountMenu triggerClassName="btn-login btn-login-mobile" />
               </div>
 
@@ -578,9 +597,12 @@ export default function Home() {
         </div>
 
         {/* Mobile off-canvas navigation */}
-        <div
+        <button
+          type="button"
           className={`menu-mb-backdrop${mobileMenuOpen ? " is-open" : ""}`}
           onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu"
+          tabIndex={mobileMenuOpen ? 0 : -1}
           aria-hidden={!mobileMenuOpen}
         />
         <nav
@@ -588,6 +610,7 @@ export default function Home() {
           className={`menu-mb${mobileMenuOpen ? " is-open" : ""}`}
           aria-label="Mobile"
           aria-hidden={!mobileMenuOpen}
+          {...(!mobileMenuOpen ? { inert: true } : {})}
         >
           <div className="menu-mb-inner">
             <ul className="menu-mb-links list-3">
@@ -597,37 +620,13 @@ export default function Home() {
                 </Link>
               </li>
               <li>
-                <a
-                  href="#recommended"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setMobileMenuOpen(false);
-                  }}
-                >
-                  <span>Recommended</span>
-                </a>
+                <PendingNavControl label="Recommended" wrapLabel />
               </li>
               <li>
-                <a
-                  href="#promotions"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setMobileMenuOpen(false);
-                  }}
-                >
-                  <span>Promotions</span>
-                </a>
+                <PendingNavControl label="Promotions" wrapLabel />
               </li>
               <li>
-                <a
-                  href="#about-us"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setMobileMenuOpen(false);
-                  }}
-                >
-                  <span>About Us</span>
-                </a>
+                <PendingNavControl label="About Us" wrapLabel />
               </li>
             </ul>
             <div className="menu-mb-categories-block">
@@ -654,7 +653,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="home-main">
+      <main id="main-content" className="home-main" tabIndex={-1}>
         <section id="main-slide" className="block slider-block">
           <div className="container-fluid">
             {homepage.status === "loading" || homepage.status === "error" ? (
@@ -1030,7 +1029,7 @@ export default function Home() {
                                         <img
                                           className="img-responsive-2"
                                           src={product.imagePlaceholder}
-                                          alt=""
+                                          alt={product.title}
                                         />
                                       </span>
                                     </div>
@@ -1146,13 +1145,7 @@ export default function Home() {
           <div className="container-fluid">
             <ul className="list-inline footer-menu">
               <li>
-                <a
-                  href="#allergen-information"
-                  title="Allergen Information"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  Allergen Information
-                </a>
+                <PendingNavControl label="Allergen Information" />
               </li>
             </ul>
             <ul className="list-inline socials" />

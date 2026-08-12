@@ -24,7 +24,7 @@ export default function SavedAddressesPageClient() {
 
   if (!ready || !isAuthenticated) {
     return (
-      <main className="account-page">
+      <main className="account-page" id="main-content" tabIndex={-1}>
         <div className="account-page__inner">
           <h1 className="account-page__title">Saved Addresses</h1>
         </div>
@@ -33,7 +33,7 @@ export default function SavedAddressesPageClient() {
   }
 
   return (
-    <main className="account-page">
+    <main className="account-page" id="main-content" tabIndex={-1}>
       <div className="account-page__inner">
         <Link href="/account" className="account-page__back">
           ← Back
