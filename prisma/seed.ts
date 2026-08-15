@@ -1,49 +1,40 @@
 /**
- * Development seed only — placeholder catalog/ops data.
- * Not production Thailand pricing, legal copy, or real customer data.
+ * Development seed — Thailand Product Master Safe-Draft (Sprint 33C).
+ * Not production pricing, live availability, or approved delivery eligibility.
  * Rerunnable via upsert on unique keys.
  *
  * Run: npm run db:seed
  * Refused when APP_ENV=production (Sprint 31 fail-closed).
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type ProductBehavior } from "@prisma/client";
+import { assertThailandCatalogReady } from "../lib/catalog/thailand-product-import";
 import { assertDatabaseSeedAllowed } from "../src/server/hardening/deploy-readiness";
-import { MOCK_PRODUCTS } from "../src/server/repositories/mock/data";
 
 assertDatabaseSeedAllowed();
 
 const prisma = new PrismaClient();
+const catalog = assertThailandCatalogReady();
 
-/** Modifier/allergen structure from mock catalog — do not invent Thailand copy. */
-const MOCK_MACARON_REFERENCE = MOCK_PRODUCTS[0]!;
+/** Deterministic UUID v5-like for rerunnable seed keys (not cryptographic). */
+function stableUuid(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const hex = seed
+    .split("")
+    .reduce((acc, ch) => acc + ch.charCodeAt(0).toString(16).padStart(2, "0"), "")
+    .padEnd(32, "0")
+    .slice(0, 32)
+    .replace(/[^0-9a-f]/gi, "a")
+    .toLowerCase();
+  // Mix hash into first segment for uniqueness across short seeds.
+  const mixed = (hash.toString(16).padStart(8, "0") + hex).slice(0, 32);
+  return `${mixed.slice(0, 8)}-${mixed.slice(8, 12)}-4${mixed.slice(13, 16)}-a${mixed.slice(17, 20)}-${mixed.slice(20, 32)}`;
+}
 
-/** Stable UUIDs so seed upserts remain idempotent. */
 const IDS = {
-  categories: {
-    macarons: "11111111-1111-4111-8111-111111111101",
-    chocolates: "11111111-1111-4111-8111-111111111102",
-    tea: "11111111-1111-4111-8111-111111111103",
-    giftBoxes: "11111111-1111-4111-8111-111111111104",
-  },
-  products: {
-    placeholderMacaron: "22222222-2222-4222-8222-222222222201",
-    placeholderChocolate: "22222222-2222-4222-8222-222222222202",
-    placeholderTea: "22222222-2222-4222-8222-222222222203",
-    placeholderGift: "22222222-2222-4222-8222-222222222204",
-  },
-  media: {
-    macaron: "55555555-5555-4555-8555-555555555501",
-    chocolate: "55555555-5555-4555-8555-555555555502",
-    tea: "55555555-5555-4555-8555-555555555503",
-    gift: "55555555-5555-4555-8555-555555555504",
-  },
-  images: {
-    macaron: "33333333-3333-4333-8333-333333333301",
-    chocolate: "33333333-3333-4333-8333-333333333302",
-    tea: "33333333-3333-4333-8333-333333333303",
-    gift: "33333333-3333-4333-8333-333333333304",
-  },
   boutiques: {
     flagship: "44444444-4444-4444-8444-444444444401",
     embassy: "44444444-4444-4444-8444-444444444402",
@@ -71,47 +62,22 @@ function bangkokDateKeys(count = 3): string[] {
 }
 
 async function seedCategories() {
-  const definitions = [
-    {
-      id: IDS.categories.macarons,
-      name: "Macarons",
-      slug: "macarons",
-      description: null as string | null,
-      sortOrder: 1,
-      isActive: true,
-    },
-    {
-      id: IDS.categories.chocolates,
-      name: "Chocolates",
-      slug: "chocolates",
-      description: null as string | null,
-      sortOrder: 2,
-      isActive: true,
-    },
-    {
-      id: IDS.categories.tea,
-      name: "Tea",
-      slug: "tea",
-      description: null as string | null,
-      sortOrder: 3,
-      isActive: true,
-    },
-    {
-      id: IDS.categories.giftBoxes,
-      name: "Gift Boxes",
-      slug: "gift-boxes",
-      description: null as string | null,
-      sortOrder: 4,
-      isActive: true,
-    },
-  ] as const;
-
   const bySlug = new Map<string, string>();
 
-  for (const category of definitions) {
+  for (const category of catalog.categories) {
+    if (category.slug === "all-items") {
+      // Browse aggregate is storefront-only; skip Prisma category row.
+      continue;
+    }
     const row = await prisma.category.upsert({
       where: { slug: category.slug },
-      create: category,
+      create: {
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        sortOrder: category.sortOrder,
+        isActive: category.isActive,
+      },
       update: {
         name: category.name,
         description: category.description,
@@ -126,175 +92,98 @@ async function seedCategories() {
 }
 
 async function seedProducts(categoryIds: Map<string, string>) {
-  const definitions = [
-    {
-      id: IDS.products.placeholderMacaron,
-      categorySlug: "macarons",
-      slug: "dev-placeholder-macaron-box",
-      sku: "DEV-MACARON-BOX",
-      title: "[DEV] Placeholder Macaron Box",
-      description: [
-        "[CONTENT PENDING APPROVAL] Development placeholder product description.",
-      ],
-      storageLabel: "Storage Information:",
-      storageText: "[CONTENT PENDING APPROVAL]",
-      priceMinor: 129000,
-      sortOrder: 1,
-      mediaId: IDS.media.macaron,
-      imageId: IDS.images.macaron,
-    },
-    {
-      id: IDS.products.placeholderChocolate,
-      categorySlug: "chocolates",
-      slug: "dev-placeholder-chocolate-selection",
-      sku: "DEV-CHOCOLATE-SEL",
-      title: "[DEV] Placeholder Chocolate Selection",
-      description: [
-        "[CONTENT PENDING APPROVAL] Development placeholder product description.",
-      ],
-      storageLabel: "Storage Information:",
-      storageText: "[CONTENT PENDING APPROVAL]",
-      priceMinor: 159000,
-      sortOrder: 2,
-      mediaId: IDS.media.chocolate,
-      imageId: IDS.images.chocolate,
-    },
-    {
-      id: IDS.products.placeholderTea,
-      categorySlug: "tea",
-      slug: "dev-placeholder-tea-tin",
-      sku: "DEV-TEA-TIN",
-      title: "[DEV] Placeholder Tea Tin",
-      description: [
-        "[CONTENT PENDING APPROVAL] Development placeholder product description.",
-      ],
-      storageLabel: "Storage Information:",
-      storageText: "[CONTENT PENDING APPROVAL]",
-      priceMinor: 89000,
-      sortOrder: 3,
-      mediaId: IDS.media.tea,
-      imageId: IDS.images.tea,
-    },
-    {
-      id: IDS.products.placeholderGift,
-      categorySlug: "gift-boxes",
-      slug: "dev-placeholder-gift-box",
-      sku: "DEV-GIFT-BOX",
-      title: "[DEV] Placeholder Gift Box",
-      description: [
-        "[CONTENT PENDING APPROVAL] Development placeholder product description.",
-      ],
-      storageLabel: "Storage Information:",
-      storageText: "[CONTENT PENDING APPROVAL]",
-      priceMinor: 199000,
-      sortOrder: 4,
-      mediaId: IDS.media.gift,
-      imageId: IDS.images.gift,
-    },
-  ] as const;
-
-  for (const product of definitions) {
-    const categoryId = categoryIds.get(product.categorySlug);
-    if (!categoryId) {
-      throw new Error(`Missing seeded category: ${product.categorySlug}`);
+  for (const product of catalog.products) {
+    const categorySlug = catalog.categories.find(
+      (c) => c.id === product.categoryId,
+    )?.slug;
+    if (!categorySlug) {
+      throw new Error(`Missing category for product ${product.sku}`);
     }
-
-    const isMacaronPlaceholder =
-      product.id === IDS.products.placeholderMacaron;
-    const isTeaPlaceholder = product.id === IDS.products.placeholderTea;
-    const allergenLabel = isMacaronPlaceholder
-      ? MOCK_MACARON_REFERENCE.allergenLabel
-      : null;
-    const allergenText = isMacaronPlaceholder
-      ? MOCK_MACARON_REFERENCE.allergenText
-      : null;
-    const modifierGroupsJson = isMacaronPlaceholder
-      ? MOCK_MACARON_REFERENCE.modifierGroups
-      : [];
-    const productBehavior = isMacaronPlaceholder
-      ? ("CONFIGURABLE_BOX" as const)
-      : isTeaPlaceholder
-        ? ("FIXED_PACK" as const)
-        : ("SIMPLE_PRODUCT" as const);
-    const packSize = isMacaronPlaceholder ? 8 : isTeaPlaceholder ? 12 : null;
+    const categoryId = categoryIds.get(categorySlug);
+    if (!categoryId) {
+      throw new Error(`Missing seeded category: ${categorySlug}`);
+    }
 
     const row = await prisma.product.upsert({
       where: { slug: product.slug },
       create: {
-        id: product.id,
         categoryId,
         slug: product.slug,
         sku: product.sku,
         title: product.title,
         description: [...product.description],
-        allergenLabel,
-        allergenText,
+        allergenLabel: product.allergenLabel,
+        allergenText: product.allergenText,
         storageLabel: product.storageLabel,
-        storageText: product.storageText,
+        storageText: product.storageText || null,
         priceMinor: product.priceMinor,
         currency: "THB",
-        isActive: true,
-        available: true,
-        deliveryEligible: true,
-        productBehavior,
-        packSize,
+        isActive: product.isActive,
+        available: product.available,
+        deliveryEligible: product.deliveryEligible,
+        productBehavior: product.productBehavior as ProductBehavior,
+        packSize: product.packSize,
         sortOrder: product.sortOrder,
-        modifierGroupsJson,
+        modifierGroupsJson: product.modifierGroups,
       },
       update: {
         categoryId,
         sku: product.sku,
         title: product.title,
         description: [...product.description],
-        allergenLabel,
-        allergenText,
+        allergenLabel: product.allergenLabel,
+        allergenText: product.allergenText,
         storageLabel: product.storageLabel,
-        storageText: product.storageText,
+        storageText: product.storageText || null,
         priceMinor: product.priceMinor,
         currency: "THB",
-        isActive: true,
-        available: true,
-        deliveryEligible: true,
-        productBehavior,
-        packSize,
+        isActive: product.isActive,
+        available: product.available,
+        deliveryEligible: product.deliveryEligible,
+        productBehavior: product.productBehavior as ProductBehavior,
+        packSize: product.packSize,
         sortOrder: product.sortOrder,
-        modifierGroupsJson,
+        modifierGroupsJson: product.modifierGroups,
       },
     });
 
+    const mediaId = stableUuid(`media:${product.sku}`);
+    const imageId = stableUuid(`image:${product.sku}`);
+    const altText = product.images[0]?.altText ?? product.title;
+
     await prisma.media.upsert({
-      where: { id: product.mediaId },
+      where: { id: mediaId },
       create: {
-        id: product.mediaId,
+        id: mediaId,
         url: "/product-placeholder.svg",
-        altText: `${product.title} placeholder image`,
+        altText: `${altText} (placeholder)`,
         title: product.title,
         isActive: true,
       },
       update: {
         url: "/product-placeholder.svg",
-        altText: `${product.title} placeholder image`,
+        altText: `${altText} (placeholder)`,
         title: product.title,
         isActive: true,
       },
     });
 
     await prisma.productImage.upsert({
-      where: { id: product.imageId },
+      where: { id: imageId },
       create: {
-        id: product.imageId,
+        id: imageId,
         productId: row.id,
-        mediaId: product.mediaId,
+        mediaId,
         url: "/product-placeholder.svg",
-        altText: `${product.title} placeholder image`,
+        altText: `${altText} (placeholder)`,
         sortOrder: 0,
         isPrimary: true,
       },
       update: {
         productId: row.id,
-        mediaId: product.mediaId,
+        mediaId,
         url: "/product-placeholder.svg",
-        altText: `${product.title} placeholder image`,
+        altText: `${altText} (placeholder)`,
         sortOrder: 0,
         isPrimary: true,
       },
@@ -350,7 +239,6 @@ async function seedBoutiques() {
 }
 
 async function seedPickupSlots(boutiqueIds: string[]) {
-  // Match storefront candidate window (7 Asia/Bangkok calendar days).
   const dateKeys = bangkokDateKeys(7);
 
   const templates = [
@@ -364,7 +252,6 @@ async function seedPickupSlots(boutiqueIds: string[]) {
       startTime: "10:30",
       endTime: "11:00",
       label: "10:30–11:00",
-      /** Fully reserved / unavailable for smoke filtering */
       capacity: 0,
     },
     {
@@ -509,14 +396,14 @@ async function seedHomepageCms() {
 }
 
 async function main() {
-  console.log("Seeding development placeholder data…");
+  console.log("Seeding Thailand Product Master Safe-Draft (Sprint 33C)…");
   const categoryIds = await seedCategories();
   await seedProducts(categoryIds);
   const boutiqueIds = await seedBoutiques();
   await seedPickupSlots(boutiqueIds);
   await seedHomepageCms();
   console.log(
-    "Seed complete (categories, products, images, boutiques, slots, homepage CMS).",
+    `Seed complete: ${catalog.products.length} LDR products, Thailand categories, boutiques, slots, homepage CMS.`,
   );
 }
 

@@ -92,7 +92,7 @@ function toCartItems(items: ApiCartItem[]): CartItem[] {
     exactSelectionQuantity: item.exactSelectionQuantity ?? null,
     productBehavior: item.productBehavior ?? null,
     packSize: item.packSize ?? null,
-    deliveryEligible: item.deliveryEligible !== false,
+    deliveryEligible: item.deliveryEligible === true,
     unitPriceThb: item.unitPriceThb ?? null,
     unitPriceMinor: item.unitPriceMinor ?? null,
     lineTotalThb: item.lineTotalThb ?? null,

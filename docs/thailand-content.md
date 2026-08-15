@@ -56,11 +56,13 @@ Do not invent customer-facing copy. Use TODO for information not yet approved.
 - Pickup verification: QR Code and Pickup Code, subject to approval
 
 ## Product Data
-- Thailand product catalogue: TODO
-- Thailand prices:
-  - « Napoléon III » Macaron - 8pcs: ฿990 (approved)
-- Thailand availability: TODO
+- Thailand product catalogue: **Sprint 33C Safe-Draft** — owner Product Master LDR001–LDR038 (`data/thailand-product-master.ts`)
+- Status: Draft (inactive / non-purchasable) until owner activates
+- Thailand prices: all `n/a` → null (non-purchasable). Do **not** use legacy « Napoléon III » ฿990 as an automatic LDR price.
+- Thailand availability: unresolved / Draft → unavailable (fail-closed)
+- Delivery eligibility: unresolved → ineligible (fail-closed); workbook Delivery=1 is not an approved delivery promise
 - Allergen information: TODO (storefront currently uses Singapore referral wording pending Thailand approval)
+- Configurable options (`MACARON_FLAVORS` / `EUGENIE_FLAVORS`): pending owner lists — architecture imported, SKUs non-purchasable
 
 ## Product Detail / Ordering Content Pending Approval
 - Pickup handling acknowledgement title (mock currently marked `[CONTENT PENDING APPROVAL]`)

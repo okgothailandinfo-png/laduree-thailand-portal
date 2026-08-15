@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
@@ -274,11 +275,31 @@ export class DefaultCheckoutService {
 
     for (const line of cart.items) {
       const product = await this.products.findById(line.productId);
-      if (!product || !product.available) {
+      if (!product) {
         throw new AppError(
           "VALIDATION_ERROR",
           `Product unavailable: ${line.productId}`,
           { details: { field: "cart.items", productId: line.productId } },
+        );
+      }
+
+      const purchasability = evaluateProductPurchasability(product);
+      if (!purchasability.purchasable) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          purchasability.reasons.includes("PRICE_UNAVAILABLE")
+            ? "Price unavailable for one or more products."
+            : `Product unavailable: ${line.productId}`,
+          {
+            details: {
+              field: "cart.items",
+              code: purchasability.reasons.includes("PRICE_UNAVAILABLE")
+                ? "PRICE_UNAVAILABLE"
+                : "PRODUCT_UNAVAILABLE",
+              productId: product.id,
+              reasons: purchasability.reasons,
+            },
+          },
         );
       }
 
