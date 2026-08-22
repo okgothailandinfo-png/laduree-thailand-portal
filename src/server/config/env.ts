@@ -72,6 +72,24 @@ export function isProductionBuildPhase(): boolean {
   );
 }
 
+/**
+ * Vercel Production ≠ live commerce. APP_ENV must be explicit on Vercel
+ * (preview for Public Preview; production only when live commerce is authorized).
+ */
+export function assertVercelAppEnvExplicit(
+  env: NodeJS.ProcessEnv = process.env,
+  buildPhase: boolean = isProductionBuildPhase(),
+): void {
+  if (env.VERCEL !== "1") return;
+  if (buildPhase) return;
+  const raw = env.APP_ENV?.trim();
+  if (!raw) {
+    throw new EnvValidationError(
+      "Vercel deployments require APP_ENV to be set explicitly. Use APP_ENV=preview for Public Preview. Do not treat Vercel Production as live commerce.",
+    );
+  }
+}
+
 function resolveNodeEnv(value: string | undefined): ServerEnv["nodeEnv"] {
   if (value === "production" || value === "test") return value;
   return "development";
@@ -314,8 +332,9 @@ function requireSecret(value: string | undefined, name: string): string {
 
 function loadEnv(): ServerEnv {
   const nodeEnv = resolveNodeEnv(process.env.NODE_ENV);
-  const appEnv = resolveAppEnv(nodeEnv, process.env.APP_ENV);
   const buildPhase = isProductionBuildPhase();
+  assertVercelAppEnvExplicit(process.env, buildPhase);
+  const appEnv = resolveAppEnv(nodeEnv, process.env.APP_ENV);
   const allowsMockProviders =
     buildPhase ||
     appEnv === "development" ||

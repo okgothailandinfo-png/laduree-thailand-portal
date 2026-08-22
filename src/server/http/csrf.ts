@@ -46,7 +46,14 @@ export function assertCsrfOrigin(request: Request): void {
 function allowedOrigins(): Set<string> {
   const set = new Set<string>();
   try {
-    set.add(new URL(env.appBaseUrl).origin);
+    const base = new URL(env.appBaseUrl);
+    set.add(base.origin);
+    if (base.hostname === "ok-go.cloud") {
+      set.add("https://www.ok-go.cloud");
+    }
+    if (base.hostname === "www.ok-go.cloud") {
+      set.add("https://ok-go.cloud");
+    }
   } catch {
     // ignore invalid base
   }

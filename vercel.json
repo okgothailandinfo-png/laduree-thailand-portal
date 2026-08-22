@@ -1,0 +1,18 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npx prisma generate && next build",
+  "installCommand": "npm ci",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.ok-go.cloud"
+        }
+      ],
+      "destination": "https://ok-go.cloud/:path*",
+      "permanent": true
+    }
+  ]
+}
