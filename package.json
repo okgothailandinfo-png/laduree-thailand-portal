@@ -2,11 +2,15 @@
   "name": "okgo-pickup-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
     "test:pickup": "tsx --test app/a11y/*.test.ts app/pickup/*.test.ts app/cart/*.test.ts app/checkout/*.test.ts app/product/*.test.ts app/payment/*.test.ts lib/product/*.test.ts lib/catalog/*.test.ts lib/consent/*.test.ts lib/seo/*.test.ts lib/preview/*.test.ts lib/customer/*.test.ts lib/payment/*.test.ts lib/orders/*.test.ts src/server/services/cart.service.test.ts src/server/services/checkout.service.test.ts src/server/repositories/mock/pickup.repository.test.ts src/server/repositories/mock/payment.repository.test.ts src/server/repositories/mock/order.repository.test.ts src/server/repositories/mock/webhook-event.repository.test.ts src/server/repositories/prisma/*.test.ts src/server/repositories/smoke/*.test.ts src/server/delivery/*.test.ts src/server/orders/*.test.ts src/server/admin/oidc/*.test.ts src/server/http/*.test.ts src/server/hardening/*.test.ts src/server/preview/*.test.ts",
     "prisma:format": "prisma format",
     "prisma:validate": "prisma validate",
@@ -23,7 +27,7 @@
     "smoke:security": "tsx src/server/hardening/smoke/run-security-smoke.ts",
     "smoke:webhook": "tsx src/server/payment/webhook/run-webhook-smoke.ts",
     "smoke:deploy": "tsx src/server/hardening/smoke/run-deploy-smoke.ts",
-    "smoke:preview": "tsx --test app/a11y/sprint-34-public-preview.test.ts lib/preview/*.test.ts src/server/preview/*.test.ts"
+    "smoke:preview": "tsx --test app/a11y/sprint-34-public-preview.test.ts app/a11y/sprint-34b-vercel.test.ts lib/preview/*.test.ts src/server/preview/*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

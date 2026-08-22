@@ -2,6 +2,8 @@
  * Storefront indexing policy — fail-closed until live commerce is authorized.
  *
  * STOREFRONT_INDEXING=live is required in addition to APP_ENV=production.
+ * Vercel Production (VERCEL_ENV=production) is not live commerce and does not
+ * enable indexing by itself.
  * Safe-Draft / staging / development / public preview never emit public SEO inventory.
  */
 

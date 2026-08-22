@@ -564,7 +564,7 @@ describe("Sprint 34 — TEST 13 preview does not require a production PSP", () =
     assert.match(envExample, /APP_ENV=preview/);
     assert.match(envExample, /PAYMENT_PROVIDER=mock/);
     assert.match(envExample, /STOREFRONT_INDEXING=/);
-    assert.match(envExample, /REPLACE-WITH-OWNER-DOMAIN/);
+    assert.match(envExample, /https:\/\/ok-go\.cloud/);
     assert.doesNotMatch(envExample, /omise|2c2p|stripe|paypal/i);
 
     const envSource = readFileSync(
