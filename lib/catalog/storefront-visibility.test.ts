@@ -55,6 +55,14 @@ describe("Sprint 33D — storefront visibility", () => {
       isStorefrontUnavailableDisplay({ available: true, priceThb: 1290 }),
       false,
     );
+    assert.equal(
+      isStorefrontUnavailableDisplay({ available: true, priceThb: 0 }),
+      true,
+    );
+  });
+
+  it("allows Thailand master draft PDPs in public preview", () => {
+    assert.equal(isStorefrontPdpVisible(draft, "preview"), true);
   });
 
   it("maps All Items to /Category", () => {

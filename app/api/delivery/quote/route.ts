@@ -10,6 +10,7 @@ import {
   createRuntimeDeliveryFeeEngine,
 } from "@/src/server/delivery/runtime";
 import type { DeliveryFeeQuoteInput } from "@/src/server/models/delivery";
+import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
 import { AppError } from "@/src/server/utils/errors";
 import { requireObject, requireString } from "@/src/server/utils/validation";
 
@@ -50,6 +51,7 @@ function parseQuoteAddress(raw: unknown): DeliveryFeeQuoteInput["address"] {
 /** POST /api/delivery/quote — zone fee + earliest promise + pre-order catalog. */
 export async function POST(request: Request) {
   return handleApi(async () => {
+    assertPublicPreviewCommerceAllowed();
     let raw: unknown;
     try {
       raw = await request.json();

@@ -4,6 +4,7 @@ import {
   MOCK_ADMIN_SESSION_VALUE,
 } from "@/lib/admin/session";
 import { toErrorResponse } from "@/src/server/api/responses";
+import { isPublicPreview, PUBLIC_PREVIEW_ADMIN_CODE } from "@/lib/preview/public-preview";
 import { env } from "@/src/server/config/env";
 import { assertCsrfOrigin } from "@/src/server/http/csrf";
 import {
@@ -25,6 +26,13 @@ export async function POST(request: Request) {
   const requestId = createRequestId(request.headers.get(REQUEST_ID_HEADER));
   return runWithRequestContext(requestId, async () => {
     try {
+      if (isPublicPreview()) {
+        throw new AppError(
+          "FORBIDDEN",
+          "Admin is not available.",
+          { status: 403, details: { code: PUBLIC_PREVIEW_ADMIN_CODE } },
+        );
+      }
       if (env.isStrictProduction) {
         throw new AppError(
           "CONFIG_ERROR",

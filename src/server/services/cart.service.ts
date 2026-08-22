@@ -7,6 +7,7 @@ import {
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
 import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
+import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
 import {
   resolveExactSelectionQuantityForBehavior,
   snapshotProductBehavior,
@@ -203,6 +204,7 @@ export class DefaultCartService implements CartService {
     cartId: string | undefined,
     input: AddCartItemRequestDto,
   ): Promise<CartDto> {
+    assertPublicPreviewCommerceAllowed();
     const cart = cloneCart(await this.resolveCart(cartId));
     const product = await this.products.findById(input.productId);
     if (!product) {
@@ -311,6 +313,7 @@ export class DefaultCartService implements CartService {
     itemId: string,
     input: UpdateCartItemRequestDto,
   ): Promise<CartDto> {
+    assertPublicPreviewCommerceAllowed();
     const id = requireString(itemId, "id");
     const cart = cloneCart(await this.requireCart(cartId));
     const index = cart.items.findIndex((item) => item.id === id);

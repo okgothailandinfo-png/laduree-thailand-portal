@@ -36,6 +36,7 @@ import type { OrderRepository } from "@/src/server/repositories/interfaces";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 import { AppError } from "@/src/server/utils/errors";
+import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
 import { logger } from "@/src/server/utils/logger";
 import { minorToMajor } from "@/src/server/utils/money";
 import {
@@ -215,6 +216,7 @@ export class PaymentService {
   async createPayment(
     input: CreatePaymentRequestDto,
   ): Promise<CreatePaymentResult> {
+    assertPublicPreviewCommerceAllowed();
     const id = requireString(input.orderId, "orderId");
     const accessToken = this.assertOrderAccessToken(id, input.accessToken);
     const method: PaymentMethodId = input.method;
@@ -318,6 +320,7 @@ export class PaymentService {
     result: ConfirmPaymentRequestDto["result"],
     accessToken?: string | null,
   ): Promise<ConfirmPaymentResponseDto> {
+    assertPublicPreviewCommerceAllowed();
     const id = requireString(paymentId, "paymentId");
     const { payment: existing, token } = await this.requireAuthorizedPayment(
       id,

@@ -15,10 +15,18 @@ import { createDeliveryFeeEngine } from "@/src/server/delivery/fee-engine";
 import { createDeliveryAvailabilityEngine } from "@/src/server/delivery/availability";
 
 describe("Delivery demo fixture gating", () => {
-  it("is disabled in production regardless of DELIVERY_DEMO flag", () => {
+  it("is disabled in production and public preview regardless of DELIVERY_DEMO flag", () => {
     assert.equal(
       isDeliveryDemoFixtureEnabled({
         appEnv: "production",
+        nodeEnv: "production",
+        deliveryDemo: "1",
+      }),
+      false,
+    );
+    assert.equal(
+      isDeliveryDemoFixtureEnabled({
+        appEnv: "preview",
         nodeEnv: "production",
         deliveryDemo: "1",
       }),

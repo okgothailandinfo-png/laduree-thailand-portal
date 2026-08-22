@@ -2,12 +2,14 @@
  * Server environment configuration with fail-closed production validation.
  *
  * Mock payment/storage/notification providers are allowed only in
- * development, test, and explicitly configured staging (APP_ENV=staging).
+ * development, test, public preview (APP_ENV=preview), and staging.
  * Production refuses mock/local providers and DATA_SOURCE=mock.
  */
 
+import { classifyCanonicalHost } from "@/lib/preview/public-preview";
+
 export type DataSource = "mock" | "prisma";
-export type AppEnvName = "development" | "staging" | "production" | "test";
+export type AppEnvName = "development" | "staging" | "preview" | "production" | "test";
 /** mock = local/dev; external = production adapter boundary (real vendor module TBD). */
 export type PaymentProviderName = "mock" | "external";
 export type StorageProviderName = "local" | "external";
@@ -83,6 +85,7 @@ function resolveAppEnv(
   if (
     value === "development" ||
     value === "staging" ||
+    value === "preview" ||
     value === "production" ||
     value === "test"
   ) {
@@ -90,7 +93,7 @@ function resolveAppEnv(
   }
   if (value) {
     throw new EnvValidationError(
-      `Invalid APP_ENV="${value}". Expected development|staging|production|test.`,
+      `Invalid APP_ENV="${value}". Expected development|staging|preview|production|test.`,
     );
   }
   if (nodeEnv === "production") return "production";
@@ -282,7 +285,7 @@ function requireHttpsBaseUrl(url: string, field: string): string {
     throw new EnvValidationError(`${field} must be a valid absolute URL.`);
   }
   if (parsed.protocol !== "https:") {
-    throw new EnvValidationError(`${field} must use HTTPS in production.`);
+    throw new EnvValidationError(`${field} must use HTTPS.`);
   }
   return url.replace(/\/$/, "");
 }
@@ -317,6 +320,7 @@ function loadEnv(): ServerEnv {
     buildPhase ||
     appEnv === "development" ||
     appEnv === "staging" ||
+    appEnv === "preview" ||
     appEnv === "test";
   const isStrictProduction = appEnv === "production" && !buildPhase;
 
@@ -422,6 +426,8 @@ function loadEnv(): ServerEnv {
     assertStrictProductionEnv(envConfig);
   } else if (appEnv === "staging") {
     assertStagingEnv(envConfig);
+  } else if (appEnv === "preview") {
+    assertPublicPreviewEnv(envConfig, buildPhase);
   }
 
   return envConfig;
@@ -486,6 +492,62 @@ function assertStrictProductionEnv(config: ServerEnv): void {
     config.adminSessionSecret || config.pickupRevealSecret,
     "ADMIN_SESSION_SECRET",
   );
+}
+
+function assertPublicPreviewEnv(config: ServerEnv, buildPhase: boolean): void {
+  // Public website on a real domain; live commerce remains off.
+  if (config.paymentProvider !== "mock") {
+    throw new EnvValidationError(
+      "Public preview requires PAYMENT_PROVIDER=mock. Do not register a production PSP in this environment.",
+    );
+  }
+  if (process.env.STOREFRONT_INDEXING?.trim() === "live") {
+    throw new EnvValidationError(
+      "STOREFRONT_INDEXING=live is not allowed in public preview. Indexing stays noindex until live commerce is authorized.",
+    );
+  }
+  if (buildPhase) return;
+
+  config.appBaseUrl = requireHttpsBaseUrl(config.appBaseUrl, "APP_BASE_URL");
+  config.notificationBaseUrl = requireHttpsBaseUrl(
+    config.notificationBaseUrl,
+    "NOTIFICATION_BASE_URL",
+  );
+
+  let host: string;
+  try {
+    host = new URL(config.appBaseUrl).hostname.toLowerCase();
+  } catch {
+    throw new EnvValidationError("APP_BASE_URL must be a valid absolute HTTPS URL.");
+  }
+  const hostKind = classifyCanonicalHost(host);
+  if (hostKind === "localhost") {
+    throw new EnvValidationError(
+      "Public preview APP_BASE_URL must be the owner-approved real domain, not localhost.",
+    );
+  }
+  if (hostKind === "singapore") {
+    throw new EnvValidationError(
+      "APP_BASE_URL must not use the Singapore domain as the Thailand canonical host.",
+    );
+  }
+
+  // Integrity secrets only — not PSP credentials.
+  requireSecret(
+    config.mockPaymentWebhookSecret || undefined,
+    "MOCK_PAYMENT_WEBHOOK_SECRET",
+  );
+  if (!config.pickupRevealSecret) {
+    config.pickupRevealSecret = requireSecret(
+      config.mockPaymentWebhookSecret,
+      "PICKUP_REVEAL_SECRET",
+    );
+  } else {
+    config.pickupRevealSecret = requireSecret(
+      config.pickupRevealSecret,
+      "PICKUP_REVEAL_SECRET",
+    );
+  }
 }
 
 function assertStagingEnv(config: ServerEnv): void {

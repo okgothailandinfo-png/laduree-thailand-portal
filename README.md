@@ -30,6 +30,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 See [docs/production-hardening.md](docs/production-hardening.md) and [docs/backend-repositories.md](docs/backend-repositories.md).
 
+Public preview (real domain, no live commerce): [docs/sprint-34-public-preview-deployment.md](docs/sprint-34-public-preview-deployment.md).
+
 Production is **fail-closed**: mock payment, local storage, and `DATA_SOURCE=mock` are refused. Remaining real-provider work is listed as Production Blockers in the hardening doc.
 
 Health probes:

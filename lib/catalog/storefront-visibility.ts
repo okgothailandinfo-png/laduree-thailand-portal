@@ -37,7 +37,11 @@ export function isStorefrontUnavailableDisplay(product: {
   available: boolean;
   priceThb: number | null;
 }): boolean {
-  return !product.available || product.priceThb === null;
+  return (
+    !product.available ||
+    product.priceThb === null ||
+    product.priceThb <= 0
+  );
 }
 
 export function categoryPath(slug: string): string {

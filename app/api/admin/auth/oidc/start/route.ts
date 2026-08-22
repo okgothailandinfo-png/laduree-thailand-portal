@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { isPublicPreview, PUBLIC_PREVIEW_ADMIN_CODE } from "@/lib/preview/public-preview";
 import { env } from "@/src/server/config/env";
 import { createAdminAuthProvider } from "@/src/server/admin/oidc/provider";
 import { toErrorResponse } from "@/src/server/api/responses";
@@ -18,6 +19,13 @@ export async function GET(request: Request) {
   const requestId = createRequestId(request.headers.get(REQUEST_ID_HEADER));
   return runWithRequestContext(requestId, async () => {
     try {
+      if (isPublicPreview()) {
+        throw new AppError(
+          "FORBIDDEN",
+          "Admin is not available.",
+          { status: 403, details: { code: PUBLIC_PREVIEW_ADMIN_CODE } },
+        );
+      }
       if (env.adminAuthProvider !== "oidc") {
         throw new AppError(
           "CONFIG_ERROR",

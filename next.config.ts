@@ -23,7 +23,9 @@ function buildSecurityHeaders(): { key: string; value: string }[] {
     "font-src 'self' data:",
     "connect-src 'self'",
     "worker-src 'self' blob:",
-    ...(appEnv === "production" ? ["upgrade-insecure-requests"] : []),
+    ...(appEnv === "production" || appEnv === "preview"
+      ? ["upgrade-insecure-requests"]
+      : []),
   ].join("; ");
 
   const headers: { key: string; value: string }[] = [
@@ -39,7 +41,7 @@ function buildSecurityHeaders(): { key: string; value: string }[] {
     { key: "Cross-Origin-Resource-Policy", value: "same-site" },
   ];
 
-  if (appEnv === "production") {
+  if (appEnv === "production" || appEnv === "preview") {
     headers.push({
       key: "Strict-Transport-Security",
       value: "max-age=31536000; includeSubDomains",

@@ -28,6 +28,9 @@ describe("Sprint 31 — seed production refuse", () => {
     assert.doesNotThrow(() =>
       assertDatabaseSeedAllowed({ APP_ENV: "staging" }),
     );
+    assert.doesNotThrow(() =>
+      assertDatabaseSeedAllowed({ APP_ENV: "preview" }),
+    );
     assert.doesNotThrow(() => assertDatabaseSeedAllowed({ APP_ENV: "test" }));
   });
 

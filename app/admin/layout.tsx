@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { isPublicPreview } from "@/lib/preview/public-preview";
 import "./admin.css";
 
 export const metadata: Metadata = {
@@ -12,5 +14,8 @@ export default function AdminRootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  if (isPublicPreview()) {
+    notFound();
+  }
   return <div className="admin-root">{children}</div>;
 }

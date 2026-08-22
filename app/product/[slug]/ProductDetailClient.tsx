@@ -6,6 +6,7 @@ import { isStorefrontUnavailableDisplay } from "@/lib/catalog/storefront-visibil
 import CatalogStatus from "../../catalog/CatalogStatus";
 import { useAsyncResource } from "../../catalog/useAsyncResource";
 import { useCart } from "../../cart/CartContext";
+import StorefrontImg from "../../chrome/StorefrontImg";
 import {
   fetchProductBySlug,
   formatPriceThb,
@@ -368,7 +369,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                             onClick={() => setActiveImage(index)}
                             aria-label={`Product image ${index + 1}`}
                           >
-                            <img
+                            <StorefrontImg
                               className="img-product-detail img-responsive"
                               src={gallery[index]?.url}
                               alt={

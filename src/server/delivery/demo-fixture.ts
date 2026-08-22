@@ -90,7 +90,7 @@ export function isDeliveryDemoFixtureEnabled(env: {
     .trim()
     .toLowerCase();
 
-  if (appEnv === "production") return false;
+  if (appEnv === "production" || appEnv === "preview") return false;
   if (flag === "0" || flag === "false" || flag === "off") return false;
   if (flag === "1" || flag === "true" || flag === "on") {
     return appEnv !== "production";

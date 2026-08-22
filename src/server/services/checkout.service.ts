@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
+import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
@@ -688,6 +689,7 @@ export class DefaultCheckoutService {
     cartId: string | undefined,
     input: CheckoutRequestDto,
   ): Promise<CheckoutResponseDto> {
+    assertPublicPreviewCommerceAllowed();
     if (!cartId) {
       throw new AppError("VALIDATION_ERROR", "Cart not found.", {
         details: { field: "cart" },
