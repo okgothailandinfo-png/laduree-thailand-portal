@@ -1,9 +1,8 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../chrome/StorefrontChrome";
 import PaymentPageClient from "./PaymentPageClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Payment | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("Payment");
 
 type PageProps = {
   searchParams: Promise<{ orderId?: string; token?: string }>;
@@ -12,9 +11,11 @@ type PageProps = {
 export default async function PaymentPage({ searchParams }: PageProps) {
   const params = await searchParams;
   return (
-    <PaymentPageClient
-      orderId={params.orderId ?? null}
-      accessToken={params.token ?? null}
-    />
+    <StorefrontChrome>
+      <PaymentPageClient
+        orderId={params.orderId ?? null}
+        accessToken={params.token ?? null}
+      />
+    </StorefrontChrome>
   );
 }

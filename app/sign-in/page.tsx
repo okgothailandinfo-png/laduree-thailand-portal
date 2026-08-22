@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../chrome/StorefrontChrome";
 import SignInPageClient from "./SignInPageClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Sign In | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("Sign In");
 
 export default function SignInPage() {
-  return <SignInPageClient />;
+  return (
+    <StorefrontChrome>
+      <SignInPageClient />
+    </StorefrontChrome>
+  );
 }

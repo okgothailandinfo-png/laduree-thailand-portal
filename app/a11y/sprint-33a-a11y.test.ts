@@ -106,11 +106,22 @@ describe("Sprint 33A — layout / skip link / system pages", () => {
 
 describe("Sprint 33A — storefront landmarks and image alts", () => {
   it("homepage main landmark and product image alts use product titles", () => {
-    const page = readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
+    const page = readFileSync(
+      path.join(process.cwd(), "app/HomePageClient.tsx"),
+      "utf8",
+    );
+    const header = readFileSync(
+      path.join(process.cwd(), "app/chrome/SiteHeader.tsx"),
+      "utf8",
+    );
+    const card = readFileSync(
+      path.join(process.cwd(), "app/chrome/ProductCard.tsx"),
+      "utf8",
+    );
     assert.match(page, /id=\"main-content\"/);
-    assert.match(page, /alt=\{product\.title\}/);
-    assert.match(page, /LanguageSwitcher/);
-    assert.match(page, /PendingNavControl/);
+    assert.match(card, /alt=\{product\.title\}/);
+    assert.match(header, /LanguageSwitcher/);
+    assert.match(header, /PendingNavControl/);
     assert.match(page, /prefers-reduced-motion/);
   });
 

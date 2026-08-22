@@ -14,7 +14,9 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
   }, [error]);
 
   return (
-    <main id="main-content" className="system-page" tabIndex={-1}>
+    <>
+      <meta name="robots" content="noindex, nofollow" />
+      <main id="main-content" className="system-page" tabIndex={-1}>
       <h1 className="system-page__title">{uiChrome("errorTitle")}</h1>
       <p className="system-page__body" role="alert">
         {uiChrome("errorBody")}
@@ -23,5 +25,6 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         {uiChrome("errorRetry")}
       </button>
     </main>
+    </>
   );
 }

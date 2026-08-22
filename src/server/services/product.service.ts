@@ -1,3 +1,8 @@
+import { isProductPurchasable } from "@/lib/catalog/product-purchasability";
+import {
+  isLiveListedProduct,
+  isStorefrontPdpVisible,
+} from "@/lib/catalog/storefront-visibility";
 import type { ProductRepository } from "@/src/server/repositories/interfaces";
 import type { ProductService } from "@/src/server/services/interfaces";
 import {
@@ -22,9 +27,19 @@ export class DefaultProductService implements ProductService {
   async getProductBySlug(slug: string): Promise<ProductDetailDto> {
     const normalized = requireString(slug, "slug");
     const product = await this.products.findBySlug(normalized);
-    if (!product) {
+    if (!product || !isStorefrontPdpVisible(product)) {
       throw new AppError("NOT_FOUND", `Product not found: ${normalized}`);
     }
     return toProductDetailDto(product);
+  }
+
+  async listIndexableProducts(): Promise<Array<{ slug: string }>> {
+    const items = await this.products.list();
+    return items
+      .filter(
+        (product) =>
+          isLiveListedProduct(product) && isProductPurchasable(product),
+      )
+      .map((product) => ({ slug: product.slug }));
   }
 }

@@ -76,6 +76,10 @@ export type ProductDetail = ProductSummary & {
   storageLabel: string;
   storageText: string;
   modifierGroups: ProductModifierGroup[];
+  images: Array<{
+    url: string;
+    altText: string | null;
+  }>;
 };
 
 export type Boutique = {

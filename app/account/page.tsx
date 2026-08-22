@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../chrome/StorefrontChrome";
 import AccountPageClient from "./AccountPageClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "My Account | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("My Account");
 
 export default function AccountPage() {
-  return <AccountPageClient />;
+  return (
+    <StorefrontChrome>
+      <AccountPageClient />
+    </StorefrontChrome>
+  );
 }

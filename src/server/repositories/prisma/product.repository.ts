@@ -3,6 +3,7 @@ import type {
   AdminProductListQuery,
   AdminUpdateProductInput,
 } from "@/src/server/admin/dto";
+import { isStorefrontPdpVisible } from "@/lib/catalog/storefront-visibility";
 import type { Product } from "@/src/server/models/product";
 import type {
   AdminProductListPage,
@@ -95,7 +96,10 @@ export class PrismaProductRepository implements ProductRepository {
       where: { slug },
       include: productInclude,
     });
-    return row ? toDomainProduct(row) : null;
+    if (!row) return null;
+    const product = toDomainProduct(row);
+    if (!isStorefrontPdpVisible(product)) return null;
+    return product;
   }
 
   async findById(id: string): Promise<Product | null> {

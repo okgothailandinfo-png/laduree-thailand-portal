@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../../chrome/StorefrontChrome";
 import SavedAddressesPageClient from "./SavedAddressesPageClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Saved Addresses | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("Saved Addresses");
 
 export default function SavedAddressesPage() {
-  return <SavedAddressesPageClient />;
+  return (
+    <StorefrontChrome>
+      <SavedAddressesPageClient />
+    </StorefrontChrome>
+  );
 }

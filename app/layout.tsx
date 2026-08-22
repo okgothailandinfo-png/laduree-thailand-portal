@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
+import { storefrontRootMetadata } from "@/lib/seo/metadata";
 import SkipToContent from "./a11y/SkipToContent";
 import CartProviderShell from "./cart/CartProviderShell";
 import "./globals.css";
@@ -11,10 +12,7 @@ const lora = Lora({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Ladurée Thailand",
-  description: "Order in advance and collect at your preferred boutique.",
-};
+export const metadata: Metadata = storefrontRootMetadata();
 
 export default function RootLayout({
   children,

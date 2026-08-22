@@ -3,7 +3,7 @@ import Link from "next/link";
 import { uiChrome } from "@/lib/i18n/ui-chrome";
 
 export const metadata: Metadata = {
-  title: "Page not found | Ladurée Thailand",
+  title: "Page not found",
   robots: { index: false, follow: false },
 };
 

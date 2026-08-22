@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../chrome/StorefrontChrome";
 import CheckoutPageClient from "./CheckoutPageClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Checkout | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("Checkout");
 
 export default function CheckoutPage() {
-  return <CheckoutPageClient />;
+  return (
+    <StorefrontChrome>
+      <CheckoutPageClient />
+    </StorefrontChrome>
+  );
 }

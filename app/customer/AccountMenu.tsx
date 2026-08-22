@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { trapTabKey } from "@/lib/a11y/dialog-focus";
 import { useCustomerSession } from "./CustomerSessionContext";
 import "./account-menu.css";
 
@@ -27,6 +28,7 @@ export default function AccountMenu({
   } = useCustomerSession();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
   useEffect(() => {
@@ -37,7 +39,11 @@ export default function AccountMenu({
       }
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (panelRef.current) trapTabKey(event, panelRef.current);
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -64,7 +70,12 @@ export default function AccountMenu({
       </button>
 
       {open ? (
-        <div className="account-menu__panel" id={menuId} role="menu">
+        <div
+          className="account-menu__panel"
+          id={menuId}
+          role="menu"
+          ref={panelRef}
+        >
           {isAuthenticated ? (
             <>
               <Link
