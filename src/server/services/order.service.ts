@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
+import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
@@ -201,6 +202,7 @@ export class DefaultOrderService implements OrderService {
   }
 
   async createOrder(input: CreateOrderRequestDto): Promise<OrderDto> {
+    assertPublicPreviewCommerceAllowed();
     if (!input.pickup) {
       throw new AppError(
         "VALIDATION_ERROR",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { isStorefrontUnavailableDisplay } from "@/lib/catalog/storefront-visibility";
 import { formatPriceThb } from "@/lib/api/catalog";
 import type { ProductSummary } from "@/lib/api/types";
+import StorefrontImg from "./StorefrontImg";
 
 export default function ProductCard({ product }: { product: ProductSummary }) {
   const unavailable = isStorefrontUnavailableDisplay(product);
@@ -15,7 +16,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
         <div className="thumbnail-group__top">
           <div className="product__img">
             <Link href={href} className="img-1">
-              <img
+              <StorefrontImg
                 className="img-responsive-2"
                 src={product.imagePlaceholder}
                 alt={product.title}

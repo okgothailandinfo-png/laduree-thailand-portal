@@ -3,6 +3,7 @@ import { ADMIN_SESSION_COOKIE, MOCK_ADMIN_USER } from "@/lib/admin/session";
 import { createAdminAuthProvider } from "@/src/server/admin/oidc/provider";
 import type { AdminPrincipal } from "@/src/server/admin/oidc/types";
 import { env, getDataSource } from "@/src/server/config/env";
+import { isPublicPreview, PUBLIC_PREVIEW_ADMIN_CODE } from "@/lib/preview/public-preview";
 import { assertCsrfOrigin } from "@/src/server/http/csrf";
 import { AppError } from "@/src/server/utils/errors";
 
@@ -28,6 +29,13 @@ function adminAuth() {
  * Customer authentication is intentionally separate (guest / future LINE).
  */
 export async function requireAdminSession(): Promise<AdminPrincipal> {
+  if (isPublicPreview()) {
+    throw new AppError(
+      "FORBIDDEN",
+      "Admin is not available.",
+      { status: 403, details: { code: PUBLIC_PREVIEW_ADMIN_CODE } },
+    );
+  }
   if (env.adminAuthProvider === "mock" && env.isStrictProduction) {
     throw new AppError(
       "CONFIG_ERROR",

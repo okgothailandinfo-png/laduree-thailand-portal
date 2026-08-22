@@ -29,11 +29,12 @@ export type RateLimitReadinessInput = {
 export function resolveSeedAppEnv(env: {
   APP_ENV?: string;
   NODE_ENV?: string;
-} = process.env): "development" | "staging" | "production" | "test" {
+} = process.env): "development" | "staging" | "preview" | "production" | "test" {
   const raw = env.APP_ENV?.trim().toLowerCase();
   if (
     raw === "development" ||
     raw === "staging" ||
+    raw === "preview" ||
     raw === "production" ||
     raw === "test"
   ) {
@@ -41,7 +42,7 @@ export function resolveSeedAppEnv(env: {
   }
   if (raw) {
     throw new EnvValidationError(
-      `Invalid APP_ENV="${raw}" for db:seed. Expected development|staging|production|test. Refusing seed (fail-closed).`,
+      `Invalid APP_ENV="${raw}" for db:seed. Expected development|staging|preview|production|test. Refusing seed (fail-closed).`,
     );
   }
   if (env.NODE_ENV === "production") return "production";

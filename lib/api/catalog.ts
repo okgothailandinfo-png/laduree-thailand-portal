@@ -26,7 +26,9 @@ export function fetchBoutiques(init?: RequestInit) {
 }
 
 export function formatPriceThb(priceThb: number | null): string {
-  if (priceThb === null || Number.isNaN(priceThb)) return "฿ —";
+  if (priceThb === null || Number.isNaN(priceThb) || priceThb <= 0) {
+    return "฿ —";
+  }
   return `฿${priceThb.toLocaleString("en-US", {
     maximumFractionDigits: 0,
   })}`;

@@ -25,6 +25,13 @@ describe("Sprint 33D — storefront indexing policy", () => {
     );
     assert.equal(
       isStorefrontIndexingLive({
+        APP_ENV: "preview",
+        STOREFRONT_INDEXING: "live",
+      }),
+      false,
+    );
+    assert.equal(
+      isStorefrontIndexingLive({
         APP_ENV: "production",
         STOREFRONT_INDEXING: "live",
       }),

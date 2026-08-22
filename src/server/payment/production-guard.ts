@@ -1,3 +1,4 @@
+import { isPublicPreview } from "@/lib/preview/public-preview";
 import { env } from "@/src/server/config/env";
 import { AppError } from "@/src/server/utils/errors";
 
@@ -7,6 +8,13 @@ import { AppError } from "@/src/server/utils/errors";
  * Production must use signed provider webhooks only.
  */
 export function assertMockPaymentMutationsAllowed(): void {
+  if (isPublicPreview()) {
+    throw new AppError(
+      "FORBIDDEN",
+      "Ordering is not available.",
+      { status: 403, details: { code: "PREVIEW_COMMERCE_DISABLED" } },
+    );
+  }
   if (env.isStrictProduction || !env.allowsMockProviders) {
     throw new AppError(
       "FORBIDDEN",
@@ -22,6 +30,13 @@ export function assertMockPaymentMutationsAllowed(): void {
 }
 
 export function assertMockWebhookAllowed(): void {
+  if (isPublicPreview()) {
+    throw new AppError(
+      "FORBIDDEN",
+      "Ordering is not available.",
+      { status: 403, details: { code: "PREVIEW_COMMERCE_DISABLED" } },
+    );
+  }
   if (env.isStrictProduction || !env.allowsMockProviders) {
     throw new AppError(
       "FORBIDDEN",

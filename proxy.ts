@@ -4,6 +4,7 @@ import {
   ADMIN_SESSION_COOKIE,
   isMockAdminSession,
 } from "@/lib/admin/session";
+import { isPublicPreview } from "@/lib/preview/public-preview";
 import { isAdminOidcSessionCookie } from "@/src/server/admin/oidc/session";
 import { createRequestId, REQUEST_ID_HEADER } from "@/src/server/http/request-context";
 
@@ -12,6 +13,7 @@ import { createRequestId, REQUEST_ID_HEADER } from "@/src/server/http/request-co
  * Protects Admin CMS routes. Accepts mock session (non-prod) or OIDC session cookie.
  * Customer auth is separate and not handled here.
  * API routes under /api/admin are guarded in handlers (session + CSRF), not here.
+ * Public preview: admin UI is unavailable (not a mock-login surface).
  */
 export function proxy(request: NextRequest) {
   const requestId = createRequestId(request.headers.get(REQUEST_ID_HEADER));
@@ -24,6 +26,10 @@ export function proxy(request: NextRequest) {
 
   if (!pathname.startsWith("/admin")) {
     return withRequestId(NextResponse.next());
+  }
+
+  if (isPublicPreview()) {
+    return withRequestId(new NextResponse(null, { status: 404 }));
   }
 
   const isLogin = pathname === "/admin/login";

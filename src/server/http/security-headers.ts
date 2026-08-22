@@ -15,6 +15,7 @@ function resolveAppEnvForHeaders(): string {
   if (
     raw === "development" ||
     raw === "staging" ||
+    raw === "preview" ||
     raw === "production" ||
     raw === "test"
   ) {
@@ -39,7 +40,7 @@ export function buildContentSecurityPolicy(
     "connect-src 'self'",
     "worker-src 'self' blob:",
   ];
-  if (appEnv === "production") {
+  if (appEnv === "production" || appEnv === "preview") {
     directives.push("upgrade-insecure-requests");
   }
   return directives.join("; ");
@@ -64,7 +65,7 @@ export function buildSecurityHeaders(
     { key: "Cross-Origin-Resource-Policy", value: "same-site" },
   ];
 
-  if (appEnv === "production") {
+  if (appEnv === "production" || appEnv === "preview") {
     headers.push({
       key: "Strict-Transport-Security",
       value: "max-age=31536000; includeSubDomains",
