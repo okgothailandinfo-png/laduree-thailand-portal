@@ -1,58 +1,52 @@
+/**
+ * Sprint 33C — Thailand Safe-Draft catalog replaces SG/mock product catalogue.
+ * DEV behavior fixtures are isolated and must not override Thailand master data.
+ */
+
+import { assertThailandCatalogReady } from "@/lib/catalog/thailand-product-import";
 import type { Boutique } from "@/src/server/models/boutique";
 import type { Category } from "@/src/server/models/category";
 import type { PickupTimeSlot } from "@/src/server/models/pickup";
 import type { Product } from "@/src/server/models/product";
 
+const thailandCatalog = assertThailandCatalogReady();
+
+/** Owner-approved Thailand category hierarchy (+ All Items). */
+export const MOCK_CATEGORIES: Category[] = thailandCatalog.categories;
+
 /**
- * Mock catalog / ops seed data.
- * Structure mirrors the frontend MVP; Thailand retail/ops values remain placeholders.
+ * Thailand Product Master LDR001–LDR038 (Safe-Draft).
+ * All current rows are Draft → inactive, unavailable, null price, delivery ineligible.
  */
+export const MOCK_PRODUCTS: Product[] = thailandCatalog.products;
 
-export const MOCK_CATEGORIES: Category[] = [
+/**
+ * Isolated DEV fixtures for architecture/unit tests only.
+ * Never merge into storefront catalog lists.
+ */
+export const DEV_BEHAVIOR_FIXTURES: Product[] = [
   {
-    id: "cat-macaron-gift-boxes",
-    name: "Macaron Gift Boxes",
-    slug: "macaron-gift-boxes",
-    description: null,
-    sortOrder: 1,
-    isActive: true,
-  },
-  {
-    id: "cat-all-items",
-    name: "All Items",
-    slug: "all-items",
-    description: null,
-    sortOrder: 2,
-    isActive: true,
-  },
-];
-
-export const MOCK_PRODUCTS: Product[] = [
-  {
-    id: "prod-napoleon-iii-macaron-8pcs",
-    slug: "napoleon-iii-macaron-8pcs",
-    sku: "SKU-NAPOLEON-8",
-    title: "« Napoléon III » Macaron - 8pcs",
+    id: "dev-fixture-configurable-box",
+    slug: "dev-fixture-configurable-box",
+    sku: "DEV-CFG-BOX",
+    title: "[DEV] Configurable Box Fixture",
     categoryId: "cat-macaron-gift-boxes",
-    description: [
-      "Discover an assortment of 8 iconic Ladurée macarons, offering a delightful journey through timeless flavors. A delicate and sophisticated gift, perfect for sharing or indulging in a moment of pure sweetness.",
-    ],
+    description: ["Architecture test fixture — not Thailand catalog."],
     allergenLabel: "Allergen Information:",
     allergenText:
       "Kindly refer to the Allergens page (located at the bottom of the site) for more product information.",
     storageLabel: "Storage Information:",
-    storageText: "Macarons can be stored for up to 4 days in the Chiller.",
-    // Owner-approved Thailand retail price (docs/thailand-content.md).
+    storageText: "",
     priceThb: 990,
     priceMinor: 99000,
     currency: "THB",
     imagePlaceholder: "/product-placeholder.svg",
     images: [
       {
-        id: "img-napoleon",
-        mediaId: "media-napoleon-placeholder",
+        id: "img-dev-cfg",
+        mediaId: "media-dev-cfg",
         url: "/product-placeholder.svg",
-        altText: "« Napoléon III » Macaron - 8pcs",
+        altText: "[DEV] Configurable Box Fixture",
         sortOrder: 0,
         isPrimary: true,
       },
@@ -62,11 +56,11 @@ export const MOCK_PRODUCTS: Product[] = [
     deliveryEligible: true,
     productBehavior: "CONFIGURABLE_BOX",
     packSize: 8,
-    sortOrder: 1,
+    sortOrder: 9001,
     modifierGroups: [
       {
-        id: "choice-of-macarons",
-        title: "Choice of Macarons:",
+        id: "choice-of-items",
+        title: "Choice of items:",
         requiredText: "Please select 8",
         type: "quantity",
         exactSelectionQuantity: 8,
@@ -75,158 +69,58 @@ export const MOCK_PRODUCTS: Product[] = [
         maxSelection: 8,
         sortOrder: 1,
         isActive: true,
-        options: [
-          "Almond",
-          "Chocolate",
-          "Coffee",
-          "« Seasonal » Dubai Chocolate",
-          "Lemon",
-          "« Asia Exclusive » Matcha",
-          "Marie-Antoinette Tea",
-          "« Seasonal » Milk Chocolate Coated Coconut",
-          "« Seasonal » Milk Chocolate Coated Caramel Peanuts",
-          "Orange Blossom",
-          "Passion Fruit",
-          "Pistachio",
-          "Raspberry",
-          "Rose",
-          "Salted Caramel",
-          "Vanilla",
-        ],
-      },
-      {
-        id: "pickup-acknowledgement",
-        title:
-          "[CONTENT PENDING APPROVAL] Product handling acknowledgement (Pickup)",
-        requiredText: "Please select 1",
-        type: "radio",
-        required: true,
-        minSelection: 1,
-        maxSelection: 1,
-        isAcknowledgement: true,
-        sortOrder: 2,
-        isActive: true,
-        options: [
-          "[CONTENT PENDING APPROVAL] I acknowledge & agree to proceed with my pickup order.",
-        ],
-      },
-      {
-        id: "gifting-ribbon",
-        title: "Add a Gifting Ribbon Bow:",
-        requiredText: null,
-        type: "radio",
-        required: false,
-        maxSelection: 1,
-        sortOrder: 3,
-        isActive: true,
-        // No approved Thailand add-on price — UI shows ฿ — and does not affect subtotal.
-        options: ["1 x Gifting Ribbon Bow (M)"],
-        optionDetails: [
-          {
-            label: "1 x Gifting Ribbon Bow (M)",
-            priceMinor: null,
-            sortOrder: 1,
-            isActive: true,
-          },
-        ],
-      },
-      {
-        id: "packing-options",
-        title: "Upgrade Packing Options:",
-        requiredText: null,
-        type: "quantity",
-        required: false,
-        maxSelection: 1,
-        sortOrder: 4,
-        isActive: true,
-        options: ["+2 Ice Packs (+2 hrs)", "+5 Ice Packs (+4 hrs)"],
-        optionDetails: [
-          {
-            label: "+2 Ice Packs (+2 hrs)",
-            priceMinor: null,
-            sortOrder: 1,
-            isActive: true,
-          },
-          {
-            label: "+5 Ice Packs (+4 hrs)",
-            priceMinor: null,
-            sortOrder: 2,
-            isActive: true,
-          },
-        ],
+        options: ["Rose", "Chocolate", "Pistachio", "Vanilla"],
       },
     ],
   },
   {
-    id: "prod-dev-fixed-tea-tin",
-    slug: "dev-fixed-tea-tin",
-    sku: "DEV-FIXED-TEA",
-    title: "[DEV] Fixed Tea Tin",
-    categoryId: "cat-all-items",
-    description: [
-      "[CONTENT PENDING APPROVAL] Development FIXED_PACK placeholder.",
-    ],
+    id: "dev-fixture-fixed-pack",
+    slug: "dev-fixture-fixed-pack",
+    sku: "DEV-FIXED-PACK",
+    title: "[DEV] Fixed Pack Fixture",
+    categoryId: "cat-tea-boxes",
+    description: ["Architecture test fixture — not Thailand catalog."],
     allergenLabel: "Allergen Information:",
     allergenText:
       "Kindly refer to the Allergens page (located at the bottom of the site) for more product information.",
     storageLabel: "Storage Information:",
-    storageText: "[CONTENT PENDING APPROVAL]",
+    storageText: "",
     priceThb: 890,
     priceMinor: 89000,
     currency: "THB",
     imagePlaceholder: "/product-placeholder.svg",
-    images: [
-      {
-        id: "img-dev-tea",
-        mediaId: "media-dev-tea",
-        url: "/product-placeholder.svg",
-        altText: "[DEV] Fixed Tea Tin",
-        sortOrder: 0,
-        isPrimary: true,
-      },
-    ],
+    images: [],
     isActive: true,
     available: true,
     deliveryEligible: true,
     productBehavior: "FIXED_PACK",
     packSize: 12,
-    sortOrder: 2,
+    sortOrder: 9002,
     modifierGroups: [],
   },
   {
-    id: "prod-dev-simple-accessory",
-    slug: "dev-simple-accessory",
-    sku: "DEV-SIMPLE-ACC",
-    title: "[DEV] Simple Accessory",
-    categoryId: "cat-all-items",
-    description: [
-      "[CONTENT PENDING APPROVAL] Development SIMPLE_PRODUCT placeholder.",
-    ],
+    id: "dev-fixture-simple-product",
+    slug: "dev-fixture-simple-product",
+    sku: "DEV-SIMPLE",
+    title: "[DEV] Simple Product Fixture",
+    categoryId: "cat-lifestyle",
+    description: ["Architecture test fixture — not Thailand catalog."],
     allergenLabel: "Allergen Information:",
     allergenText:
       "Kindly refer to the Allergens page (located at the bottom of the site) for more product information.",
     storageLabel: "Storage Information:",
-    storageText: "[CONTENT PENDING APPROVAL]",
+    storageText: "",
     priceThb: 490,
     priceMinor: 49000,
     currency: "THB",
     imagePlaceholder: "/product-placeholder.svg",
-    images: [
-      {
-        id: "img-dev-simple",
-        mediaId: "media-dev-simple",
-        url: "/product-placeholder.svg",
-        altText: "[DEV] Simple Accessory",
-        sortOrder: 0,
-        isPrimary: true,
-      },
-    ],
+    images: [],
     isActive: true,
     available: true,
     deliveryEligible: true,
     productBehavior: "SIMPLE_PRODUCT",
     packSize: null,
-    sortOrder: 3,
+    sortOrder: 9003,
     modifierGroups: [],
   },
 ];

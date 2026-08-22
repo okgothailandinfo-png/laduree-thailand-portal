@@ -6,6 +6,7 @@ import {
 } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
+import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
 import {
   resolveExactSelectionQuantityForBehavior,
   snapshotProductBehavior,
@@ -204,11 +205,34 @@ export class DefaultCartService implements CartService {
   ): Promise<CartDto> {
     const cart = cloneCart(await this.resolveCart(cartId));
     const product = await this.products.findById(input.productId);
-    if (!product || !product.available || !product.isActive) {
+    if (!product) {
       throw new AppError(
         "VALIDATION_ERROR",
         `Product unavailable: ${input.productId}`,
         { details: { field: "productId", productId: input.productId } },
+      );
+    }
+
+    const purchasability = evaluateProductPurchasability(product);
+    if (!purchasability.purchasable) {
+      const code = purchasability.reasons.includes("PRICE_UNAVAILABLE")
+        ? "PRICE_UNAVAILABLE"
+        : purchasability.reasons.includes("CONFIG_OPTIONS_UNAVAILABLE")
+          ? "CONFIG_OPTIONS_UNAVAILABLE"
+          : "PRODUCT_UNAVAILABLE";
+      throw new AppError(
+        "VALIDATION_ERROR",
+        code === "PRICE_UNAVAILABLE"
+          ? "Price unavailable for one or more products."
+          : `Product unavailable: ${input.productId}`,
+        {
+          details: {
+            field: "productId",
+            code,
+            productId: product.id,
+            reasons: purchasability.reasons,
+          },
+        },
       );
     }
 
@@ -356,7 +380,7 @@ export class DefaultCartService implements CartService {
         : {
             productBehavior: item.productBehavior,
             packSize: item.packSize ?? null,
-            deliveryEligible: item.deliveryEligible !== false,
+            deliveryEligible: item.deliveryEligible === true,
             exactSelectionQuantity: item.exactSelectionQuantity ?? null,
           };
 

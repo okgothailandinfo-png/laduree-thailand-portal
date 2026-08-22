@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { MOCK_PRODUCTS } from "@/src/server/repositories/mock/data";
+import { DEV_BEHAVIOR_FIXTURES } from "@/src/server/repositories/mock/data";
 import {
   toDomainOrder,
   toDomainProduct,
@@ -8,7 +8,7 @@ import {
 
 describe("Sprint 29 — Prisma domain mapping parity", () => {
   it("maps allergen + modifierGroupsJson onto Product domain", () => {
-    const mock = MOCK_PRODUCTS[0]!;
+    const mock = DEV_BEHAVIOR_FIXTURES[0]!;
     const product = toDomainProduct({
       id: mock.id,
       categoryId: mock.categoryId,

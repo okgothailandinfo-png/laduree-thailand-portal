@@ -4,6 +4,7 @@ import type {
   ProductRepository,
 } from "@/src/server/repositories/interfaces";
 import { MOCK_PRODUCTS } from "@/src/server/repositories/mock/data";
+import { isThailandMasterSku } from "@/lib/catalog/thailand-product-import";
 import { AppError } from "@/src/server/utils/errors";
 
 function rejectAdmin(): never {
@@ -13,11 +14,32 @@ function rejectAdmin(): never {
   );
 }
 
-export class MockProductRepository implements ProductRepository {
-  async list(): Promise<Product[]> {
+function isProductionAppEnv(): boolean {
+  return process.env.APP_ENV === "production";
+}
+
+/**
+ * Storefront listing.
+ * Production: only active + available.
+ * Safe-Draft (non-production): also include Thailand LDR Draft rows for catalog QA
+ * while cart/checkout remain fail-closed (inactive / unavailable / null price).
+ */
+function listForStorefront(): Product[] {
+  if (isProductionAppEnv()) {
     return MOCK_PRODUCTS.filter(
       (product) => product.available && product.isActive,
     );
+  }
+  return MOCK_PRODUCTS.filter(
+    (product) =>
+      (product.available && product.isActive) ||
+      isThailandMasterSku(product.sku),
+  );
+}
+
+export class MockProductRepository implements ProductRepository {
+  async list(): Promise<Product[]> {
+    return listForStorefront();
   }
 
   async findBySlug(slug: string): Promise<Product | null> {

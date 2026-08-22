@@ -88,12 +88,14 @@ export function snapshotProductBehavior(
         ? product.packSize
         : null,
     exactSelectionQuantity: resolveExactSelectionQuantityForBehavior(product),
-    deliveryEligible: product.deliveryEligible !== false,
+    // Sprint 33C — fail-closed: only explicit true is delivery-eligible.
+    deliveryEligible: product.deliveryEligible === true,
   };
 }
 
 export function isDeliveryEligibleProduct(
   product: Pick<BehaviorCatalogProduct, "deliveryEligible">,
 ): boolean {
-  return product.deliveryEligible !== false;
+  // Sprint 33C — unresolved / undefined / false → not eligible (no delivery promise).
+  return product.deliveryEligible === true;
 }

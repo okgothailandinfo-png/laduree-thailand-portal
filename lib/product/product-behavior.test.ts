@@ -65,8 +65,9 @@ describe("Sprint 33B — product behavior", () => {
     });
   });
 
-  it("treats missing deliveryEligible as eligible (pickup-preserving default)", () => {
-    assert.equal(isDeliveryEligibleProduct({}), true);
+  it("Sprint 33C — unresolved deliveryEligible is fail-closed ineligible", () => {
+    assert.equal(isDeliveryEligibleProduct({}), false);
+    assert.equal(isDeliveryEligibleProduct({ deliveryEligible: undefined }), false);
     assert.equal(isDeliveryEligibleProduct({ deliveryEligible: true }), true);
     assert.equal(isDeliveryEligibleProduct({ deliveryEligible: false }), false);
   });

@@ -16,6 +16,8 @@
 - Existing Sprint 18 / 20.7 exact-selection helpers are preserved; cart/checkout/order **gate** them by `productBehavior`.
 - `deliveryEligible` defaults `true` (pickup-preserving). Thailand values filled in 33C. DELIVERY checkout rejects `false`.
 
+**Sprint 33C update:** Application helpers are fail-closed — only explicit `deliveryEligible === true` is treated as eligible. Unresolved/undefined does **not** create a delivery promise. Schema DB default may still be `true`; imports must write explicit booleans.
+
 ## Prisma / migration
 
 **Migration:** `prisma/migrations/20260812140000_product_behavior_architecture/`

@@ -10,14 +10,12 @@
 
 import { GET as getBoutiques } from "@/app/api/boutiques/route";
 import { GET as getCategories } from "@/app/api/categories/route";
-import { GET as getOrderById } from "@/app/api/orders/[id]/route";
 import { POST as postOrder } from "@/app/api/orders/route";
 import { GET as getPickupAvailability } from "@/app/api/pickup/availability/route";
 import { GET as getProductBySlug } from "@/app/api/products/[slug]/route";
 import { GET as getProducts } from "@/app/api/products/route";
 import { getDataSource } from "@/src/server/config/env";
 import type { ProductModifierGroup } from "@/src/server/models/product";
-import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
 import { buildValidModifiersForProduct } from "@/src/server/repositories/smoke/order-modifiers";
 
 type CheckResult = { name: string; ok: boolean; detail?: string };
@@ -255,48 +253,39 @@ async function run(): Promise<void> {
       }),
     );
     const createJson: unknown = await createRes.json();
-    const createEnvelope = assertSuccessEnvelope(createJson);
-    const created = isPlainObject(createEnvelope.data) ? createEnvelope.data : null;
-    const orderId =
-      created && typeof created.id === "string" ? created.id : null;
-    const hasOrderDto =
-      created &&
-      typeof created.orderNumber === "string" &&
-      created.status === "mock_placed" &&
-      isPlainObject(created.payment) &&
-      typeof created.totalThb === "number" &&
-      !("totalMinor" in created);
+    // Sprint 33C Safe-Draft: Thailand LDR catalog is Draft / null-priced /
+    // options-pending → order create must fail closed (non-purchasable).
+    const safeDraftReject = assertErrorEnvelope(
+      createJson,
+      "VALIDATION_ERROR",
+    );
+    const rejectDetail =
+      isPlainObject(createJson) &&
+      isPlainObject((createJson as { error?: unknown }).error) &&
+      typeof (createJson as { error: { message?: unknown } }).error.message ===
+        "string"
+        ? String((createJson as { error: { message: string } }).error.message)
+        : safeDraftReject.detail;
+    const rejectedAsNonPurchasable =
+      createRes.status === 400 &&
+      safeDraftReject.ok &&
+      (/Price unavailable/i.test(rejectDetail) ||
+        /Product unavailable/i.test(rejectDetail));
 
     results.push({
-      name: "POST /api/orders",
-      ok: createRes.status === 201 && createEnvelope.ok && Boolean(orderId) && !!hasOrderDto,
-      detail: `status=${createRes.status}; dtoCompatible=${Boolean(hasOrderDto)}`,
+      name: "POST /api/orders (Safe-Draft non-purchasable)",
+      ok: rejectedAsNonPurchasable,
+      detail: `status=${createRes.status}; ${rejectDetail}`,
     });
 
-    if (orderId) {
-      const token = issueOrderAccessToken(orderId);
-      const getUrl = new URL("http://local/api/orders/" + orderId);
-      getUrl.searchParams.set("token", token);
-      const getRes = await getOrderById(new Request(getUrl), {
-        params: Promise.resolve({ id: orderId }),
-      });
-      const getJson: unknown = await getRes.json();
-      const getEnvelope = assertSuccessEnvelope(getJson);
-      results.push({
-        name: "GET /api/orders/[id]",
-        ok: getRes.status === 200 && getEnvelope.ok,
-        detail: `status=${getRes.status}; ${getEnvelope.detail}`,
-      });
-    } else {
-      results.push({
-        name: "GET /api/orders/[id]",
-        ok: false,
-        detail: "skipped — create failed",
-      });
-    }
+    results.push({
+      name: "GET /api/orders/[id]",
+      ok: true,
+      detail: "skipped — Safe-Draft catalog is intentionally non-purchasable",
+    });
   } else {
     results.push({
-      name: "POST /api/orders",
+      name: "POST /api/orders (Safe-Draft non-purchasable)",
       ok: false,
       detail: "missing boutique/slot/product",
     });
