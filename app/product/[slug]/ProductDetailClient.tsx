@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { isStorefrontUnavailableDisplay } from "@/lib/catalog/storefront-visibility";
 import CatalogStatus from "../../catalog/CatalogStatus";
 import { useAsyncResource } from "../../catalog/useAsyncResource";
 import { useCart } from "../../cart/CartContext";
@@ -80,13 +81,29 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   );
 
   const product = productQuery.data;
-  const imageCount = 4;
+  const gallery =
+    product && product.images?.length > 0
+      ? product.images.map((image) => ({
+          url: image.url,
+          alt: image.altText?.trim() || product.title,
+        }))
+      : product
+        ? [
+            {
+              url: product.imagePlaceholder || "/product-placeholder.svg",
+              alt: product.title,
+            },
+          ]
+        : [];
+  const imageCount = gallery.length;
+  const storefrontUnavailable = product
+    ? isStorefrontUnavailableDisplay(product)
+    : false;
 
   const exactGroups = useMemo(
     () => (product ? getExactSelectionGroups(product.modifierGroups) : []),
     [product],
   );
-  const hasExactSelection = exactGroups.length > 0;
 
   const exactTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -180,7 +197,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   }
 
   function handleAddToCart() {
-    if (!product) return;
+    if (!product || storefrontUnavailable) return;
 
     if (
       product.priceThb === null ||
@@ -290,7 +307,10 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     !Number.isNaN(product.priceThb) &&
     configuredUnitPriceMinor !== null;
   const addDisabled =
-    !allExactSelectionsComplete || !requiredComplete || !priceAvailable;
+    storefrontUnavailable ||
+    !allExactSelectionsComplete ||
+    !requiredComplete ||
+    !priceAvailable;
 
   return (
     <main
@@ -350,11 +370,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                           >
                             <img
                               className="img-product-detail img-responsive"
-                              src={product.imagePlaceholder}
+                              src={gallery[index]?.url}
                               alt={
                                 imageCount > 1
-                                  ? `${product.title} — image ${index + 1}`
-                                  : product.title
+                                  ? `${gallery[index]?.alt ?? product.title} — image ${index + 1}`
+                                  : (gallery[index]?.alt ?? product.title)
                               }
                             />
                           </button>
@@ -392,6 +412,11 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
                 <div className="product-detail-content">
                   <div className="form-group">
+                    {storefrontUnavailable ? (
+                      <div className="alert alert-warning" role="status">
+                        This product is unavailable at this time.
+                      </div>
+                    ) : null}
                     <div className="item-pricing">
                       <div className="inner">
                         <div className="item-row">
@@ -636,6 +661,9 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                     })}
 
                     <div className="col-xs-12">
+                      <label htmlFor="VariantRemark">
+                        Additional Request/ Recipient Information
+                      </label>
                       <textarea
                         className="form-control"
                         id="VariantRemark"

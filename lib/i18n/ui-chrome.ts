@@ -19,7 +19,15 @@ export type UiChromeKey =
   | "notFoundHome"
   | "errorTitle"
   | "errorBody"
-  | "errorRetry";
+  | "errorRetry"
+  | "cookieSettings"
+  | "cookieBannerBody"
+  | "cookieEssential"
+  | "cookieAnalytics"
+  | "cookieMarketing"
+  | "cookieSave"
+  | "cookieEssentialOnly"
+  | "cookieClose";
 
 const EN: Record<UiChromeKey, string> = {
   skipToContent: "Skip to content",
@@ -36,6 +44,14 @@ const EN: Record<UiChromeKey, string> = {
   errorTitle: "Something went wrong",
   errorBody: "Please try again.",
   errorRetry: "Retry",
+  cookieSettings: "Cookie settings",
+  cookieBannerBody: "[CONTENT PENDING APPROVAL]",
+  cookieEssential: "Essential",
+  cookieAnalytics: "Analytics",
+  cookieMarketing: "Marketing",
+  cookieSave: "Save",
+  cookieEssentialOnly: "Essential only",
+  cookieClose: "Close",
 };
 
 /**
@@ -57,6 +73,14 @@ const TH_PENDING: Record<UiChromeKey, string> = {
   errorTitle: "[CONTENT PENDING APPROVAL]",
   errorBody: "[CONTENT PENDING APPROVAL]",
   errorRetry: "[CONTENT PENDING APPROVAL]",
+  cookieSettings: "[CONTENT PENDING APPROVAL]",
+  cookieBannerBody: "[CONTENT PENDING APPROVAL]",
+  cookieEssential: "[CONTENT PENDING APPROVAL]",
+  cookieAnalytics: "[CONTENT PENDING APPROVAL]",
+  cookieMarketing: "[CONTENT PENDING APPROVAL]",
+  cookieSave: "[CONTENT PENDING APPROVAL]",
+  cookieEssentialOnly: "[CONTENT PENDING APPROVAL]",
+  cookieClose: "[CONTENT PENDING APPROVAL]",
 };
 
 const MESSAGES: Record<Locale, Record<UiChromeKey, string>> = {

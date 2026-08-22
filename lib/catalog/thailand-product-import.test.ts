@@ -282,6 +282,14 @@ describe("Sprint 33C — Thailand Product Master Safe-Draft", () => {
   });
 });
 
+describe("Sprint 33D — Safe-Draft SEO / slug gating", () => {
+  it("keeps all 38 Thailand SKUs non-purchasable", () => {
+    const products = assertThailandCatalogReady().products;
+    assert.equal(products.length, 38);
+    assert.equal(products.filter((p) => isProductPurchasable(p)).length, 0);
+  });
+});
+
 describe("Sprint 33C — purchasability helper", () => {
   it("allows fully ready fixture products", () => {
     const fixture = DEV_BEHAVIOR_FIXTURES[0] as Product;

@@ -5,6 +5,7 @@ import type {
 } from "@/src/server/repositories/interfaces";
 import { MOCK_PRODUCTS } from "@/src/server/repositories/mock/data";
 import { isThailandMasterSku } from "@/lib/catalog/thailand-product-import";
+import { isStorefrontPdpVisible } from "@/lib/catalog/storefront-visibility";
 import { AppError } from "@/src/server/utils/errors";
 
 function rejectAdmin(): never {
@@ -43,7 +44,10 @@ export class MockProductRepository implements ProductRepository {
   }
 
   async findBySlug(slug: string): Promise<Product | null> {
-    return MOCK_PRODUCTS.find((product) => product.slug === slug) ?? null;
+    const product =
+      MOCK_PRODUCTS.find((item) => item.slug === slug) ?? null;
+    if (!product || !isStorefrontPdpVisible(product)) return null;
+    return product;
   }
 
   async findById(id: string): Promise<Product | null> {

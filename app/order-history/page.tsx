@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../chrome/StorefrontChrome";
 import OrderHistoryClient from "./OrderHistoryClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Order History | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("Order History");
 
 export default function OrderHistoryPage() {
-  return <OrderHistoryClient />;
+  return (
+    <StorefrontChrome>
+      <OrderHistoryClient />
+    </StorefrontChrome>
+  );
 }

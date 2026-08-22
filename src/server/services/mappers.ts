@@ -38,6 +38,10 @@ export function toProductDetailDto(product: Product): ProductDetailDto {
     allergenText: product.allergenText,
     storageLabel: product.storageLabel,
     storageText: product.storageText,
+    images: product.images.map((image) => ({
+      url: image.url,
+      altText: image.altText,
+    })),
     modifierGroups: product.modifierGroups.map((group) => ({
       id: group.id,
       title: group.title,

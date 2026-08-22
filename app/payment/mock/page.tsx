@@ -1,9 +1,8 @@
-import type { Metadata } from "next";
+import StorefrontChrome from "../../chrome/StorefrontChrome";
 import MockPaymentPageClient from "./MockPaymentPageClient";
+import { transactionalPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Payment | Ladurée Thailand",
-};
+export const metadata = transactionalPageMetadata("Payment");
 
 type PageProps = {
   searchParams: Promise<{ paymentId?: string; token?: string }>;
@@ -12,9 +11,11 @@ type PageProps = {
 export default async function MockPaymentPage({ searchParams }: PageProps) {
   const params = await searchParams;
   return (
-    <MockPaymentPageClient
-      paymentId={params.paymentId ?? null}
-      accessToken={params.token ?? null}
-    />
+    <StorefrontChrome>
+      <MockPaymentPageClient
+        paymentId={params.paymentId ?? null}
+        accessToken={params.token ?? null}
+      />
+    </StorefrontChrome>
   );
 }

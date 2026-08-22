@@ -199,8 +199,8 @@ body {
 }
 
 .language-switcher__option {
-  min-width: 32px;
-  min-height: 32px;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
   padding: 4px 6px;
   color: var(--main-color);
   background: transparent;
@@ -2387,5 +2387,38 @@ button.btn-login {
 
 .catalog-status__retry:hover {
   background: var(--main-light-color);
+}
+
+.floating-category-link {
+  display: block;
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.brand-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.footer-cookie-settings {
+  min-height: var(--touch-target-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.category-browse__page-title {
+  margin: 16px 0 24px;
 }
 

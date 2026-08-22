@@ -27,6 +27,10 @@ export type ProductDetailDto = ProductSummaryDto & {
   storageLabel: string;
   storageText: string;
   modifierGroups: ProductModifierGroupDto[];
+  images: Array<{
+    url: string;
+    altText: string | null;
+  }>;
 };
 
 export type ProductModifierOptionDetailDto = {

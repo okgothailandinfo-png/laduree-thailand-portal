@@ -18,6 +18,8 @@ import type {
 export interface ProductService {
   listProducts(): Promise<ProductSummaryDto[]>;
   getProductBySlug(slug: string): Promise<ProductDetailDto>;
+  /** Active + available + purchasable products only — sitemap / public SEO. */
+  listIndexableProducts(): Promise<Array<{ slug: string }>>;
 }
 
 export interface CategoryService {

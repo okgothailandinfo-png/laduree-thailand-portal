@@ -7,6 +7,8 @@ import { CustomerSessionProvider } from "../customer/CustomerSessionContext";
 import { OrderFlowProvider } from "../order/OrderFlowContext";
 import { PickupProvider } from "../pickup/PickupContext";
 import PickupSelectionModal from "../pickup/PickupSelectionModal";
+import { ConsentProvider } from "../consent/ConsentContext";
+import CookieConsentBanner from "../consent/CookieConsentBanner";
 import { CartProvider } from "./CartContext";
 import CartDrawer from "./CartDrawer";
 
@@ -25,17 +27,20 @@ export default function CartProviderShell({
 
   return (
     <CustomerSessionProvider>
-      <PickupProvider>
-        <CartProvider>
-          <CheckoutProvider>
-            <OrderFlowProvider>
-              {children}
-              <CartDrawer />
-              <PickupSelectionModal />
-            </OrderFlowProvider>
-          </CheckoutProvider>
-        </CartProvider>
-      </PickupProvider>
+      <ConsentProvider>
+        <PickupProvider>
+          <CartProvider>
+            <CheckoutProvider>
+              <OrderFlowProvider>
+                {children}
+                <CartDrawer />
+                <PickupSelectionModal />
+                <CookieConsentBanner />
+              </OrderFlowProvider>
+            </CheckoutProvider>
+          </CartProvider>
+        </PickupProvider>
+      </ConsentProvider>
     </CustomerSessionProvider>
   );
 }
