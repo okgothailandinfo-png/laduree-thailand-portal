@@ -12,6 +12,7 @@ import {
   formatPriceThb,
 } from "@/lib/api/catalog";
 import type { ProductModifierGroup } from "@/lib/api/types";
+import { isProductAddCtaEnabled } from "@/lib/product/add-cta";
 import {
   formatExactSelectionIncompleteMessage,
   formatExactSelectionMaximumMessage,
@@ -307,11 +308,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     product.priceThb !== null &&
     !Number.isNaN(product.priceThb) &&
     configuredUnitPriceMinor !== null;
-  const addDisabled =
-    storefrontUnavailable ||
-    !allExactSelectionsComplete ||
-    !requiredComplete ||
-    !priceAvailable;
+  const addDisabled = !isProductAddCtaEnabled({
+    storefrontUnavailable,
+    exactSelectionComplete: allExactSelectionsComplete,
+    requiredComplete,
+    priceAvailable,
+  });
 
   return (
     <main

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { buildThailandCatalog } from "@/lib/catalog/thailand-product-import";
 import {
   PREVIEW_TEST_CATALOG_PRICE_MINOR,
@@ -152,6 +154,51 @@ function overlayLdr003(): Product {
 }
 
 describe("Sprint 34D — preview cart functional flow", () => {
+  it("adds Almond 4 + Chocolate 4 as one box", async () => {
+    const product = overlayLdr003();
+    const service = new DefaultCartService(
+      memoryCartRepo(),
+      singleProductRepo(product),
+    );
+    await withEnvAsync(
+      { APP_ENV: "preview", PREVIEW_TEST_CATALOG: "true" },
+      async () => {
+        const cart = await service.addItem(undefined, {
+          productId: product.id,
+          quantity: 1,
+          modifiers: [
+            { label: "Almond", quantity: 4 },
+            { label: "Chocolate", quantity: 4 },
+          ],
+        });
+        assert.equal(cart.itemCount, 1);
+        assert.deepEqual(cart.items[0]?.modifiers, [
+          { label: "Almond", quantity: 4 },
+          { label: "Chocolate", quantity: 4 },
+        ]);
+      },
+    );
+  });
+
+  it("keeps the ADD CTA above the fixed View Cart bar", () => {
+    const css = readFileSync(
+      path.join(process.cwd(), "app/product/product-detail.css"),
+      "utf8",
+    );
+    const source = readFileSync(
+      path.join(process.cwd(), "app/product/[slug]/ProductDetailClient.tsx"),
+      "utf8",
+    );
+    assert.match(source, /id="btn-AddToCart"/);
+    assert.match(source, />\s*ADD\s*</);
+    assert.match(source, /isProductAddCtaEnabled/);
+    assert.match(
+      css,
+      /@media \(max-width: 991px\)[\s\S]*bottom:\s*var\(--view-cart-bar-clearance/,
+    );
+    assert.match(css, /z-index:\s*45/);
+  });
+
   it("adds one configurable box, not eight macaron pieces", async () => {
     const product = overlayLdr003();
     const service = new DefaultCartService(
