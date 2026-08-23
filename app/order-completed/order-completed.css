@@ -452,6 +452,16 @@
   }
 }
 
+@media (max-width: 991px) {
+  .order-completed-page__inner,
+  .order-receipt-page__inner {
+    padding-bottom: calc(
+      var(--view-cart-bar-clearance, 64px) + 24px +
+        env(safe-area-inset-bottom, 0px)
+    );
+  }
+}
+
 @media print {
   .order-receipt-page {
     background: #fff;

@@ -1,4 +1,6 @@
+import { isPublicPreview } from "@/lib/preview/public-preview";
 import { getDataSource } from "@/src/server/config/env";
+import { AppError } from "@/src/server/utils/errors";
 import type { RepositoryBundle } from "@/src/server/repositories/interfaces";
 import { MockBoutiqueRepository } from "@/src/server/repositories/mock/boutique.repository";
 import { MockCartRepository } from "@/src/server/repositories/mock/cart.repository";
@@ -91,6 +93,13 @@ function createPrismaRepositories(): RepositoryBundle {
  */
 export function createRepositories(): RepositoryBundle {
   const source = getDataSource();
+  if (isPublicPreview() && source === "prisma") {
+    throw new AppError(
+      "CONFIG_ERROR",
+      "DATA_SOURCE=prisma is not allowed in public preview. Preview commerce uses DATA_SOURCE=mock only.",
+      { status: 500 },
+    );
+  }
   logger.info("Creating repository bundle", { dataSource: source });
 
   if (source === "prisma") {

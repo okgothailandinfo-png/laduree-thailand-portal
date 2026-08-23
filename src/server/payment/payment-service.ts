@@ -37,6 +37,7 @@ import type { PaymentRepository } from "@/src/server/repositories/payment.reposi
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 import { AppError } from "@/src/server/utils/errors";
 import { assertPublicPreviewCheckoutPaymentAllowed } from "@/src/server/preview/commerce-guard";
+import { closePreviewPaymentRecovery } from "@/src/server/preview/preview-commerce-cookie";
 import { logger } from "@/src/server/utils/logger";
 import { minorToMajor } from "@/src/server/utils/money";
 import {
@@ -570,6 +571,14 @@ export class PaymentService {
     if (paymentStatus === "SUCCESS") {
       working = await this.promoteDraftOrderNumber(working.id);
       await this.clearCartAfterSuccessfulPayment(working);
+      try {
+        await closePreviewPaymentRecovery();
+      } catch (error) {
+        logger.error("Failed to close Preview payment recovery after SUCCESS", {
+          orderId: working.id,
+          message: error instanceof Error ? error.message : "unknown",
+        });
+      }
     }
 
     if (

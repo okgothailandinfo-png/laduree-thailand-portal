@@ -345,7 +345,7 @@ describe("Sprint 22 — confirmation and tracking UI contracts", () => {
     assert.match(source, /isDelivery \? \(\s*<DeliveryTrackingSection/);
     assert.match(
       source,
-      /\{!isDelivery && resolvedAccessToken \? \(\s*<PickupCredentialsCard/,
+      /\{!isDelivery \? \(\s*<PickupCredentialsCard/,
     );
     // Only one JSX render site — gated behind !isDelivery.
     assert.equal(

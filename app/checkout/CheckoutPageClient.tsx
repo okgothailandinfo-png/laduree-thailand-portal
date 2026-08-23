@@ -321,7 +321,7 @@ export default function CheckoutPageClient() {
         accessToken: result.accessToken,
       });
       router.push(
-        `/payment?orderId=${encodeURIComponent(result.orderId)}&token=${encodeURIComponent(result.accessToken)}`,
+        `/payment?orderId=${encodeURIComponent(result.orderId)}`,
       );
     } catch (error: unknown) {
       setSubmitStatus("error");

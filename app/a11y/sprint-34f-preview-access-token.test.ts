@@ -553,7 +553,7 @@ describe("Sprint 34F — preview order access token persistence", () => {
       path.join(process.cwd(), "app/payment/page.tsx"),
       "utf8",
     );
-    assert.match(paymentPage, /readPreviewCommerceSnapshot/);
+    assert.match(paymentPage, /readPreviewPaymentDraftOrderId/);
     assert.match(paymentPage, /accessToken=\{params\.token \?\? null\}/);
     assert.doesNotMatch(paymentPage, /snapshot\?\.accessToken/);
 

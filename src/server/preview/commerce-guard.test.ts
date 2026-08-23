@@ -69,6 +69,26 @@ describe("Sprint 34 — commerce guard", () => {
       } as NodeJS.ProcessEnv),
     );
     assert.throws(
+      () =>
+        assertPublicPreviewCheckoutPaymentAllowed("preview", {
+          APP_ENV: "preview",
+          PREVIEW_TEST_CATALOG: "true",
+          DATA_SOURCE: "prisma",
+        } as NodeJS.ProcessEnv),
+      (error: unknown) =>
+        error instanceof AppError && error.status === 403,
+    );
+    assert.throws(
+      () =>
+        assertPublicPreviewCartMutationsAllowed("preview", {
+          APP_ENV: "preview",
+          PREVIEW_TEST_CATALOG: "true",
+          DATA_SOURCE: "prisma",
+        } as NodeJS.ProcessEnv),
+      (error: unknown) =>
+        error instanceof AppError && error.status === 403,
+    );
+    assert.throws(
       () => assertPublicPreviewCommerceAllowed("preview"),
       (error: unknown) =>
         error instanceof AppError && error.status === 403,

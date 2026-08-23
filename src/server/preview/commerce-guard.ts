@@ -13,6 +13,15 @@ function previewCommerceForbidden(): never {
   );
 }
 
+function assertPreviewUsesMockDataSource(
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (!isPublicPreview(env.APP_ENV)) return;
+  if (env.DATA_SOURCE?.trim().toLowerCase() === "prisma") {
+    previewCommerceForbidden();
+  }
+}
+
 /**
  * Server-side commerce kill switch for APP_ENV=preview.
  * Delivery and legacy place-order stay blocked even in test-catalog mode.
@@ -42,6 +51,7 @@ export function assertPublicPreviewCartMutationsAllowed(
       APP_ENV: appEnv,
     })
   ) {
+    assertPreviewUsesMockDataSource({ ...env, APP_ENV: appEnv });
     return;
   }
   previewCommerceForbidden();
@@ -63,6 +73,7 @@ export function assertPublicPreviewCheckoutPaymentAllowed(
       APP_ENV: appEnv,
     })
   ) {
+    assertPreviewUsesMockDataSource({ ...env, APP_ENV: appEnv });
     return;
   }
   previewCommerceForbidden();

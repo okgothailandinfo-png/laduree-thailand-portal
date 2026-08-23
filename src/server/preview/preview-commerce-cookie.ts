@@ -22,6 +22,8 @@ export type PreviewCommerceSnapshot = {
   order: Order | null;
   payment: Payment | null;
   accessToken: string | null;
+  /** Set after successful Preview payment so /payment will not reopen the draft. */
+  paymentClosed?: boolean;
 };
 
 export type PreviewCookieStore = {
@@ -106,6 +108,7 @@ export function parsePreviewCommerceSnapshot(
       order?: unknown;
       payment?: unknown;
       accessToken?: unknown;
+      paymentClosed?: unknown;
     };
     const order = isOrderSnapshot(record.order) ? record.order : null;
     const payment = isPaymentSnapshot(record.payment) ? record.payment : null;
@@ -114,8 +117,9 @@ export function parsePreviewCommerceSnapshot(
       record.accessToken.includes(".")
         ? record.accessToken
         : null;
+    const paymentClosed = record.paymentClosed === true;
     if (!order && !payment && !accessToken) return null;
-    return { order, payment, accessToken };
+    return { order, payment, accessToken, paymentClosed };
   } catch {
     return null;
   }
@@ -146,6 +150,32 @@ export async function readPreviewCommerceSnapshot(): Promise<PreviewCommerceSnap
   return parsePreviewCommerceSnapshot(raw);
 }
 
+function snapshotIsPaymentClosed(
+  snapshot: PreviewCommerceSnapshot | null,
+  order: Order | null,
+  payment: Payment | null,
+): boolean {
+  if (snapshot?.paymentClosed) return true;
+  if (payment?.status === "SUCCESS") return true;
+  if (!order) return false;
+  return (
+    order.status === "confirmed" ||
+    order.status === "completed" ||
+    order.status === "cancelled" ||
+    order.payment?.status === "mock_accepted"
+  );
+}
+
+export function isPreviewPaymentDraftRecoverable(
+  snapshot: PreviewCommerceSnapshot | null,
+): boolean {
+  const order = snapshot?.order;
+  if (!order) return false;
+  if (snapshotIsPaymentClosed(snapshot, order, snapshot.payment)) return false;
+  if (order.status !== "pending" && order.status !== "mock_placed") return false;
+  return true;
+}
+
 export async function writePreviewOrderCookie(order: Order): Promise<void> {
   if (order.serviceType !== "PICKUP") return;
   const current = await readPreviewCommerceSnapshot();
@@ -157,7 +187,12 @@ export async function writePreviewOrderCookie(order: Order): Promise<void> {
     current?.accessToken && current.order?.id === order.id
       ? current.accessToken
       : null;
-  await writeSnapshot({ order, payment, accessToken });
+  await writeSnapshot({
+    order,
+    payment,
+    accessToken,
+    paymentClosed: snapshotIsPaymentClosed(current, order, payment),
+  });
 }
 
 export async function writePreviewPaymentCookie(
@@ -172,7 +207,12 @@ export async function writePreviewPaymentCookie(
     current?.accessToken && current.order?.id === payment.orderId
       ? current.accessToken
       : null;
-  await writeSnapshot({ order, payment, accessToken });
+  await writeSnapshot({
+    order,
+    payment,
+    accessToken,
+    paymentClosed: snapshotIsPaymentClosed(current, order, payment),
+  });
 }
 
 export async function writePreviewOrderAccessToken(
@@ -191,6 +231,11 @@ export async function writePreviewOrderAccessToken(
         ? current.payment
         : null,
     accessToken: token,
+    paymentClosed: snapshotIsPaymentClosed(
+      current,
+      current?.order ?? null,
+      current?.payment ?? null,
+    ),
   });
 }
 
@@ -206,6 +251,27 @@ export async function readPreviewOrderAccessToken(
     return null;
   }
   return token;
+}
+
+export async function readPreviewPaymentDraftOrderId(): Promise<string | null> {
+  const snapshot = await readPreviewCommerceSnapshot();
+  if (!isPreviewPaymentDraftRecoverable(snapshot)) return null;
+  return snapshot?.order?.id ?? null;
+}
+
+export async function readPreviewConfirmationOrderId(): Promise<string | null> {
+  const snapshot = await readPreviewCommerceSnapshot();
+  return snapshot?.order?.id ?? null;
+}
+
+/** Invalidate /payment draft recovery after SUCCESS. Token remains for confirmation. */
+export async function closePreviewPaymentRecovery(): Promise<void> {
+  const current = await readPreviewCommerceSnapshot();
+  if (!current) return;
+  await writeSnapshot({
+    ...current,
+    paymentClosed: true,
+  });
 }
 
 export async function clearPreviewCommerceCookie(): Promise<void> {
