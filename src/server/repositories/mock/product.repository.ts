@@ -6,7 +6,12 @@ import type {
 import { MOCK_PRODUCTS } from "@/src/server/repositories/mock/data";
 import { isThailandMasterSku } from "@/lib/catalog/thailand-product-import";
 import { isStorefrontPdpVisible } from "@/lib/catalog/storefront-visibility";
+import { applyPreviewTestCatalogOverlay } from "@/lib/preview/preview-test-catalog";
 import { AppError } from "@/src/server/utils/errors";
+
+function withPreviewOverlay(product: Product): Product {
+  return applyPreviewTestCatalogOverlay(product);
+}
 
 function rejectAdmin(): never {
   throw new AppError(
@@ -26,16 +31,16 @@ function isProductionAppEnv(): boolean {
  * while cart/checkout remain fail-closed (inactive / unavailable / null price).
  */
 function listForStorefront(): Product[] {
-  if (isProductionAppEnv()) {
-    return MOCK_PRODUCTS.filter(
-      (product) => product.available && product.isActive,
-    );
-  }
-  return MOCK_PRODUCTS.filter(
-    (product) =>
-      (product.available && product.isActive) ||
-      isThailandMasterSku(product.sku),
-  );
+  const listed = isProductionAppEnv()
+    ? MOCK_PRODUCTS.filter(
+        (product) => product.available && product.isActive,
+      )
+    : MOCK_PRODUCTS.filter(
+        (product) =>
+          (product.available && product.isActive) ||
+          isThailandMasterSku(product.sku),
+      );
+  return listed.map(withPreviewOverlay);
 }
 
 export class MockProductRepository implements ProductRepository {
@@ -47,15 +52,19 @@ export class MockProductRepository implements ProductRepository {
     const product =
       MOCK_PRODUCTS.find((item) => item.slug === slug) ?? null;
     if (!product || !isStorefrontPdpVisible(product)) return null;
-    return product;
+    return withPreviewOverlay(product);
   }
 
   async findById(id: string): Promise<Product | null> {
-    return MOCK_PRODUCTS.find((product) => product.id === id) ?? null;
+    const product =
+      MOCK_PRODUCTS.find((item) => item.id === id) ?? null;
+    return product ? withPreviewOverlay(product) : null;
   }
 
   async findBySku(sku: string): Promise<Product | null> {
-    return MOCK_PRODUCTS.find((product) => product.sku === sku) ?? null;
+    const product =
+      MOCK_PRODUCTS.find((item) => item.sku === sku) ?? null;
+    return product ? withPreviewOverlay(product) : null;
   }
 
   async adminList(): Promise<AdminProductListPage> {

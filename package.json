@@ -27,7 +27,7 @@
     "smoke:security": "tsx src/server/hardening/smoke/run-security-smoke.ts",
     "smoke:webhook": "tsx src/server/payment/webhook/run-webhook-smoke.ts",
     "smoke:deploy": "tsx src/server/hardening/smoke/run-deploy-smoke.ts",
-    "smoke:preview": "tsx --test app/a11y/sprint-34-public-preview.test.ts app/a11y/sprint-34b-vercel.test.ts lib/preview/*.test.ts src/server/preview/*.test.ts"
+    "smoke:preview": "tsx --test app/a11y/sprint-34-public-preview.test.ts app/a11y/sprint-34b-vercel.test.ts app/a11y/sprint-34c-preview-test-catalog.test.ts lib/preview/*.test.ts src/server/preview/*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

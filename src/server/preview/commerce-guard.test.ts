@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PUBLIC_PREVIEW_COMMERCE_CODE } from "@/lib/preview/public-preview";
-import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
+import {
+  assertPublicPreviewCartMutationsAllowed,
+  assertPublicPreviewCommerceAllowed,
+} from "@/src/server/preview/commerce-guard";
 import { AppError } from "@/src/server/utils/errors";
 
 describe("Sprint 34 — commerce guard", () => {
@@ -17,6 +20,32 @@ describe("Sprint 34 — commerce guard", () => {
     );
     assert.doesNotThrow(() =>
       assertPublicPreviewCommerceAllowed(undefined),
+    );
+  });
+
+  it("allows preview cart mutations only when PREVIEW_TEST_CATALOG is on", () => {
+    assert.throws(
+      () => assertPublicPreviewCartMutationsAllowed("preview"),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.status === 403 &&
+        Boolean(
+          error.details &&
+            typeof error.details === "object" &&
+            (error.details as { code?: string }).code ===
+              PUBLIC_PREVIEW_COMMERCE_CODE,
+        ),
+    );
+    assert.doesNotThrow(() =>
+      assertPublicPreviewCartMutationsAllowed("preview", {
+        APP_ENV: "preview",
+        PREVIEW_TEST_CATALOG: "true",
+      } as NodeJS.ProcessEnv),
+    );
+    assert.throws(
+      () => assertPublicPreviewCommerceAllowed("preview"),
+      (error: unknown) =>
+        error instanceof AppError && error.status === 403,
     );
   });
 
