@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { assertCsrfOrigin } from "@/src/server/http/csrf";
+import {
+  assertCsrfOrigin,
+  vercelPreviewOrigins,
+} from "@/src/server/http/csrf";
 import { env } from "@/src/server/config/env";
 import { AppError } from "@/src/server/utils/errors";
 
@@ -34,6 +37,47 @@ describe("Sprint 30 — CSRF origin checks", () => {
         error instanceof AppError &&
         error.code === "FORBIDDEN" &&
         error.message.includes("origin"),
+    );
+  });
+
+  it("accepts the current Vercel Preview Origin on mutating requests", () => {
+    const previousEnv = process.env.APP_ENV;
+    const previousUrl = process.env.VERCEL_URL;
+    process.env.APP_ENV = "preview";
+    process.env.VERCEL_URL = "laduree-preview.vercel.app";
+    try {
+      const request = new Request("https://laduree-preview.vercel.app/api/cart/items", {
+        method: "POST",
+        headers: { origin: "https://laduree-preview.vercel.app" },
+      });
+      assert.doesNotThrow(() => assertCsrfOrigin(request));
+    } finally {
+      if (previousEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = previousEnv;
+      if (previousUrl === undefined) delete process.env.VERCEL_URL;
+      else process.env.VERCEL_URL = previousUrl;
+    }
+  });
+
+  it("allows Vercel Preview origins only when APP_ENV=preview", () => {
+    assert.deepEqual(
+      vercelPreviewOrigins({
+        APP_ENV: "preview",
+        VERCEL_URL: "laduree-thailand-portal-okvwyy6fc-okgo.vercel.app",
+        VERCEL_BRANCH_URL:
+          "laduree-thailand-portal-git-cursor-sprint-34d-okgo.vercel.app",
+      } as NodeJS.ProcessEnv),
+      [
+        "https://laduree-thailand-portal-okvwyy6fc-okgo.vercel.app",
+        "https://laduree-thailand-portal-git-cursor-sprint-34d-okgo.vercel.app",
+      ],
+    );
+    assert.deepEqual(
+      vercelPreviewOrigins({
+        APP_ENV: "production",
+        VERCEL_URL: "laduree-thailand-portal-okvwyy6fc-okgo.vercel.app",
+      } as NodeJS.ProcessEnv),
+      [],
     );
   });
 

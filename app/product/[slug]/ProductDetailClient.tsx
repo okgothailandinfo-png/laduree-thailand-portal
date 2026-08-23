@@ -250,7 +250,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
       quantity: productQty,
       modifiers,
       note: remark.trim() || undefined,
-    });
+    }).catch(() => undefined);
   }
 
   if (
