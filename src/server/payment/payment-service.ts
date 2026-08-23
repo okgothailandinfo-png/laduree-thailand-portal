@@ -24,7 +24,7 @@ import { verifyWebhookSignature } from "@/src/server/payment/webhook/verify";
 import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
 import { appendAccessTokenToUrl } from "@/src/server/orders/append-access-token";
 import {
-  extractOrderAccessToken,
+  resolveRequestAccessToken,
   verifyOrderAccessToken,
 } from "@/src/server/orders/order-access-token";
 import {
@@ -36,7 +36,8 @@ import type { OrderRepository } from "@/src/server/repositories/interfaces";
 import type { PaymentRepository } from "@/src/server/repositories/payment.repository";
 import type { WebhookEventRepository } from "@/src/server/repositories/webhook-event.repository";
 import { AppError } from "@/src/server/utils/errors";
-import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
+import { assertPublicPreviewCheckoutPaymentAllowed } from "@/src/server/preview/commerce-guard";
+import { closePreviewPaymentRecovery } from "@/src/server/preview/preview-commerce-cookie";
 import { logger } from "@/src/server/utils/logger";
 import { minorToMajor } from "@/src/server/utils/money";
 import {
@@ -123,13 +124,6 @@ export class PaymentService {
     }
     const accessToken =
       typeof body.accessToken === "string" ? body.accessToken.trim() : "";
-    if (!accessToken) {
-      throw new AppError(
-        "UNAUTHORIZED",
-        "Order access token is required to create a payment.",
-        { status: 401, details: { field: "accessToken" } },
-      );
-    }
     return {
       orderId: requireString(body.orderId, "orderId"),
       method: methodRaw,
@@ -142,13 +136,14 @@ export class PaymentService {
    * Resolve capability token from parsed body and/or request headers/query.
    * Body wins when present (create payload); otherwise header/query.
    */
-  resolveAccessToken(
+  async resolveAccessToken(
     request: Request,
     bodyToken?: string | null,
-  ): string {
+    orderId?: string | null,
+  ): Promise<string> {
     const fromBody = bodyToken?.trim() ?? "";
     if (fromBody) return fromBody;
-    const fromRequest = extractOrderAccessToken(request);
+    const fromRequest = await resolveRequestAccessToken(request, orderId);
     if (fromRequest) return fromRequest;
     throw new AppError(
       "UNAUTHORIZED",
@@ -216,7 +211,7 @@ export class PaymentService {
   async createPayment(
     input: CreatePaymentRequestDto,
   ): Promise<CreatePaymentResult> {
-    assertPublicPreviewCommerceAllowed();
+    assertPublicPreviewCheckoutPaymentAllowed();
     const id = requireString(input.orderId, "orderId");
     const accessToken = this.assertOrderAccessToken(id, input.accessToken);
     const method: PaymentMethodId = input.method;
@@ -320,7 +315,7 @@ export class PaymentService {
     result: ConfirmPaymentRequestDto["result"],
     accessToken?: string | null,
   ): Promise<ConfirmPaymentResponseDto> {
-    assertPublicPreviewCommerceAllowed();
+    assertPublicPreviewCheckoutPaymentAllowed();
     const id = requireString(paymentId, "paymentId");
     const { payment: existing, token } = await this.requireAuthorizedPayment(
       id,
@@ -576,6 +571,14 @@ export class PaymentService {
     if (paymentStatus === "SUCCESS") {
       working = await this.promoteDraftOrderNumber(working.id);
       await this.clearCartAfterSuccessfulPayment(working);
+      try {
+        await closePreviewPaymentRecovery();
+      } catch (error) {
+        logger.error("Failed to close Preview payment recovery after SUCCESS", {
+          orderId: working.id,
+          message: error instanceof Error ? error.message : "unknown",
+        });
+      }
     }
 
     if (

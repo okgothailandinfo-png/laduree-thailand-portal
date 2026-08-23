@@ -33,13 +33,6 @@ export default function OrderReceiptClient({
 
   const query = useAsyncResource(
     (signal) => {
-      if (!resolvedAccessToken) {
-        return Promise.reject(
-          new Error(
-            "Order access token is required. Open this page from Order Confirmation or Order History.",
-          ),
-        );
-      }
       return fetchOrderCompletion(orderId, {
         signal,
         accessToken: resolvedAccessToken,
@@ -61,10 +54,9 @@ export default function OrderReceiptClient({
   }, [query.status, query.data, resolvedAccessToken]);
 
   const showLoadState =
-    Boolean(resolvedAccessToken) &&
-    (query.status === "loading" ||
-      query.status === "error" ||
-      query.status === "empty");
+    query.status === "loading" ||
+    query.status === "error" ||
+    query.status === "empty";
 
   function handlePrint() {
     window.print();
@@ -75,14 +67,10 @@ export default function OrderReceiptClient({
       <div className="order-receipt-page__inner">
         <div className="order-receipt-toolbar no-print">
           <Link
-            href={
-              resolvedAccessToken
-                ? buildOrderCompletedPath({
-                    orderId,
-                    accessToken: resolvedAccessToken,
-                  })
-                : "/order-history"
-            }
+            href={buildOrderCompletedPath({
+              orderId,
+              accessToken: resolvedAccessToken,
+            })}
             className="order-completed-btn order-completed-btn--secondary"
           >
             ← Back

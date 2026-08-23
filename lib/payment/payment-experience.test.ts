@@ -304,11 +304,19 @@ describe("Sprint 24 payment experience", () => {
     const order = draftOrder();
     await orders.create(order);
 
-    assert.throws(() =>
-      service.parseCreatePaymentBody({
-        orderId: order.id,
-        method: "credit-card",
-      }),
+    const parsedWithoutToken = service.parseCreatePaymentBody({
+      orderId: order.id,
+      method: "credit-card",
+    });
+    assert.equal(parsedWithoutToken.accessToken, "");
+    await assert.rejects(
+      () =>
+        service.resolveAccessToken(
+          new Request("http://localhost/api/payment/create"),
+          parsedWithoutToken.accessToken,
+          parsedWithoutToken.orderId,
+        ),
+      /access token is required/i,
     );
 
     await assert.rejects(

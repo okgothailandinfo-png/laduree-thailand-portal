@@ -29,4 +29,19 @@ describe("Sprint 25 — post-payment reopen paths", () => {
       "order",
     );
   });
+
+  it("omits the token query when none is supplied", () => {
+    assert.equal(
+      buildOrderConfirmationPath({ orderId: "order-123" }),
+      "/order-confirmation?orderId=order-123",
+    );
+    assert.equal(
+      buildOrderCompletedPath({ orderId: "order-123" }),
+      "/order-completed/order-123",
+    );
+    assert.equal(
+      buildOrderReceiptPath({ orderId: "order-123" }),
+      "/order-completed/order-123/receipt",
+    );
+  });
 });

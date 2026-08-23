@@ -103,11 +103,11 @@ export default function MockPaymentPageClient({
     resolvedToken?.trim() ||
     (payment?.orderId
       ? getRememberedOrderAccessToken(payment.orderId)
-      : null);
-  const missingAccessToken = Boolean(paymentId) && !loadToken;
+      : null) ||
+    null;
 
   useEffect(() => {
-    if (!paymentId || !loadToken) return;
+    if (!paymentId) return;
     const id = paymentId;
     const token = loadToken;
 
@@ -118,7 +118,7 @@ export default function MockPaymentPageClient({
       try {
         const data = await fetchPayment(id, {
           signal: controller.signal,
-          accessToken: token,
+          ...(token ? { accessToken: token } : {}),
         });
         if (cancelled) return;
         setPayment(data);
@@ -154,7 +154,10 @@ export default function MockPaymentPageClient({
 
     const interval = window.setInterval(() => {
       if (cancelled) return;
-      void fetchPayment(id, { signal: controller.signal, accessToken: token })
+      void fetchPayment(id, {
+        signal: controller.signal,
+        ...(token ? { accessToken: token } : {}),
+      })
         .then((data) => {
           if (cancelled) return;
           setPayment(data);
@@ -200,16 +203,17 @@ export default function MockPaymentPageClient({
   useEffect(() => {
     if (!payment || payment.status !== "SUCCESS" || redirected.current) return;
     if (!canAccessOrderConfirmation("SUCCEEDED")) return;
-    const accessToken = payment.accessToken?.trim();
-    if (!accessToken) return;
 
     redirected.current = true;
     const orderNumber = payment.orderNumber ?? undefined;
-    rememberCustomerOrder({
-      orderId: payment.orderId,
-      accessToken,
-      orderNumber,
-    });
+    const accessToken = payment.accessToken?.trim();
+    if (accessToken) {
+      rememberCustomerOrder({
+        orderId: payment.orderId,
+        accessToken,
+        orderNumber,
+      });
+    }
     placeMockOrder(payment.method, {
       safeDisplay: payment.safeDisplay,
       orderNumber,
@@ -229,7 +233,6 @@ export default function MockPaymentPageClient({
       router.push(
         buildOrderConfirmationPath({
           orderId: payment.orderId,
-          accessToken,
         }),
       );
     })();
@@ -247,19 +250,13 @@ export default function MockPaymentPageClient({
     if (payment && payment.status !== "PENDING") return;
     if (uiState === "EXPIRED") return;
     const token = resolveToken(payment?.orderId);
-    if (!token) {
-      setError(
-        "Order access token is required. Return to checkout to continue payment.",
-      );
-      return;
-    }
     setActionBusy(true);
     setError(null);
     setUiState("PROCESSING");
     try {
       const confirmed = await confirmPayment(
         { paymentId, result },
-        { accessToken: token },
+        token ? { accessToken: token } : {},
       );
       setPayment((current) =>
         current
@@ -291,18 +288,13 @@ export default function MockPaymentPageClient({
     if (!paymentId || actionBusy) return;
     if (payment && payment.status !== "PENDING") return;
     const tokenForCancel = resolveToken(payment?.orderId);
-    if (!tokenForCancel) {
-      setError(
-        "Order access token is required. Return to checkout to continue payment.",
-      );
-      return;
-    }
     setActionBusy(true);
     setError(null);
     try {
-      const cancelled = await cancelPayment(paymentId, {
-        accessToken: tokenForCancel,
-      });
+      const cancelled = await cancelPayment(
+        paymentId,
+        tokenForCancel ? { accessToken: tokenForCancel } : {},
+      );
       setPayment((current) =>
         current
           ? {
@@ -323,10 +315,9 @@ export default function MockPaymentPageClient({
           orderNumber: cancelled.orderNumber,
         });
       }
-      const paymentReturn = token
-        ? `/payment?orderId=${encodeURIComponent(cancelled.orderId)}&token=${encodeURIComponent(token)}`
-        : `/payment?orderId=${encodeURIComponent(cancelled.orderId)}`;
-      router.push(paymentReturn);
+      router.push(
+        `/payment?orderId=${encodeURIComponent(cancelled.orderId)}`,
+      );
     } catch (err: unknown) {
       setError(
         errorMessage(err, "Unable to cancel payment. Please try again."),
@@ -374,23 +365,19 @@ export default function MockPaymentPageClient({
           </div>
         ) : null}
 
-        {paymentId && !missingAccessToken && phase === "loading" ? (
+        {paymentId && phase === "loading" ? (
           <CatalogStatus status="loading" />
         ) : null}
 
-        {paymentId && (missingAccessToken || phase === "error") ? (
+        {paymentId && phase === "error" ? (
           <CatalogStatus
             status="error"
-            errorMessage={
-              missingAccessToken
-                ? "Order access token is required. Return to checkout to continue payment."
-                : (error ?? "Unable to load payment.")
-            }
-            onRetry={missingAccessToken ? undefined : retry}
+            errorMessage={error ?? "Unable to load payment."}
+            onRetry={retry}
           />
         ) : null}
 
-        {paymentId && payment && phase === "ready" && !missingAccessToken ? (
+        {paymentId && payment && phase === "ready" ? (
           <section
             className="payment-card"
             aria-labelledby="mock-payment-title"

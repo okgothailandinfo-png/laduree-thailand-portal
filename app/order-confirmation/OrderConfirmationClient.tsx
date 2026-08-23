@@ -188,13 +188,6 @@ export default function OrderConfirmationClient({
   const orderQuery = useAsyncResource(
     (signal) => {
       if (!orderId) return Promise.resolve(null);
-      if (!resolvedAccessToken) {
-        return Promise.reject(
-          new Error(
-            "Order access token is required. Open this page from your payment confirmation or Order History link.",
-          ),
-        );
-      }
       return fetchOrderById(orderId, {
         signal,
         accessToken: resolvedAccessToken,
@@ -252,19 +245,7 @@ export default function OrderConfirmationClient({
 
           <h1 className="order-confirmation-page__title">Order Confirmation</h1>
 
-          {!resolvedAccessToken ? (
-            <div
-              className="order-confirmation-gate"
-              role="alert"
-              data-testid="confirmation-token-required"
-            >
-              Order access token is required. Open this page from your payment
-              confirmation or Order History link.{" "}
-              <Link href="/order-history">Order History</Link>
-            </div>
-          ) : null}
-
-          {resolvedAccessToken && showLoadState ? (
+          {showLoadState ? (
             <CatalogStatus
               status={
                 orderQuery.status === "loading"
@@ -292,8 +273,7 @@ export default function OrderConfirmationClient({
             />
           ) : null}
 
-          {resolvedAccessToken &&
-          orderQuery.status === "success" &&
+          {orderQuery.status === "success" &&
           order ? (
             !isConfirmationAllowed(order) ? (
               <div
@@ -424,7 +404,7 @@ export default function OrderConfirmationClient({
                   currentStatus={deliveryTrackingStatus}
                 />
               ) : null}
-              {!isDelivery && resolvedAccessToken ? (
+              {!isDelivery ? (
                 <PickupCredentialsCard
                   orderId={order.id}
                   accessToken={resolvedAccessToken}
@@ -516,19 +496,17 @@ export default function OrderConfirmationClient({
               </section>
 
               <div className="order-confirmation-actions">
-                {resolvedAccessToken ? (
-                  <Link
-                    href={buildOrderReceiptPath({
-                      orderId: order.id,
-                      accessToken: resolvedAccessToken,
-                    })}
-                    className="order-confirmation-continue"
-                    data-testid="view-payment-receipt"
-                  >
-                    View Payment Receipt
-                  </Link>
-                ) : null}
-                {order.status === "completed" && resolvedAccessToken ? (
+                <Link
+                  href={buildOrderReceiptPath({
+                    orderId: order.id,
+                    accessToken: resolvedAccessToken,
+                  })}
+                  className="order-confirmation-continue"
+                  data-testid="view-payment-receipt"
+                >
+                  View Payment Receipt
+                </Link>
+                {order.status === "completed" ? (
                   <Link
                     href={buildOrderCompletedPath({
                       orderId: order.id,

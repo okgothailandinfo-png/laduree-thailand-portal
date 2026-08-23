@@ -21,7 +21,7 @@ export async function GET(request: Request, context: RouteContext) {
       maxAttempts: 60,
       windowMs: 60_000,
     });
-    assertOrderAccess(request, id, "order");
+    await assertOrderAccess(request, id, "order");
     const data = await orderService.getOrderById(id);
     return ok(data);
   }, request);

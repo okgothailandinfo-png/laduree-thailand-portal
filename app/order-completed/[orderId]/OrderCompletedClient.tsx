@@ -34,13 +34,6 @@ export default function OrderCompletedClient({
 
   const query = useAsyncResource(
     (signal) => {
-      if (!resolvedAccessToken) {
-        return Promise.reject(
-          new Error(
-            "Order access token is required. Open this page from Order Confirmation or Order History.",
-          ),
-        );
-      }
       return fetchOrderCompletion(orderId, {
         signal,
         accessToken: resolvedAccessToken,
@@ -62,10 +55,9 @@ export default function OrderCompletedClient({
   }, [query.status, query.data, resolvedAccessToken]);
 
   const showLoadState =
-    Boolean(resolvedAccessToken) &&
-    (query.status === "loading" ||
-      query.status === "error" ||
-      query.status === "empty");
+    query.status === "loading" ||
+    query.status === "error" ||
+    query.status === "empty";
 
   return (
     <main className="order-completed-page" id="main-content" tabIndex={-1}>
@@ -80,18 +72,6 @@ export default function OrderCompletedClient({
         </div>
 
         <h1 className="order-completed-page__title">Order Completed</h1>
-
-        {!resolvedAccessToken ? (
-          <div className="order-completed-banner" role="alert">
-            <p className="order-completed-banner__message">
-              Order access token is required.
-            </p>
-            <p className="order-completed-banner__sub">
-              Open this page from Order Confirmation or{" "}
-              <Link href="/order-history">Order History</Link>.
-            </p>
-          </div>
-        ) : null}
 
         {showLoadState ? (
           <CatalogStatus
@@ -247,17 +227,15 @@ export default function OrderCompletedClient({
             ) : null}
 
             <div className="order-completed-actions">
-              {resolvedAccessToken ? (
-                <Link
-                  href={buildOrderReceiptPath({
-                    orderId: query.data.orderId,
-                    accessToken: resolvedAccessToken,
-                  })}
-                  className="order-completed-btn order-completed-btn--primary"
-                >
-                  View Payment Receipt
-                </Link>
-              ) : null}
+              <Link
+                href={buildOrderReceiptPath({
+                  orderId: query.data.orderId,
+                  accessToken: resolvedAccessToken,
+                })}
+                className="order-completed-btn order-completed-btn--primary"
+              >
+                View Payment Receipt
+              </Link>
               <div className="order-completed-actions__secondary">
                 <Link
                   href="/order-history"

@@ -1,7 +1,12 @@
+import { isPublicPreview } from "@/lib/preview/public-preview";
 import { getDataSource } from "@/src/server/config/env";
+import { AppError } from "@/src/server/utils/errors";
 import type { RepositoryBundle } from "@/src/server/repositories/interfaces";
 import { MockBoutiqueRepository } from "@/src/server/repositories/mock/boutique.repository";
 import { MockCartRepository } from "@/src/server/repositories/mock/cart.repository";
+import { PreviewCookieCartRepository } from "@/src/server/preview/preview-cart-repository";
+import { PreviewCookieOrderRepository } from "@/src/server/preview/preview-order-repository";
+import { PreviewCookiePaymentRepository } from "@/src/server/preview/preview-payment-repository";
 import { MockCategoryRepository } from "@/src/server/repositories/mock/category.repository";
 import { MockHomepageBannerRepository } from "@/src/server/repositories/mock/homepage-banner.repository";
 import { MockHomepageContentRepository } from "@/src/server/repositories/mock/homepage-content.repository";
@@ -46,11 +51,11 @@ function createMockRepositories(): RepositoryBundle {
     homepageContent: new MockHomepageContentRepository(),
     boutiques: new MockBoutiqueRepository(),
     pickup: new MockPickupRepository(),
-    orders: new MockOrderRepository(),
+    orders: new PreviewCookieOrderRepository(new MockOrderRepository()),
     pickupVerifications: new MockPickupVerificationRepository(),
     // Cart / gateway payments / webhook idempotency — in-memory until persistent models exist.
-    carts: new MockCartRepository(),
-    payments: new MockPaymentRepository(),
+    carts: new PreviewCookieCartRepository(new MockCartRepository()),
+    payments: new PreviewCookiePaymentRepository(new MockPaymentRepository()),
     webhookEvents: new MockWebhookEventRepository(),
     notificationQueue: new MockNotificationQueueRepository(),
     notificationSettings: new MockNotificationSettingRepository(),
@@ -88,6 +93,13 @@ function createPrismaRepositories(): RepositoryBundle {
  */
 export function createRepositories(): RepositoryBundle {
   const source = getDataSource();
+  if (isPublicPreview() && source === "prisma") {
+    throw new AppError(
+      "CONFIG_ERROR",
+      "DATA_SOURCE=prisma is not allowed in public preview. Preview commerce uses DATA_SOURCE=mock only.",
+      { status: 500 },
+    );
+  }
   logger.info("Creating repository bundle", { dataSource: source });
 
   if (source === "prisma") {

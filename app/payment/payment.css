@@ -352,3 +352,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 991px) {
+  .payment-page__inner {
+    padding-bottom: calc(
+      var(--view-cart-bar-clearance, 64px) + 24px +
+        env(safe-area-inset-bottom, 0px)
+    );
+  }
+}

@@ -264,6 +264,11 @@ export function resolveDataSource(options?: {
   )?.trim();
 
   if (raw === "prisma") {
+    if (appEnv === "preview") {
+      throw new EnvValidationError(
+        "DATA_SOURCE=prisma is not allowed in public preview. Preview commerce uses DATA_SOURCE=mock only.",
+      );
+    }
     if (!databaseUrl) {
       throw new EnvValidationError(
         "DATA_SOURCE=prisma requires DATABASE_URL to be set. Refusing to start.",
@@ -515,6 +520,11 @@ function assertStrictProductionEnv(config: ServerEnv): void {
 
 function assertPublicPreviewEnv(config: ServerEnv, buildPhase: boolean): void {
   // Public website on a real domain; live commerce remains off.
+  if (config.dataSource === "prisma") {
+    throw new EnvValidationError(
+      "DATA_SOURCE=prisma is not allowed in public preview. Preview commerce uses DATA_SOURCE=mock only.",
+    );
+  }
   if (config.paymentProvider !== "mock") {
     throw new EnvValidationError(
       "Public preview requires PAYMENT_PROVIDER=mock. Do not register a production PSP in this environment.",

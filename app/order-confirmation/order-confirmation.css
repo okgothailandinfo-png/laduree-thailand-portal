@@ -282,3 +282,12 @@
     padding: 28px 24px 64px;
   }
 }
+
+@media (max-width: 991px) {
+  .order-confirmation-page__inner {
+    padding-bottom: calc(
+      var(--view-cart-bar-clearance, 64px) + 24px +
+        env(safe-area-inset-bottom, 0px)
+    );
+  }
+}

@@ -1,4 +1,5 @@
 import { env } from "@/src/server/config/env";
+import { isPublicPreview } from "@/lib/preview/public-preview";
 import { AppError } from "@/src/server/utils/errors";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -66,5 +67,22 @@ function allowedOrigins(): Set<string> {
     set.add("http://localhost:3000");
     set.add("http://127.0.0.1:3000");
   }
+  for (const origin of vercelPreviewOrigins(process.env)) {
+    set.add(origin);
+  }
   return set;
+}
+
+/** Preview-only: allow this deployment's Vercel URLs (not arbitrary *.vercel.app). */
+export function vercelPreviewOrigins(
+  processEnv: NodeJS.ProcessEnv = process.env,
+): string[] {
+  if (!isPublicPreview(processEnv.APP_ENV)) return [];
+  const origins: string[] = [];
+  for (const raw of [processEnv.VERCEL_URL, processEnv.VERCEL_BRANCH_URL]) {
+    const host = raw?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (!host) continue;
+    origins.push(`https://${host}`);
+  }
+  return origins;
 }

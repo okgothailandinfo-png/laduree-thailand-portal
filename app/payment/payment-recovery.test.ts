@@ -102,6 +102,31 @@ describe("Sprint 28 — payment recovery helpers", () => {
     );
   });
 
+  it("allows a recovered unpaid draft without a client-visible token", () => {
+    const order = unpaidPickupOrder();
+    assert.equal(
+      canContinuePayment({
+        orderId: order.id,
+        accessToken: null,
+        order,
+        sessionReady: false,
+      }),
+      true,
+    );
+  });
+
+  it("still requires a token when no recoverable server order is loaded", () => {
+    assert.equal(
+      canContinuePayment({
+        orderId: "order-1",
+        accessToken: null,
+        order: null,
+        sessionReady: true,
+      }),
+      false,
+    );
+  });
+
   it("falls back to sessionReady when no recoverable server order", () => {
     assert.equal(
       canContinuePayment({

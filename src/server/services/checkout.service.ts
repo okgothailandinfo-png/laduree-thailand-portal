@@ -1,6 +1,14 @@
 import { randomUUID } from "crypto";
 import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
-import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
+import {
+  isPreviewTestCatalogEnabled,
+  isPreviewTestCatalogSku,
+} from "@/lib/preview/preview-test-catalog";
+import { isPublicPreview } from "@/lib/preview/public-preview";
+import {
+  assertPublicPreviewCheckoutPaymentAllowed,
+  assertPublicPreviewCommerceAllowed,
+} from "@/src/server/preview/commerce-guard";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
@@ -39,6 +47,7 @@ import type {
   DeliveryAddressDto,
 } from "@/src/server/types/dto";
 import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
+import { writePreviewOrderAccessToken } from "@/src/server/preview/preview-commerce-cookie";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
 import {
@@ -284,6 +293,13 @@ export class DefaultCheckoutService {
         );
       }
 
+      if (
+        isPreviewTestCatalogEnabled() &&
+        !isPreviewTestCatalogSku(product.sku)
+      ) {
+        assertPublicPreviewCommerceAllowed();
+      }
+
       const purchasability = evaluateProductPurchasability(product);
       if (!purchasability.purchasable) {
         throw new AppError(
@@ -500,6 +516,8 @@ export class DefaultCheckoutService {
     });
 
     const total = minorToMajor(saved.totalMinor);
+    const accessToken = issueOrderAccessToken(saved.id);
+    await writePreviewOrderAccessToken(saved.id, accessToken);
     return {
       orderId: saved.id,
       subtotal: total,
@@ -508,7 +526,7 @@ export class DefaultCheckoutService {
       status: "PENDING",
       serviceType: "PICKUP",
       deliveryFee: null,
-      accessToken: issueOrderAccessToken(saved.id),
+      accessToken,
     };
   }
 
@@ -689,14 +707,17 @@ export class DefaultCheckoutService {
     cartId: string | undefined,
     input: CheckoutRequestDto,
   ): Promise<CheckoutResponseDto> {
-    assertPublicPreviewCommerceAllowed();
+    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
+    if (isPublicPreview() && serviceType === "DELIVERY") {
+      assertPublicPreviewCommerceAllowed();
+    }
+    assertPublicPreviewCheckoutPaymentAllowed();
     if (!cartId) {
       throw new AppError("VALIDATION_ERROR", "Cart not found.", {
         details: { field: "cart" },
       });
     }
 
-    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
     if (serviceType === "DELIVERY") {
       return this.createDeliveryDraft(cartId, input);
     }

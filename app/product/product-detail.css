@@ -382,7 +382,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 30;
+  z-index: 45;
   margin: 0;
   padding: 10px 15px;
   padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -390,6 +390,19 @@
   border: 0;
   border-top: 1px solid #e5e5e5;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 991px) {
+  /* Sit above the site-wide View Cart bar so ADD stays visible and tappable. */
+  .product-detail-page .modal-footer.product-detail-footer.v2 {
+    bottom: var(--view-cart-bar-clearance, 64px);
+  }
+
+  .product-detail-page .modal-body {
+    padding-bottom: calc(
+      164px + env(safe-area-inset-bottom, 0px)
+    );
+  }
 }
 
 .product-detail-page .product-detail-footer .footer-actions {

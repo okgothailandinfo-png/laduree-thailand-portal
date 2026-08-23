@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -117,6 +118,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
   const [reloadToken, setReloadToken] = useState(0);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const fetchGeneration = useRef(0);
 
   const applyCart = useCallback(
     (nextItems: CartItem[], nextSubtotal: number | null, nextPrices: boolean) => {
@@ -152,10 +154,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    const generation = ++fetchGeneration.current;
 
     fetchCart({ signal: controller.signal })
       .then((cart) => {
         if (controller.signal.aborted) return;
+        if (generation !== fetchGeneration.current) return;
         applyFromApi(cart);
       })
       .catch((error: unknown) => {
@@ -204,6 +208,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           modifiers: input.modifiers,
           note: input.note,
         });
+        fetchGeneration.current += 1;
         applyFromApi(cart);
       } catch (error: unknown) {
         applyCart(previous, previousSubtotal, previousPrices);
@@ -233,6 +238,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       try {
         const cart = await updateCartItem(id, { quantity: nextQty });
+        fetchGeneration.current += 1;
         applyFromApi(cart);
       } catch (error: unknown) {
         applyCart(previous, previousSubtotal, previousPrices);
@@ -259,6 +265,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       try {
         const cart = await removeCartItem(id);
+        fetchGeneration.current += 1;
         applyFromApi(cart);
       } catch (error: unknown) {
         applyCart(previous, previousSubtotal, previousPrices);
@@ -279,6 +286,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     try {
       const cart = await clearCartApi();
+      fetchGeneration.current += 1;
       applyFromApi(cart);
     } catch (error: unknown) {
       applyCart(previous, previousSubtotal, previousPrices);

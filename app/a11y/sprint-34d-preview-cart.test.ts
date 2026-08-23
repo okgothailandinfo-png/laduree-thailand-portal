@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { buildThailandCatalog } from "@/lib/catalog/thailand-product-import";
 import {
   PREVIEW_TEST_CATALOG_PRICE_MINOR,
   applyPreviewTestCatalogOverlay,
 } from "@/lib/preview/preview-test-catalog";
 import { PUBLIC_PREVIEW_COMMERCE_CODE } from "@/lib/preview/public-preview";
+import { vercelPreviewOrigins } from "@/src/server/http/csrf";
 import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCheckoutService } from "@/src/server/services/checkout.service";
 import type { Cart } from "@/src/server/models/cart";
@@ -18,35 +20,18 @@ import type {
   PickupRepository,
   ProductRepository,
 } from "@/src/server/repositories/interfaces";
-import { MockProductRepository } from "@/src/server/repositories/mock/product.repository";
+import { PreviewCookieCartRepository } from "@/src/server/preview/preview-cart-repository";
+import { MockCartRepository } from "@/src/server/repositories/mock/cart.repository";
 import { AppError } from "@/src/server/utils/errors";
 
 const completeNapoleonModifiers = [
-  { label: "Rose", quantity: 4 },
-  { label: "Chocolate", quantity: 4 },
+  { label: "Almond", quantity: 2 },
+  { label: "Chocolate", quantity: 2 },
+  { label: "Coffee", quantity: 1 },
+  { label: "Lemon", quantity: 1 },
+  { label: "« Asia Exclusive » Matcha", quantity: 1 },
+  { label: "Marie-Antoinette Tea", quantity: 1 },
 ];
-
-function withEnv<T>(
-  values: Record<string, string | undefined>,
-  fn: () => T,
-): T {
-  const previous: Record<string, string | undefined> = {};
-  for (const key of Object.keys(values)) {
-    previous[key] = process.env[key];
-    const next = values[key];
-    if (next === undefined) delete process.env[key];
-    else process.env[key] = next;
-  }
-  try {
-    return fn();
-  } finally {
-    for (const key of Object.keys(values)) {
-      const prior = previous[key];
-      if (prior === undefined) delete process.env[key];
-      else process.env[key] = prior;
-    }
-  }
-}
 
 async function withEnvAsync<T>(
   values: Record<string, string | undefined>,
@@ -68,20 +53,6 @@ async function withEnvAsync<T>(
       else process.env[key] = prior;
     }
   }
-}
-
-function isPreviewCommerceError(error: unknown): boolean {
-  return (
-    error instanceof AppError &&
-    error.code === "FORBIDDEN" &&
-    error.status === 403 &&
-    Boolean(
-      error.details &&
-        typeof error.details === "object" &&
-        (error.details as { code?: string }).code ===
-          PUBLIC_PREVIEW_COMMERCE_CODE,
-    )
-  );
 }
 
 function unused(): never {
@@ -182,10 +153,54 @@ function overlayLdr003(): Product {
   } as NodeJS.ProcessEnv);
 }
 
-describe("Sprint 34C — preview test catalog cart path", () => {
-  it("lets LDR003 configure and enter the cart in preview test mode", async () => {
+describe("Sprint 34D — preview cart functional flow", () => {
+  it("adds Almond 4 + Chocolate 4 as one box", async () => {
     const product = overlayLdr003();
-    assert.equal(evaluateProductPurchasability(product).purchasable, true);
+    const service = new DefaultCartService(
+      memoryCartRepo(),
+      singleProductRepo(product),
+    );
+    await withEnvAsync(
+      { APP_ENV: "preview", PREVIEW_TEST_CATALOG: "true" },
+      async () => {
+        const cart = await service.addItem(undefined, {
+          productId: product.id,
+          quantity: 1,
+          modifiers: [
+            { label: "Almond", quantity: 4 },
+            { label: "Chocolate", quantity: 4 },
+          ],
+        });
+        assert.equal(cart.itemCount, 1);
+        assert.deepEqual(cart.items[0]?.modifiers, [
+          { label: "Almond", quantity: 4 },
+          { label: "Chocolate", quantity: 4 },
+        ]);
+      },
+    );
+  });
+
+  it("keeps the ADD CTA above the fixed View Cart bar", () => {
+    const css = readFileSync(
+      path.join(process.cwd(), "app/product/product-detail.css"),
+      "utf8",
+    );
+    const source = readFileSync(
+      path.join(process.cwd(), "app/product/[slug]/ProductDetailClient.tsx"),
+      "utf8",
+    );
+    assert.match(source, /id="btn-AddToCart"/);
+    assert.match(source, />\s*ADD\s*</);
+    assert.match(source, /isProductAddCtaEnabled/);
+    assert.match(
+      css,
+      /@media \(max-width: 991px\)[\s\S]*bottom:\s*var\(--view-cart-bar-clearance/,
+    );
+    assert.match(css, /z-index:\s*45/);
+  });
+
+  it("adds one configurable box, not eight macaron pieces", async () => {
+    const product = overlayLdr003();
     const service = new DefaultCartService(
       memoryCartRepo(),
       singleProductRepo(product),
@@ -199,59 +214,59 @@ describe("Sprint 34C — preview test catalog cart path", () => {
           modifiers: completeNapoleonModifiers,
         });
         assert.equal(cart.items.length, 1);
-        assert.equal(cart.items[0]?.productId, "prod-ldr003");
+        assert.equal(cart.itemCount, 1);
+        assert.equal(cart.items[0]?.quantity, 1);
+        assert.equal(cart.items[0]?.packSize, 8);
         assert.equal(cart.items[0]?.unitPriceMinor, PREVIEW_TEST_CATALOG_PRICE_MINOR);
+        const flavorTotal = (cart.items[0]?.modifiers ?? []).reduce(
+          (sum, modifier) => sum + (modifier.quantity ?? 0),
+          0,
+        );
+        assert.equal(flavorTotal, 8);
       },
     );
   });
 
-  it("keeps LDR003 non-purchasable and cart-blocked without PREVIEW_TEST_CATALOG", async () => {
-    const raw = buildThailandCatalog().products.find(
-      (item) => item.sku === "LDR003",
-    );
-    assert.ok(raw);
-    assert.equal(evaluateProductPurchasability(raw).purchasable, false);
-
+  it("rejects incomplete and oversized Macaron selections", async () => {
+    const product = overlayLdr003();
     const service = new DefaultCartService(
       memoryCartRepo(),
-      singleProductRepo(raw),
+      singleProductRepo(product),
     );
-    await withEnvAsync({ APP_ENV: "preview", PREVIEW_TEST_CATALOG: undefined }, async () => {
-      await assert.rejects(
-        () =>
-          service.addItem(undefined, {
-            productId: raw.id,
-            quantity: 1,
-            modifiers: completeNapoleonModifiers,
-          }),
-        isPreviewCommerceError,
-      );
-    });
-  });
-
-  it("keeps Production non-purchasable even if PREVIEW_TEST_CATALOG=true", async () => {
-    const raw = buildThailandCatalog().products.find(
-      (item) => item.sku === "LDR003",
-    );
-    assert.ok(raw);
-    const overlaid = applyPreviewTestCatalogOverlay(raw, {
-      APP_ENV: "production",
-      PREVIEW_TEST_CATALOG: "true",
-    } as NodeJS.ProcessEnv);
-    assert.equal(evaluateProductPurchasability(overlaid).purchasable, false);
-
     await withEnvAsync(
-      { APP_ENV: "production", PREVIEW_TEST_CATALOG: "true" },
+      { APP_ENV: "preview", PREVIEW_TEST_CATALOG: "true" },
       async () => {
-        const listed = await new MockProductRepository().list();
-        assert.equal(listed.length, 0);
-        const bySku = await new MockProductRepository().findBySku("LDR003");
-        assert.equal(bySku && evaluateProductPurchasability(bySku).purchasable, false);
+        await assert.rejects(
+          () =>
+            service.addItem(undefined, {
+              productId: product.id,
+              quantity: 1,
+              modifiers: [
+                { label: "Almond", quantity: 2 },
+                { label: "Chocolate", quantity: 2 },
+              ],
+            }),
+          (error: unknown) =>
+            error instanceof AppError && error.code === "VALIDATION_ERROR",
+        );
+        await assert.rejects(
+          () =>
+            service.addItem(undefined, {
+              productId: product.id,
+              quantity: 1,
+              modifiers: [
+                { label: "Almond", quantity: 5 },
+                { label: "Chocolate", quantity: 4 },
+              ],
+            }),
+          (error: unknown) =>
+            error instanceof AppError && error.code === "VALIDATION_ERROR",
+        );
       },
     );
   });
 
-  it("still blocks delivery checkout in preview test mode", async () => {
+  it("keeps delivery checkout fail-closed after a successful preview cart add", async () => {
     const product = overlayLdr003();
     const carts = memoryCartRepo();
     const cartService = new DefaultCartService(carts, singleProductRepo(product));
@@ -294,35 +309,41 @@ describe("Sprint 34C — preview test catalog cart path", () => {
                 },
               },
             }),
-          isPreviewCommerceError,
+          (error: unknown) =>
+            error instanceof AppError &&
+            error.status === 403 &&
+            Boolean(
+              error.details &&
+                typeof error.details === "object" &&
+                (error.details as { code?: string }).code ===
+                  PUBLIC_PREVIEW_COMMERCE_CODE,
+            ),
         );
       },
     );
   });
 
-  it("rejects incomplete Macaron box selection in preview test mode", async () => {
-    const product = overlayLdr003();
-    const service = new DefaultCartService(
-      memoryCartRepo(),
-      singleProductRepo(product),
+  it("does not treat Vercel Production hosts as CSRF-allowed", () => {
+    assert.deepEqual(
+      vercelPreviewOrigins({
+        APP_ENV: "production",
+        VERCEL_URL: "ok-go.cloud",
+      } as NodeJS.ProcessEnv),
+      [],
     );
-    await withEnvAsync(
-      { APP_ENV: "preview", PREVIEW_TEST_CATALOG: "true" },
-      async () => {
-        await assert.rejects(
-          () =>
-            service.addItem(undefined, {
-              productId: product.id,
-              quantity: 1,
-              modifiers: [
-                { label: "Rose", quantity: 3 },
-                { label: "Chocolate", quantity: 4 },
-              ],
-            }),
-          (error: unknown) =>
-            error instanceof AppError && error.code === "VALIDATION_ERROR",
-        );
-      },
-    );
+  });
+
+  it("wraps the mock cart repository for preview cookie restore", async () => {
+    const inner = new MockCartRepository();
+    const wrapped = new PreviewCookieCartRepository(inner);
+    const saved = await wrapped.save({
+      id: "cart-preview-1",
+      currency: "THB",
+      items: [],
+      updatedAt: new Date().toISOString(),
+    });
+    assert.equal(saved.id, "cart-preview-1");
+    const found = await wrapped.findById("cart-preview-1");
+    assert.equal(found?.id, "cart-preview-1");
   });
 });

@@ -118,6 +118,12 @@ export default function CartPanel({
                                   <div className="mycart-title-product order-name">
                                     {item.name}
                                   </div>
+                                  {typeof item.packSize === "number" &&
+                                  item.packSize > 0 ? (
+                                    <div className="note">
+                                      {item.packSize} pcs
+                                    </div>
+                                  ) : null}
                                   <div className="order-price">
                                     <span className="price">{priceLabel}</span>
                                   </div>

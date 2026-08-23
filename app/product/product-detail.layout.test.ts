@@ -21,6 +21,14 @@ describe("product detail sticky CTA layout", () => {
       css,
       /\.modal-footer\.product-detail-footer\.v2\s*\{[^}]*safe-area-inset-bottom/s,
     );
+    assert.match(
+      css,
+      /\.modal-footer\.product-detail-footer\.v2\s*\{[^}]*z-index:\s*45/s,
+    );
+    assert.match(
+      css,
+      /@media \(max-width: 991px\)\s*\{[^}]*bottom:\s*var\(--view-cart-bar-clearance/s,
+    );
   });
 });
 
@@ -39,7 +47,8 @@ describe("product detail invalid price blocks ADD", () => {
       "utf8",
     );
     assert.match(source, /const priceAvailable =/);
-    assert.match(source, /!priceAvailable/);
+    assert.match(source, /isProductAddCtaEnabled/);
+    assert.match(source, /priceAvailable,/);
     assert.match(source, /disabled=\{addDisabled\}/);
     assert.match(source, /configuredUnitPriceMinor === null/);
     assert.match(source, /This product is unavailable at this time\./);
