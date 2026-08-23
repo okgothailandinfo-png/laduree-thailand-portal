@@ -47,6 +47,7 @@ import type {
   DeliveryAddressDto,
 } from "@/src/server/types/dto";
 import { issueOrderAccessToken } from "@/src/server/orders/order-access-token";
+import { writePreviewOrderAccessToken } from "@/src/server/preview/preview-commerce-cookie";
 import { AppError } from "@/src/server/utils/errors";
 import { logger } from "@/src/server/utils/logger";
 import {
@@ -515,6 +516,8 @@ export class DefaultCheckoutService {
     });
 
     const total = minorToMajor(saved.totalMinor);
+    const accessToken = issueOrderAccessToken(saved.id);
+    await writePreviewOrderAccessToken(saved.id, accessToken);
     return {
       orderId: saved.id,
       subtotal: total,
@@ -523,7 +526,7 @@ export class DefaultCheckoutService {
       status: "PENDING",
       serviceType: "PICKUP",
       deliveryFee: null,
-      accessToken: issueOrderAccessToken(saved.id),
+      accessToken,
     };
   }
 

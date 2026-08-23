@@ -106,13 +106,6 @@ export default function PaymentPageClient({
   const orderQuery = useAsyncResource(
     (signal) => {
       if (!orderId) return Promise.resolve(null);
-      if (!resolvedAccessToken) {
-        return Promise.reject(
-          new Error(
-            "Order access token is required. Return to checkout to continue payment.",
-          ),
-        );
-      }
       return fetchOrderById(orderId, {
         signal,
         accessToken: resolvedAccessToken,
@@ -331,21 +324,20 @@ export default function PaymentPageClient({
         : null;
 
     try {
-      if (!resolvedAccessToken) {
-        throw new Error(
-          "Order access token is required. Return to checkout to continue payment.",
-        );
-      }
       const result = await createPayment(
         {
           orderId,
           method,
-          accessToken: resolvedAccessToken,
+          ...(resolvedAccessToken
+            ? { accessToken: resolvedAccessToken }
+            : {}),
           ...(safeDisplay ? { safeDisplay } : {}),
         },
         {
           idempotencyKey: idempotencyKeyRef.current,
-          accessToken: resolvedAccessToken,
+          ...(resolvedAccessToken
+            ? { accessToken: resolvedAccessToken }
+            : {}),
         },
       );
       // Never carry PAN/CVV forward.

@@ -24,7 +24,7 @@ import { verifyWebhookSignature } from "@/src/server/payment/webhook/verify";
 import type { NotificationOrchestrator } from "@/src/server/notifications/orchestrator";
 import { appendAccessTokenToUrl } from "@/src/server/orders/append-access-token";
 import {
-  extractOrderAccessToken,
+  resolveRequestAccessToken,
   verifyOrderAccessToken,
 } from "@/src/server/orders/order-access-token";
 import {
@@ -123,13 +123,6 @@ export class PaymentService {
     }
     const accessToken =
       typeof body.accessToken === "string" ? body.accessToken.trim() : "";
-    if (!accessToken) {
-      throw new AppError(
-        "UNAUTHORIZED",
-        "Order access token is required to create a payment.",
-        { status: 401, details: { field: "accessToken" } },
-      );
-    }
     return {
       orderId: requireString(body.orderId, "orderId"),
       method: methodRaw,
@@ -142,13 +135,14 @@ export class PaymentService {
    * Resolve capability token from parsed body and/or request headers/query.
    * Body wins when present (create payload); otherwise header/query.
    */
-  resolveAccessToken(
+  async resolveAccessToken(
     request: Request,
     bodyToken?: string | null,
-  ): string {
+    orderId?: string | null,
+  ): Promise<string> {
     const fromBody = bodyToken?.trim() ?? "";
     if (fromBody) return fromBody;
-    const fromRequest = extractOrderAccessToken(request);
+    const fromRequest = await resolveRequestAccessToken(request, orderId);
     if (fromRequest) return fromRequest;
     throw new AppError(
       "UNAUTHORIZED",

@@ -40,9 +40,10 @@ export async function POST(request: Request) {
     }
 
     const parsed = paymentService.parseCreatePaymentBody(raw);
-    const accessToken = paymentService.resolveAccessToken(
+    const accessToken = await paymentService.resolveAccessToken(
       request,
       parsed.accessToken,
+      parsed.orderId,
     );
     const data = await paymentService.createPayment({
       ...parsed,

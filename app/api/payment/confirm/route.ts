@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     const input = paymentService.parseConfirmPaymentBody(raw);
-    const accessToken = paymentService.resolveAccessToken(request);
+    const accessToken = await paymentService.resolveAccessToken(request);
     const data = await paymentService.confirmPayment(
       input.paymentId,
       input.result,

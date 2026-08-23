@@ -37,10 +37,12 @@ export function canContinuePayment(input: {
   /** Classic session path still requires cart + pickup + checkout. */
   sessionReady: boolean;
 }): boolean {
-  if (!input.orderId || !input.accessToken) return false;
+  if (!input.orderId) return false;
   if (isOrderAlreadyPaid(input.order)) return false;
   if (input.order?.status === "cancelled") return false;
+  // Preview cookie auth can load the draft without a client-visible token.
   if (isRecoverableUnpaidOrder(input.order)) return true;
+  if (!input.accessToken) return false;
   return input.sessionReady;
 }
 

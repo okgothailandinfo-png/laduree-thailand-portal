@@ -3,6 +3,8 @@
  *
  * Mock orders/payments are in-memory and do not survive Vercel isolates.
  * Persist a cookie snapshot only when PREVIEW_TEST_CATALOG is active.
+ * Sprint 34F also stores the capability token so Payment can recover
+ * after reload / back-forward without client-readable storage.
  * Not a production database. Not used outside the Preview test catalog.
  */
 
@@ -14,11 +16,12 @@ import type { Payment } from "@/src/server/models/payment";
 
 export const PREVIEW_COMMERCE_COOKIE_NAME = "laduree_preview_commerce";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24;
-const MAX_COOKIE_CHARS = 3500;
+const MAX_COOKIE_CHARS = 4000;
 
 export type PreviewCommerceSnapshot = {
   order: Order | null;
   payment: Payment | null;
+  accessToken: string | null;
 };
 
 export type PreviewCookieStore = {
@@ -99,11 +102,20 @@ export function parsePreviewCommerceSnapshot(
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return null;
-    const record = parsed as { order?: unknown; payment?: unknown };
+    const record = parsed as {
+      order?: unknown;
+      payment?: unknown;
+      accessToken?: unknown;
+    };
     const order = isOrderSnapshot(record.order) ? record.order : null;
     const payment = isPaymentSnapshot(record.payment) ? record.payment : null;
-    if (!order && !payment) return null;
-    return { order, payment };
+    const accessToken =
+      typeof record.accessToken === "string" &&
+      record.accessToken.includes(".")
+        ? record.accessToken
+        : null;
+    if (!order && !payment && !accessToken) return null;
+    return { order, payment, accessToken };
   } catch {
     return null;
   }
@@ -141,7 +153,11 @@ export async function writePreviewOrderCookie(order: Order): Promise<void> {
     current?.payment && current.payment.orderId === order.id
       ? current.payment
       : null;
-  await writeSnapshot({ order, payment });
+  const accessToken =
+    current?.accessToken && current.order?.id === order.id
+      ? current.accessToken
+      : null;
+  await writeSnapshot({ order, payment, accessToken });
 }
 
 export async function writePreviewPaymentCookie(
@@ -152,7 +168,44 @@ export async function writePreviewPaymentCookie(
     current?.order && current.order.id === payment.orderId
       ? current.order
       : null;
-  await writeSnapshot({ order, payment });
+  const accessToken =
+    current?.accessToken && current.order?.id === payment.orderId
+      ? current.accessToken
+      : null;
+  await writeSnapshot({ order, payment, accessToken });
+}
+
+export async function writePreviewOrderAccessToken(
+  orderId: string,
+  accessToken: string,
+): Promise<void> {
+  const id = orderId.trim();
+  const token = accessToken.trim();
+  if (!id || !token.includes(".")) return;
+  const current = await readPreviewCommerceSnapshot();
+  if (current?.order && current.order.id !== id) return;
+  await writeSnapshot({
+    order: current?.order ?? null,
+    payment:
+      current?.payment && current.payment.orderId === id
+        ? current.payment
+        : null,
+    accessToken: token,
+  });
+}
+
+/** Preview-only capability token for the cookie-backed draft order. */
+export async function readPreviewOrderAccessToken(
+  orderId?: string | null,
+): Promise<string | null> {
+  if (!isPreviewTestCatalogEnabled()) return null;
+  const snapshot = await readPreviewCommerceSnapshot();
+  const token = snapshot?.accessToken?.trim() || null;
+  if (!token) return null;
+  if (orderId && snapshot?.order && snapshot.order.id !== orderId.trim()) {
+    return null;
+  }
+  return token;
 }
 
 export async function clearPreviewCommerceCookie(): Promise<void> {

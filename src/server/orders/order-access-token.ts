@@ -7,6 +7,7 @@
  */
 
 import { createHmac, timingSafeEqual } from "crypto";
+import { readPreviewOrderAccessToken } from "@/src/server/preview/preview-commerce-cookie";
 import { env } from "@/src/server/config/env";
 import { AppError } from "@/src/server/utils/errors";
 
@@ -186,12 +187,21 @@ export function extractOrderAccessToken(request: Request): string | null {
   return null;
 }
 
-export function assertOrderAccess(
+export async function resolveRequestAccessToken(
+  request: Request,
+  orderId?: string | null,
+): Promise<string | null> {
+  const fromRequest = extractOrderAccessToken(request);
+  if (fromRequest) return fromRequest;
+  return readPreviewOrderAccessToken(orderId);
+}
+
+export async function assertOrderAccess(
   request: Request,
   orderId: string,
   requiredScope: OrderAccessScope,
-): void {
-  const token = extractOrderAccessToken(request);
+): Promise<void> {
+  const token = await resolveRequestAccessToken(request, orderId);
   if (!token) {
     throw new AppError("UNAUTHORIZED", "Order access token is required.", {
       status: 401,

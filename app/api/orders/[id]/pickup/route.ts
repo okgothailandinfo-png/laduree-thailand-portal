@@ -27,7 +27,7 @@ export async function GET(request: Request, context: RouteContext) {
       maxAttempts: 30,
       windowMs: 60_000,
     });
-    assertOrderAccess(request, id, "pickup");
+    await assertOrderAccess(request, id, "pickup");
     const data = await pickupVerificationService.getCustomerCredentials(id);
     if (!data) {
       throw new AppError(
