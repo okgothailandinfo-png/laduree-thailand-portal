@@ -266,7 +266,7 @@ describe("Sprint 34D — preview cart functional flow", () => {
     );
   });
 
-  it("keeps checkout fail-closed after a successful preview cart add", async () => {
+  it("keeps delivery checkout fail-closed after a successful preview cart add", async () => {
     const product = overlayLdr003();
     const carts = memoryCartRepo();
     const cartService = new DefaultCartService(carts, singleProductRepo(product));
@@ -289,17 +289,24 @@ describe("Sprint 34D — preview cart functional flow", () => {
           () =>
             checkout.createDraftCheckout(cart.id, {
               termsAccepted: true,
-              serviceType: "PICKUP",
+              serviceType: "DELIVERY",
               customer: {
                 firstName: "Ada",
                 lastName: "Lovelace",
                 email: "ada@example.com",
                 phone: "+66812345678",
               },
-              pickup: {
-                boutiqueId: "boutique-1",
-                dateKey: "2026-08-23",
-                pickupSlotId: "1030-1100",
+              delivery: {
+                mode: "EARLIEST_AVAILABLE",
+                address: {
+                  recipient: "Ada Lovelace",
+                  phone: "+66812345678",
+                  address: "1 Test Street",
+                  subdistrict: "Lumphini",
+                  district: "Pathum Wan",
+                  province: "Bangkok",
+                  postalCode: "10330",
+                },
               },
             }),
           (error: unknown) =>

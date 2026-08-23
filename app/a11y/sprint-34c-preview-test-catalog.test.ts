@@ -9,7 +9,6 @@ import {
 import { PUBLIC_PREVIEW_COMMERCE_CODE } from "@/lib/preview/public-preview";
 import { DefaultCartService } from "@/src/server/services/cart.service";
 import { DefaultCheckoutService } from "@/src/server/services/checkout.service";
-import { PaymentService } from "@/src/server/payment/payment-service";
 import type { Cart } from "@/src/server/models/cart";
 import type { Product } from "@/src/server/models/product";
 import type {
@@ -252,7 +251,7 @@ describe("Sprint 34C — preview test catalog cart path", () => {
     );
   });
 
-  it("still blocks checkout and payment in preview test mode", async () => {
+  it("still blocks delivery checkout in preview test mode", async () => {
     const product = overlayLdr003();
     const carts = memoryCartRepo();
     const cartService = new DefaultCartService(carts, singleProductRepo(product));
@@ -275,45 +274,25 @@ describe("Sprint 34C — preview test catalog cart path", () => {
           () =>
             checkout.createDraftCheckout(cart.id, {
               termsAccepted: true,
-              serviceType: "PICKUP",
+              serviceType: "DELIVERY",
               customer: {
                 firstName: "Ada",
                 lastName: "Lovelace",
                 email: "ada@example.com",
                 phone: "+66812345678",
               },
-              pickup: {
-                boutiqueId: "boutique-1",
-                dateKey: "2026-08-23",
-                pickupSlotId: "1030-1100",
+              delivery: {
+                mode: "EARLIEST_AVAILABLE",
+                address: {
+                  recipient: "Ada Lovelace",
+                  phone: "+66812345678",
+                  address: "1 Test Street",
+                  subdistrict: "Lumphini",
+                  district: "Pathum Wan",
+                  province: "Bangkok",
+                  postalCode: "10330",
+                },
               },
-            }),
-          isPreviewCommerceError,
-        );
-        const payments = new PaymentService(
-          unusedOrderRepo(),
-          {
-            findById: unused,
-            findByOrderId: unused,
-            findPendingByOrderId: unused,
-            save: unused,
-            savePendingExclusive: unused,
-          },
-          {
-            hasProcessed: unused,
-            claimEvent: unused,
-            markProcessed: unused,
-            releaseClaim: unused,
-          },
-          "preview-integrity-secret",
-          300,
-        );
-        await assert.rejects(
-          () =>
-            payments.createPayment({
-              orderId: "order-1",
-              method: "promptpay-qr",
-              accessToken: "token",
             }),
           isPreviewCommerceError,
         );

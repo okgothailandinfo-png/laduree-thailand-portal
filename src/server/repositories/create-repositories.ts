@@ -3,6 +3,8 @@ import type { RepositoryBundle } from "@/src/server/repositories/interfaces";
 import { MockBoutiqueRepository } from "@/src/server/repositories/mock/boutique.repository";
 import { MockCartRepository } from "@/src/server/repositories/mock/cart.repository";
 import { PreviewCookieCartRepository } from "@/src/server/preview/preview-cart-repository";
+import { PreviewCookieOrderRepository } from "@/src/server/preview/preview-order-repository";
+import { PreviewCookiePaymentRepository } from "@/src/server/preview/preview-payment-repository";
 import { MockCategoryRepository } from "@/src/server/repositories/mock/category.repository";
 import { MockHomepageBannerRepository } from "@/src/server/repositories/mock/homepage-banner.repository";
 import { MockHomepageContentRepository } from "@/src/server/repositories/mock/homepage-content.repository";
@@ -47,11 +49,11 @@ function createMockRepositories(): RepositoryBundle {
     homepageContent: new MockHomepageContentRepository(),
     boutiques: new MockBoutiqueRepository(),
     pickup: new MockPickupRepository(),
-    orders: new MockOrderRepository(),
+    orders: new PreviewCookieOrderRepository(new MockOrderRepository()),
     pickupVerifications: new MockPickupVerificationRepository(),
     // Cart / gateway payments / webhook idempotency — in-memory until persistent models exist.
     carts: new PreviewCookieCartRepository(new MockCartRepository()),
-    payments: new MockPaymentRepository(),
+    payments: new PreviewCookiePaymentRepository(new MockPaymentRepository()),
     webhookEvents: new MockWebhookEventRepository(),
     notificationQueue: new MockNotificationQueueRepository(),
     notificationSettings: new MockNotificationSettingRepository(),

@@ -1,6 +1,14 @@
 import { randomUUID } from "crypto";
 import { evaluateProductPurchasability } from "@/lib/catalog/product-purchasability";
-import { assertPublicPreviewCommerceAllowed } from "@/src/server/preview/commerce-guard";
+import {
+  isPreviewTestCatalogEnabled,
+  isPreviewTestCatalogSku,
+} from "@/lib/preview/preview-test-catalog";
+import { isPublicPreview } from "@/lib/preview/public-preview";
+import {
+  assertPublicPreviewCheckoutPaymentAllowed,
+  assertPublicPreviewCommerceAllowed,
+} from "@/src/server/preview/commerce-guard";
 import { validateExactSelectionModifiers } from "@/lib/product/exact-selection";
 import { computeConfiguredUnitPriceMinor } from "@/lib/product/modifier-pricing";
 import { validateRequiredModifierGroups } from "@/lib/product/modifier-requirements";
@@ -282,6 +290,13 @@ export class DefaultCheckoutService {
           `Product unavailable: ${line.productId}`,
           { details: { field: "cart.items", productId: line.productId } },
         );
+      }
+
+      if (
+        isPreviewTestCatalogEnabled() &&
+        !isPreviewTestCatalogSku(product.sku)
+      ) {
+        assertPublicPreviewCommerceAllowed();
       }
 
       const purchasability = evaluateProductPurchasability(product);
@@ -689,14 +704,17 @@ export class DefaultCheckoutService {
     cartId: string | undefined,
     input: CheckoutRequestDto,
   ): Promise<CheckoutResponseDto> {
-    assertPublicPreviewCommerceAllowed();
+    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
+    if (isPublicPreview() && serviceType === "DELIVERY") {
+      assertPublicPreviewCommerceAllowed();
+    }
+    assertPublicPreviewCheckoutPaymentAllowed();
     if (!cartId) {
       throw new AppError("VALIDATION_ERROR", "Cart not found.", {
         details: { field: "cart" },
       });
     }
 
-    const serviceType: ServiceType = input.serviceType ?? "PICKUP";
     if (serviceType === "DELIVERY") {
       return this.createDeliveryDraft(cartId, input);
     }
