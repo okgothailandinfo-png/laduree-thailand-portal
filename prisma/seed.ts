@@ -1,7 +1,13 @@
 /**
- * Development seed — Thailand Product Master Safe-Draft (Sprint 33C).
- * Not production pricing, live availability, or approved delivery eligibility.
- * Rerunnable via upsert on unique keys.
+ * DEVELOPMENT / TEST ONLY. Never run against Production.
+ *
+ * This seed upserts Safe-Draft catalog plus boutiques, pickup slots, and homepage CMS.
+ * It invents placeholder images, copies Singapore allergen/storage headings, and
+ * overwrites unique keys. It is unsafe for Production.
+ *
+ * Production catalog load: npm run product-master:validate
+ * and npm run product-master:import -- --dry-run
+ * (execute is a separate owner opt-in; not this file).
  *
  * Run: npm run db:seed
  * Refused when APP_ENV=production (Sprint 31 fail-closed).
