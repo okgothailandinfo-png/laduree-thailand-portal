@@ -20,8 +20,16 @@ import {
   type ProductMasterImportRow,
   type ProductMasterIssue,
 } from "@/lib/catalog/product-master-production-import/contract";
+import { flavorMasterForGroup } from "@/data/thailand-product-master";
 import { isProductBehavior } from "@/lib/product/product-behavior";
 import type { ProductModifierGroup } from "@/src/server/models/product";
+
+const DRAFT_IMPORT_ALLOWED_PENDING = new Set([
+  "STATUS_DRAFT",
+  "AVAILABILITY_UNRESOLVED",
+  "ALLERGEN_PENDING",
+  "MEDIA_PENDING",
+]);
 
 const FORBIDDEN_BEHAVIORS = new Set(["FIXED_PRODUCT"]);
 const CONTENT_PENDING = "[CONTENT PENDING APPROVAL]";
@@ -30,6 +38,8 @@ const KNOWN_PACK_UNITS = new Set(["PCS", "G", "SACHET"]);
 export type ProductMasterValidation = {
   ok: boolean;
   commerciallyComplete: boolean;
+  /** Structural + owner draft-import fields; Draft/media/allergen/availability may remain pending. */
+  draftImportReady: boolean;
   skuCount: number;
   issues: ProductMasterIssue[];
 };
@@ -181,6 +191,7 @@ function architectureModifierGroups(
   const qty = row.exactSelectionQuantity;
   if (typeof qty !== "number") return [];
   const isEugenie = row.selectionGroup === "EUGENIE_FLAVORS";
+  const flavorMaster = flavorMasterForGroup(row.selectionGroup);
   return [
     {
       id: isEugenie ? "eugenie-flavors" : "macaron-flavors",
@@ -196,6 +207,12 @@ function architectureModifierGroups(
       sortOrder: 1,
       isActive: true,
       options: [...row.selectionOptions],
+      optionDetails: flavorMaster.map((option, index) => ({
+        label: option.label,
+        priceMinor: Math.round(option.priceThb * 100),
+        isActive: option.isActive,
+        sortOrder: index + 1,
+      })),
     },
   ];
 }
@@ -687,9 +704,13 @@ export function validateProductMasterImport(
 
   const errors = issues.filter((item) => item.severity === "error");
   const pending = issues.filter((item) => item.severity === "pending");
+  const draftBlocking = pending.filter(
+    (item) => !DRAFT_IMPORT_ALLOWED_PENDING.has(item.code),
+  );
   return {
     ok: errors.length === 0,
     commerciallyComplete: errors.length === 0 && pending.length === 0,
+    draftImportReady: errors.length === 0 && draftBlocking.length === 0,
     skuCount: skus.size,
     issues,
   };
@@ -839,9 +860,9 @@ export async function executeProductMasterImport(
   if (!plan.validation.ok) {
     throw new Error("Product Master write refused: validation errors present.");
   }
-  if (!options.allowPendingCommercial && !plan.validation.commerciallyComplete) {
+  if (!options.allowPendingCommercial && !plan.validation.draftImportReady) {
     throw new Error(
-      "Product Master write refused: commercial data is pending (prices, options, media, status, availability, delivery, or allergens).",
+      "Product Master write refused: not ready for safe Draft import (structural or required draft fields).",
     );
   }
   if (!options.writer) {
@@ -928,6 +949,7 @@ export function formatProductMasterReport(result: ExecuteResult): string {
     `Rolled back: ${result.rolledBack ? "YES" : "NO"}`,
     `SKU count: ${result.plan.validation.skuCount}`,
     `Structural validation: ${result.plan.validation.ok ? "PASS" : "FAIL"}`,
+    `Draft import ready: ${result.plan.validation.draftImportReady ? "YES" : "NO"}`,
     `Commercially complete: ${result.plan.validation.commerciallyComplete ? "YES" : "NO"}`,
     `Intended category inserts: ${result.plan.categoriesToInsert.length}`,
     `Intended product inserts: ${result.plan.productsToInsert.length}`,

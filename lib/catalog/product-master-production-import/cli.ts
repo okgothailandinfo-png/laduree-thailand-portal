@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   if (mode === "validate" || mode === "dry-run") {
     const result = dryRunProductMasterImport(rows);
     console.log(formatProductMasterReport(result));
-    if (!result.plan.validation.ok || !result.plan.validation.commerciallyComplete) {
+    if (!result.plan.validation.ok || !result.plan.validation.draftImportReady) {
       process.exitCode = 1;
     }
     return;
@@ -48,10 +48,10 @@ async function main(): Promise<void> {
   }
 
   const preflight = buildProductMasterPlan(rows);
-  if (!preflight.validation.ok || !preflight.validation.commerciallyComplete) {
+  if (!preflight.validation.ok || !preflight.validation.draftImportReady) {
     console.log(formatProductMasterReport(dryRunProductMasterImport(rows)));
     console.error(
-      "Product Master execute refused: commercial preflight is incomplete. Prisma was not opened.",
+      "Product Master execute refused: not ready for safe Draft import. Prisma was not opened.",
     );
     process.exitCode = 1;
     return;

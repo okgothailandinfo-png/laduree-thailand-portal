@@ -70,17 +70,16 @@ describe("Sprint 34C — preview test catalog overlay", () => {
   it("does not mutate Thailand Product Master prices or options", () => {
     const master = THAILAND_PRODUCT_MASTER.find((row) => row.sku === "LDR003");
     assert.ok(master);
-    assert.equal(master.priceThb, null);
-    assert.deepEqual(master.selectionOptions, []);
+    const priceBefore = master.priceThb;
+    const optionsBefore = [...master.selectionOptions];
 
     applyPreviewTestCatalogOverlay(ldr003(), {
       APP_ENV: "preview",
       PREVIEW_TEST_CATALOG: "true",
     } as NodeJS.ProcessEnv);
 
-    assert.equal(master.priceThb, null);
-    assert.deepEqual(master.selectionOptions, []);
-    assert.equal(buildThailandCatalog().products.find((p) => p.sku === "LDR003")?.priceMinor, null);
+    assert.equal(master.priceThb, priceBefore);
+    assert.deepEqual(master.selectionOptions, optionsBefore);
   });
 
   it("makes only designated preview SKUs purchasable", () => {

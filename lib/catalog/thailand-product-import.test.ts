@@ -60,14 +60,25 @@ describe("Sprint 33C — Thailand Product Master Safe-Draft", () => {
       ["LDR013", "LDR014", "LDR015"].includes(p.sku),
     );
     assert.equal(eugenie.length, 3);
+    const qtyBySku: Record<string, number> = {
+      LDR013: 6,
+      LDR014: 12,
+      LDR015: 18,
+    };
     for (const product of eugenie) {
       assert.equal(product.productBehavior, "CONFIGURABLE_BOX");
+      assert.equal(product.packSize, qtyBySku[product.sku]);
       assert.equal(
         product.modifierGroups[0]?.exactSelectionQuantity,
-        product.packSize,
+        qtyBySku[product.sku],
       );
       assert.equal(product.modifierGroups[0]?.id, "eugenie-flavors");
-      assert.deepEqual(product.modifierGroups[0]?.options, []);
+      assert.ok((product.modifierGroups[0]?.options.length ?? 0) > 0);
+      assert.ok(
+        product.modifierGroups[0]?.optionDetails?.every(
+          (detail) => detail.priceMinor === 0 && detail.isActive === true,
+        ),
+      );
     }
   });
 
@@ -103,18 +114,15 @@ describe("Sprint 33C — Thailand Product Master Safe-Draft", () => {
     assert.equal(napoleon.modifierGroups[0]?.id, "macaron-flavors");
   });
 
-  it("null / n/a price never becomes 0 and is non-purchasable", () => {
+  it("Draft catalog stays non-purchasable even with owner THB prices", () => {
     assert.equal(resolvePriceMinor(null), null);
     for (const product of assertThailandCatalogReady().products) {
-      assert.equal(product.priceMinor, null);
-      assert.equal(product.priceThb, null);
-      assert.notEqual(product.priceMinor, 0);
+      assert.ok(typeof product.priceMinor === "number" && product.priceMinor > 0);
+      assert.ok(typeof product.priceThb === "number" && product.priceThb > 0);
       assert.equal(isProductPurchasable(product), false);
-      assert.ok(
-        evaluateProductPurchasability(product).reasons.includes(
-          "PRICE_UNAVAILABLE",
-        ),
-      );
+      const reasons = evaluateProductPurchasability(product).reasons;
+      assert.ok(reasons.includes("INACTIVE"));
+      assert.ok(reasons.includes("UNAVAILABLE"));
     }
   });
 
@@ -124,7 +132,7 @@ describe("Sprint 33C — Thailand Product Master Safe-Draft", () => {
         Object.prototype.hasOwnProperty.call(row, "priceSgd"),
         false,
       );
-      assert.equal(row.priceThb, null);
+      assert.equal(typeof row.priceThb, "number");
     }
   });
 
@@ -140,30 +148,29 @@ describe("Sprint 33C — Thailand Product Master Safe-Draft", () => {
     }
   });
 
-  it("unresolved delivery eligibility imports as ineligible", () => {
+  it("owner-approved deliveryEligible true is imported as eligible", () => {
     assert.equal(resolveDeliveryEligible(null), false);
     assert.equal(resolveDeliveryEligible(undefined), false);
     assert.equal(resolveDeliveryEligible(false), false);
     assert.equal(resolveDeliveryEligible(true), true);
     for (const row of THAILAND_PRODUCT_MASTER) {
-      assert.equal(row.deliveryEligible, null);
+      assert.equal(row.deliveryEligible, true);
     }
     for (const product of assertThailandCatalogReady().products) {
-      assert.equal(product.deliveryEligible, false);
+      assert.equal(product.deliveryEligible, true);
     }
   });
 
-  it("configurable SKU without approved options is non-purchasable", () => {
+  it("configurable SKUs keep flavor architecture but stay non-purchasable while Draft", () => {
     const configurable = assertThailandCatalogReady().products.filter(
       (p) => p.productBehavior === "CONFIGURABLE_BOX",
     );
     for (const product of configurable) {
-      assert.deepEqual(product.modifierGroups[0]?.options, []);
-      assert.ok(
-        evaluateProductPurchasability(product).reasons.includes(
-          "CONFIG_OPTIONS_UNAVAILABLE",
-        ),
-      );
+      assert.ok((product.modifierGroups[0]?.options.length ?? 0) > 0);
+      const reasons = evaluateProductPurchasability(product).reasons;
+      assert.equal(reasons.includes("CONFIG_OPTIONS_UNAVAILABLE"), false);
+      assert.ok(reasons.includes("INACTIVE"));
+      assert.ok(reasons.includes("UNAVAILABLE"));
     }
   });
 
@@ -267,7 +274,7 @@ describe("Sprint 33C — Thailand Product Master Safe-Draft", () => {
         }),
       (error: unknown) => {
         assert.ok(error instanceof AppError);
-        assert.equal(error.details?.code, "PRICE_UNAVAILABLE");
+        assert.equal(error.details?.code, "PRODUCT_UNAVAILABLE");
         return true;
       },
     );

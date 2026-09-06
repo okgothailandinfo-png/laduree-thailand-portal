@@ -21,6 +21,10 @@ import {
 } from "@/lib/catalog/product-master-production-import/core";
 import type { ProductMasterImportRow } from "@/lib/catalog/product-master-production-import/contract";
 import { usesExactSelection } from "@/lib/product/product-behavior";
+import {
+  PRODUCT_MASTER_IMPORT_TX_MAX_WAIT_MS,
+  PRODUCT_MASTER_IMPORT_TX_TIMEOUT_MS,
+} from "@/lib/catalog/product-master-production-import/prisma-writer";
 
 function cloneRows(): ProductMasterImportRow[] {
   return structuredClone(fromThailandProductMaster());
@@ -112,6 +116,7 @@ describe("Sprint 35C-1 — Production Product Master importer", () => {
     assert.equal(validation.ok, true, JSON.stringify(validation.issues.filter((i) => i.severity === "error")));
     assert.equal(validation.skuCount, 38);
     assert.equal(validation.commerciallyComplete, false);
+    assert.equal(validation.draftImportReady, true);
   });
 
   it("fails on a missing SKU and does not skip the gap", () => {
@@ -192,6 +197,87 @@ describe("Sprint 35C-1 — Production Product Master importer", () => {
     );
   });
 
+  it("applies owner-approved flavor masters with THB 0 modifiers", () => {
+    const plan = buildProductMasterPlan(fromThailandProductMaster());
+    const macaron = plan.productsToInsert.filter((product) =>
+      ["LDR001", "LDR002", "LDR003", "LDR004", "LDR005", "LDR006", "LDR007", "LDR008"].includes(
+        product.sku,
+      ),
+    );
+    const eugenie = plan.productsToInsert.filter((product) =>
+      ["LDR013", "LDR014", "LDR015"].includes(product.sku),
+    );
+    assert.equal(macaron.length, 8);
+    assert.equal(eugenie.length, 3);
+
+    const macaronLabels = [
+      "Almond",
+      "Chocolate",
+      "Coffee",
+      "Dubai Chocolate — Limited Edition — currently Unavailable",
+      "Lemon",
+      "Marie-Antoinette Tea",
+      "Matcha — Limited Edition",
+      "Orange Blossom",
+      "Passion Fruit",
+      "Pistachio",
+      "Raspberry",
+      "Rose",
+      "Salted Caramel",
+      "Strawberry Candy Marshmallow — Limited Edition",
+      "Vanilla",
+    ];
+    const eugenieLabels = [
+      "Caramel",
+      "Chocolate",
+      "Coconut — Seasonal",
+      "Hazelnut",
+      "Matcha — Seasonal",
+      "Passion Fruit",
+      "Peanut — Seasonal",
+      "Pistachio",
+      "Rose",
+      "Strawberry",
+      "Vanilla",
+    ];
+
+    for (const product of macaron) {
+      const group = product.modifierGroups[0];
+      assert.ok(group);
+      assert.deepEqual(group.options, macaronLabels);
+      assert.equal(group.optionDetails?.length, 15);
+      assert.ok(group.optionDetails?.every((detail) => detail.priceMinor === 0));
+      const dubai = group.optionDetails?.find((detail) =>
+        detail.label.startsWith("Dubai Chocolate"),
+      );
+      assert.equal(dubai?.isActive, false);
+      assert.ok(
+        group.optionDetails
+          ?.filter((detail) => !detail.label.startsWith("Dubai Chocolate"))
+          .every((detail) => detail.isActive === true),
+      );
+    }
+
+    const qtyBySku: Record<string, number> = {
+      LDR013: 6,
+      LDR014: 12,
+      LDR015: 18,
+    };
+    for (const product of eugenie) {
+      const group = product.modifierGroups[0];
+      assert.ok(group);
+      assert.equal(group.exactSelectionQuantity, qtyBySku[product.sku]);
+      assert.deepEqual(group.options, eugenieLabels);
+      assert.ok(group.optionDetails?.every((detail) => detail.priceMinor === 0));
+      assert.ok(group.optionDetails?.every((detail) => detail.isActive === true));
+    }
+
+    const serialized = JSON.stringify(plan.productsToInsert);
+    assert.equal(serialized.includes("Ice Pack"), false);
+    assert.equal(serialized.includes("gifting-ribbon"), false);
+    assert.equal(serialized.includes("packing-options"), false);
+  });
+
   it("guards macaron configurable-box sizes 8/15/20/28/35/42", () => {
     const rows = fromThailandProductMaster();
     const macaronSizes = rows
@@ -245,7 +331,8 @@ describe("Sprint 35C-1 — Production Product Master importer", () => {
   });
 
   it("classifies explicit null price as pending and never defaults 0, 1, or SGD", () => {
-    const rows = fromThailandProductMaster();
+    const rows = cloneRows();
+    for (const row of rows) row.priceThb = null;
     const validation = validateProductMasterImport(rows);
     assert.equal(
       validation.issues.filter((item) => item.code === "PRICE_PENDING").length,
@@ -353,19 +440,17 @@ describe("Sprint 35C-1 — Production Product Master importer", () => {
     assert.equal(plan.mediaToInsert.length, 0);
     assert.equal(plan.productImagesToInsert.length, 0);
     for (const product of plan.productsToInsert) {
-      assert.equal(product.priceMinor, null);
       assert.equal(product.allergenLabel, null);
       assert.equal(product.allergenText, null);
       assert.equal(product.storageLabel, null);
       assert.equal(product.storageText, null);
       assert.equal(product.isActive, false);
       assert.equal(product.available, false);
-      assert.equal(product.deliveryEligible, false);
+      assert.equal(product.deliveryEligible, true);
       assert.equal(product.mediaReferences.length, 0);
     }
     const serialized = JSON.stringify(plan.productsToInsert);
     assert.equal(serialized.includes("/product-placeholder.svg"), false);
-    assert.equal(serialized.includes("990"), false);
     assert.equal(serialized.includes("priceSgd"), false);
     assert.equal(serialized.includes("Napoléon III"), false);
   });
@@ -393,19 +478,79 @@ describe("Sprint 35C-1 — Production Product Master importer", () => {
     assert.ok(memory.state.categories.length >= 1);
   });
 
-  it("refuses execute when the live Product Master commercial data is still pending", async () => {
+  it("allows safe Draft execute when owner draft-import fields are present", async () => {
     const memory = createMemoryWriter();
+    const result = await executeProductMasterImport(fromThailandProductMaster(), {
+      execute: true,
+      confirm: PRODUCT_MASTER_IMPORT_CONFIRM,
+      writer: memory.writer,
+    });
+    assert.equal(result.wrote, true);
+    assert.equal(result.plan.validation.draftImportReady, true);
+    assert.equal(result.plan.validation.commerciallyComplete, false);
+    assert.equal(memory.state.products.length, 38);
+    assert.ok(
+      result.plan.productsToInsert.every(
+        (product) => product.isActive === false && product.available === false,
+      ),
+    );
+  });
+
+  it("refuses execute when required draft-import prices are missing", async () => {
+    const memory = createMemoryWriter();
+    const rows = cloneRows();
+    for (const row of rows) row.priceThb = null;
     await assert.rejects(
       () =>
-        executeProductMasterImport(fromThailandProductMaster(), {
+        executeProductMasterImport(rows, {
           execute: true,
           confirm: PRODUCT_MASTER_IMPORT_CONFIRM,
           writer: memory.writer,
         }),
-      /commercial data is pending/,
+      /not ready for safe Draft import/,
     );
     assert.equal(memory.transactionCalls.count, 0);
     assert.equal(memory.state.products.length, 0);
+  });
+});
+
+describe("Sprint 35C — interactive transaction timeout", () => {
+  it("keeps one atomic insert-only transaction with an explicit 30s timeout", async () => {
+    assert.equal(PRODUCT_MASTER_IMPORT_TX_MAX_WAIT_MS, 10_000);
+    assert.equal(PRODUCT_MASTER_IMPORT_TX_TIMEOUT_MS, 30_000);
+
+    const source = readFileSync(
+      "lib/catalog/product-master-production-import/prisma-writer.ts",
+      "utf8",
+    );
+    assert.match(source, /prisma\.\$transaction\(\(tx\) => fn\(adaptTx\(tx\)\), \{/);
+    assert.match(source, /maxWait:\s*PRODUCT_MASTER_IMPORT_TX_MAX_WAIT_MS/);
+    assert.match(source, /timeout:\s*PRODUCT_MASTER_IMPORT_TX_TIMEOUT_MS/);
+    assert.equal(source.includes("upsert"), false);
+
+    const rollback = createMemoryWriter({ failOnSku: "LDR020" });
+    const rolledBack = await executeProductMasterImport(commerciallyCompleteRows(), {
+      execute: true,
+      confirm: PRODUCT_MASTER_IMPORT_CONFIRM,
+      writer: rollback.writer,
+    });
+    assert.equal(rolledBack.wrote, false);
+    assert.equal(rolledBack.rolledBack, true);
+    assert.equal(rollback.state.products.length, 0);
+    assert.equal(rollback.state.categories.length, 0);
+    assert.equal(rollback.transactionCalls.count, 1);
+
+    const existing = createMemoryWriter({ existingSkus: ["LDR003"] });
+    const refused = await executeProductMasterImport(commerciallyCompleteRows(), {
+      execute: true,
+      confirm: PRODUCT_MASTER_IMPORT_CONFIRM,
+      writer: existing.writer,
+    });
+    assert.equal(refused.wrote, false);
+    assert.equal(refused.rolledBack, true);
+    assert.equal(existing.state.products.length, 0);
+    assert.match(refused.errorMessage ?? "", /SKU already exists/);
+    assert.equal(existing.transactionCalls.count, 1);
   });
 });
 

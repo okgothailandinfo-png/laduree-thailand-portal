@@ -69,11 +69,18 @@ export type PrismaCatalogWriter = CatalogWriter & {
   disconnect(): Promise<void>;
 };
 
+/** Prisma interactive $transaction defaults to 5000 ms; too short for 8+38 Neon inserts. */
+export const PRODUCT_MASTER_IMPORT_TX_MAX_WAIT_MS = 10_000;
+export const PRODUCT_MASTER_IMPORT_TX_TIMEOUT_MS = 30_000;
+
 export function createPrismaCatalogWriter(): PrismaCatalogWriter {
   const prisma = new PrismaClient({ log: ["error"] });
   return {
     transaction(fn) {
-      return prisma.$transaction((tx) => fn(adaptTx(tx)));
+      return prisma.$transaction((tx) => fn(adaptTx(tx)), {
+        maxWait: PRODUCT_MASTER_IMPORT_TX_MAX_WAIT_MS,
+        timeout: PRODUCT_MASTER_IMPORT_TX_TIMEOUT_MS,
+      });
     },
     async disconnect() {
       await prisma.$disconnect();

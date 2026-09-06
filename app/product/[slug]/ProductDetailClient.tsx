@@ -550,7 +550,12 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
                             <table className="table-product-detail">
                               <tbody>
-                                {group.options.map((option) => {
+                                {group.options.filter((option) => {
+                                  const detail = group.optionDetails?.find(
+                                    (entry) => entry.label === option,
+                                  );
+                                  return detail?.isActive !== false;
+                                }).map((option) => {
                                   const optionKey = `${group.id}:${option}`;
                                   const optionQty = modifierQty[optionKey] ?? 0;
                                   const optionPrice = getOptionPriceMinor(
