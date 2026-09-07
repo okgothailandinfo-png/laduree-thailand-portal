@@ -53,5 +53,6 @@ describe("product detail invalid price blocks ADD", () => {
     assert.match(source, /configuredUnitPriceMinor === null/);
     assert.match(source, /This product is unavailable at this time\./);
     assert.match(source, /htmlFor=\"VariantRemark\"/);
+    assert.match(source, /detail\?\.isActive !== false/);
   });
 });

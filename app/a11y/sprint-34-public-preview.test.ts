@@ -231,7 +231,6 @@ describe("Sprint 34 — TEST 1 LDR001–LDR038 remain non-purchasable", () => {
       assert.equal(result.purchasable, false, product.sku);
       assert.ok(result.reasons.includes("INACTIVE"));
       assert.ok(result.reasons.includes("UNAVAILABLE"));
-      assert.ok(result.reasons.includes("PRICE_UNAVAILABLE"));
     }
     assert.equal(MOCK_PRODUCTS.length, 38);
     assert.ok(MOCK_PRODUCTS.every((product) => !evaluateProductPurchasability(product).purchasable));
@@ -485,14 +484,15 @@ describe("Sprint 34 — TEST 7 public preview remains noindex", () => {
 });
 
 describe("Sprint 34 — TEST 8–9 no Singapore prices or fabricated commercial data", () => {
-  it("imports THB-only null Safe-Draft prices", () => {
-    assert.ok(THAILAND_PRODUCT_MASTER.every((row) => row.priceThb === null));
+  it("imports THB-only Product Master prices without SGD", () => {
+    assert.ok(THAILAND_PRODUCT_MASTER.every((row) => typeof row.priceThb === "number" && row.priceThb > 0));
     const catalog = buildThailandCatalog();
     for (const product of catalog.products) {
       assert.equal(product.currency, "THB");
-      assert.equal(product.priceMinor, null);
-      assert.equal(product.priceThb, null);
-      assert.equal(product.deliveryEligible, false);
+      assert.ok(typeof product.priceMinor === "number" && product.priceMinor > 0);
+      assert.equal(product.deliveryEligible, true);
+      assert.equal(product.isActive, false);
+      assert.equal(product.available, false);
     }
     const masterJson = JSON.stringify(THAILAND_PRODUCT_MASTER);
     assert.doesNotMatch(masterJson, /priceSgd|SGD/);

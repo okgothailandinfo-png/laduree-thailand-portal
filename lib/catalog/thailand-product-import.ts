@@ -7,6 +7,7 @@ import {
   THAILAND_ALL_ITEMS_CATEGORY,
   THAILAND_CATEGORY_HIERARCHY,
   THAILAND_PRODUCT_MASTER,
+  flavorMasterForGroup,
   type ThailandProductMasterRow,
 } from "@/data/thailand-product-master";
 import {
@@ -277,6 +278,7 @@ function buildModifierGroups(
       ? "Choice of Eugénie chocolates:"
       : "Choice of Macarons:";
 
+  const flavorMaster = flavorMasterForGroup(row.selectionGroup);
   return [
     {
       id: groupId,
@@ -289,8 +291,13 @@ function buildModifierGroups(
       maxSelection: qty,
       sortOrder: 1,
       isActive: true,
-      // Empty until owner-approved Thailand option lists exist.
       options: [...row.selectionOptions],
+      optionDetails: flavorMaster.map((option, index) => ({
+        label: option.label,
+        priceMinor: Math.round(option.priceThb * 100),
+        isActive: option.isActive,
+        sortOrder: index + 1,
+      })),
     },
   ];
 }
